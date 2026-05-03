@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.BannerMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BannerResult" type="com.xms.dao.entity.domain.Banner">
+        <id column="id" property="id" />
+        <result column="image" property="image" />
+        <result column="url" property="url" />
+        <result column="notice_id" property="noticeId" />
+        <result column="sort" property="sort" />
+        <result column="content" property="content" />
+        <result column="enable" property="enable" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="type" property="type" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="selectBannerVo">
+        select type, id, image, url, notice_id, sort, content, enable, create_time, update_time from t_banner
+    </sql>
+
+    <select id="getBannerList" resultMap="BannerResult">
+        select * from t_banner where enable = 0 order by sort desc limit 1
+    </select>
+
+    <select id="selectBannerList" resultType="com.xms.dao.entity.domain.Banner">
+        <include refid="selectBannerVo"/>
+        <where>
+            <if test="image != null  and image != ''"> and image = #{image}</if>
+            <if test="url != null  and url != ''"> and url = #{url}</if>
+            <if test="noticeId != null "> and notice_id = #{noticeId}</if>
+            <if test="sort != null "> and sort = #{sort}</if>
+            <if test="type != null "> and type = #{type}</if>
+            <if test="content != null  and content != ''"> and content = #{content}</if>
+            <if test="enable != null  and enable != ''"> and enable = #{enable}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

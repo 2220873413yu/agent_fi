@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.UserRelationMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.xms.dao.entity.domain.UserRelation">
+        <id column="id" property="id" />
+        <result column="par_user_id" property="parUserId" />
+        <result column="pos_user_id" property="posUserId" />
+        <result column="distance" property="distance" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="active_flag" property="activeFlag" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, par_user_id, pos_user_id, distance, create_time, update_time, active_flag
+    </sql>
+    <select id="getParentUserList" resultType="com.xms.dao.entity.domain.UserInfo">
+        SELECT
+            a.*
+        FROM
+            t_user_info a
+                INNER JOIN t_user_relation b ON a.user_id = b.par_user_id
+                AND b.active_flag = 1
+                AND b.pos_user_id = #{userId}
+                AND b.distance > 0
+        ORDER BY
+            b.distance ASC
+    </select>
+    <select id="getSonListNotMeCurrentActive" resultType="com.xms.dao.entity.domain.UserInfo">
+        select a.user_id from t_user_info a
+                                  inner join t_user_relation b on a.user_id = b.pos_user_id and b.par_user_id = #{userId}
+            and b.distance > 0 AND a.is_valid =1
+    </select>
+    <select id="getSonListNotMeCurrentActiveByDepth" resultType="com.xms.dao.entity.domain.UserInfo">
+        select a.user_id userId,b.distance bizType from t_user_info a
+                                                            inner join t_user_relation b on a.user_id = b.pos_user_id and b.par_user_id = #{userId}
+            and  b.distance >0 and b.distance &lt;= #{depth} AND a.is_valid =1
+    </select>
+</mapper>

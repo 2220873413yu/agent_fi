@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.DiyStoreProductAttrValueMapper">
+
+    <resultMap type="DiyStoreProductAttrValue" id="DiyStoreProductAttrValueResult">
+        <result property="id"    column="id"    />
+        <result property="productId"    column="product_id"    />
+        <result property="sku"    column="sku"    />
+        <result property="stock"    column="stock"    />
+        <result property="sales"    column="sales"    />
+        <result property="price"    column="price"    />
+        <result property="image"    column="image"    />
+        <result property="codeUnique"    column="code_unique"    />
+        <result property="cost"    column="cost"    />
+        <result property="barCode"    column="bar_code"    />
+        <result property="weight"    column="weight"    />
+        <result property="volume"    column="volume"    />
+        <result property="brokerage"    column="brokerage"    />
+        <result property="brokerageTwo"    column="brokerage_two"    />
+        <result property="pinkPrice"    column="pink_price"    />
+        <result property="pinkStock"    column="pink_stock"    />
+        <result property="seckillPrice"    column="seckill_price"    />
+        <result property="seckillStock"    column="seckill_stock"    />
+        <result property="integral"    column="integral"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="deleted"    column="deleted"    />
+        <result property="imageEn"    column="image_en"    />
+    </resultMap>
+
+    <sql id="selectDiyStoreProductAttrValueVo">
+        select image_en, id, product_id, sku, stock, sales, price, image, code_unique, cost, bar_code, weight, volume, brokerage, brokerage_two, pink_price, pink_stock, seckill_price, seckill_stock, integral, create_time, update_time, deleted from xms_diy_store_product_attr_value
+    </sql>
+
+    <select id="selectDiyStoreProductAttrValueList" parameterType="DiyStoreProductAttrValue"
+            resultMap="DiyStoreProductAttrValueResult">
+        <include refid="selectDiyStoreProductAttrValueVo"/>
+        <where>
+            <if test="productId != null  and productId != ''"> and product_id = #{productId}</if>
+            <if test="sku != null  and sku != ''"> and sku = #{sku}</if>
+            <if test="stock != null  and stock != ''"> and stock = #{stock}</if>
+            <if test="sales != null  and sales != ''"> and sales = #{sales}</if>
+            <if test="price != null "> and price = #{price}</if>
+            <if test="image != null  and image != ''"> and image = #{image}</if>
+            <if test="codeUnique != null  and codeUnique != ''"> and code_unique = #{codeUnique}</if>
+            <if test="cost != null "> and cost = #{cost}</if>
+            <if test="barCode != null  and barCode != ''"> and bar_code = #{barCode}</if>
+            <if test="weight != null "> and weight = #{weight}</if>
+            <if test="volume != null "> and volume = #{volume}</if>
+            <if test="brokerage != null "> and brokerage = #{brokerage}</if>
+            <if test="brokerageTwo != null "> and brokerage_two = #{brokerageTwo}</if>
+            <if test="pinkPrice != null "> and pink_price = #{pinkPrice}</if>
+            <if test="pinkStock != null "> and pink_stock = #{pinkStock}</if>
+            <if test="seckillPrice != null "> and seckill_price = #{seckillPrice}</if>
+            <if test="seckillStock != null "> and seckill_stock = #{seckillStock}</if>
+            <if test="integral != null "> and integral = #{integral}</if>
+        </where>
+        order by id desc
+    </select>
+
+	<delete id="deletePhysicalByProductId">
+		DELETE FROM xms_diy_store_product_attr_value WHERE product_id = #{productId}
+	</delete>
+
+</mapper>

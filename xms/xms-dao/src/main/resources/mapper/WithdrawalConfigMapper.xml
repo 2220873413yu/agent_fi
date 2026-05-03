@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.WithdrawalConfigMapper">
+
+    <resultMap type="WithdrawalConfig" id="WithdrawalConfigResult">
+        <result property="id"    column="id"    />
+        <result property="coinType"    column="coin_type"    />
+        <result property="withdrawOpen"    column="withdraw_open"    />
+        <result property="minWithdrawAmount"    column="min_withdraw_amount"    />
+        <result property="dailyFreeAuditCount"    column="daily_free_audit_count"    />
+        <result property="withdrawLimit"    column="withdraw_limit"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+        <result property="feeRatio"    column="fee_ratio"    />
+
+    </resultMap>
+
+    <sql id="selectWithdrawalConfigVo">
+        select fee_ratio, id, coin_type, withdraw_open, min_withdraw_amount, daily_free_audit_count, withdraw_limit, create_time, update_time, remark from t_withdrawal_config
+    </sql>
+
+    <select id="selectWithdrawalConfigList" parameterType="WithdrawalConfig"
+            resultMap="WithdrawalConfigResult">
+        <include refid="selectWithdrawalConfigVo"/>
+        <where>
+            <if test="coinType != null "> and coin_type = #{coinType}</if>
+            <if test="withdrawOpen != null "> and withdraw_open = #{withdrawOpen}</if>
+            <if test="minWithdrawAmount != null "> and min_withdraw_amount = #{minWithdrawAmount}</if>
+            <if test="dailyFreeAuditCount != null "> and daily_free_audit_count = #{dailyFreeAuditCount}</if>
+            <if test="withdrawLimit != null "> and withdraw_limit = #{withdrawLimit}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

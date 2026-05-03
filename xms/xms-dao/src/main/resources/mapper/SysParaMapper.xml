@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.SysParaMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="SysParaResult" type="com.xms.dao.entity.domain.SysPara">
+        <id column="sys_para_id" property="sysParaId" />
+        <result column="para_code" property="paraCode" />
+        <result column="para_value" property="paraValue" />
+        <result column="para_desc" property="paraDesc" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="active_flag" property="activeFlag" />
+        <result column="remark" property="remark" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="selectSysParaVo">
+        select remark, sys_para_id, para_code, para_value, para_desc, visible, create_time, update_time, active_flag from t_sys_para
+    </sql>
+
+    <select id="getValue" resultType="String" >
+    	select para_value from t_sys_para where para_code = #{code} limit 1
+    </select>
+
+    <select id="selectSysParaList" parameterType="com.xms.dao.entity.domain.SysPara" resultMap="SysParaResult">
+        <include refid="selectSysParaVo"/>
+        <where>
+            <if test="paraCode != null  and paraCode != ''"> and para_code = #{paraCode}</if>
+            <if test="paraValue != null  and paraValue != ''"> and para_value = #{paraValue}</if>
+            <if test="paraDesc != null  and paraDesc != ''"> and para_desc like concat('%', #{paraDesc}, '%')</if>
+            <if test="remark != null  and remark != ''"> and remark like concat('%', #{remark}, '%')</if>
+            and visible = 0
+            and active_flag = 1
+        </where>
+        order by sys_para_id desc
+    </select>
+    <select id="listParams" resultType="com.xms.dao.entity.domain.SysPara">
+        select * from t_sys_para where para_code in
+        <foreach item="code" collection="array" open="(" separator="," close=")">
+            #{code}
+        </foreach>
+    </select>
+</mapper>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.RechargeRecordMapper">
+
+    <resultMap type="com.xms.dao.domain.RechargeRecord" id="RechargeRecordResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="coinType"    column="coin_type"    />
+        <result property="orderNo"    column="order_no"    />
+        <result property="rechargeAmount"    column="recharge_amount"    />
+        <result property="status"    column="status"    />
+        <result property="remark"    column="remark"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="deleted"    column="deleted"    />
+        <result property="txId"    column="tx_id"    />
+    </resultMap>
+
+    <sql id="selectRechargeRecordVo">
+        select coin_type, tx_id, id, user_id, order_no, recharge_amount,
+               status,  remark,create_time, update_time from t_recharge_record
+    </sql>
+
+    <select id="selectRechargeRecordList" parameterType="RechargeRecord"
+            resultMap="RechargeRecordResult">
+        <include refid="selectRechargeRecordVo"/>
+        <where>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="coinType != null "> and coin_type = #{coinType}</if>
+            <if test="remark != null "> and remark = #{remark}</if>
+            <if test="orderNo != null  and orderNo != ''"> and order_no = #{orderNo}</if>
+            <if test="txId != null  and txId != ''"> and tx_id = #{txId}</if>
+            <if test="rechargeAmount != null "> and recharge_amount = #{rechargeAmount}</if>
+            <if test="status != null "> and status = #{status}</if>
+            <if test="createTime != null "> and create_time = #{createTime}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

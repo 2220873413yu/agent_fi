@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.MqTransactionLogMapper">
+
+    <resultMap type="MqTransactionLog" id="MqTransactionLogResult">
+        <result property="id"    column="id"    />
+        <result property="transactionId"    column="transaction_id"    />
+        <result property="log"    column="log"    />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectMqTransactionLogVo">
+        select id, transaction_id, log, create_time from t_mq_transaction_log
+    </sql>
+
+    <select id="selectMqTransactionLogList" parameterType="MqTransactionLog"
+            resultMap="MqTransactionLogResult">
+        <include refid="selectMqTransactionLogVo"/>
+        <where>
+            <if test="transactionId != null  and transactionId != ''"> and transaction_id = #{transactionId}</if>
+            <if test="log != null  and log != ''"> and log = #{log}</if>
+        </where>
+    </select>
+
+</mapper>

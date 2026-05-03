@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.UserLevelConfigMapper">
+
+    <resultMap type="UserLevelConfig" id="UserLevelConfigResult">
+        <result property="id"    column="id"    />
+        <result property="level"    column="level"    />
+        <result property="teamPerformance"    column="team_performance"    />
+        <result property="performance"    column="performance"    />
+        <result property="communityPerformance"    column="community_performance"    />
+        <result property="requiredLegNum"    column="required_leg_num"    />
+        <result property="legLevelMin"    column="leg_level_min"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+        <result property="deleted"    column="deleted"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="legLevelCount"    column="leg_level_count"    />
+    </resultMap>
+
+    <sql id="selectUserLevelConfigVo">
+        select performance, leg_level_count, id, level, team_performance, community_performance, required_leg_num, leg_level_min, create_time, update_time, remark, deleted, create_by, update_by from t_user_level_config
+    </sql>
+
+    <select id="selectUserLevelConfigList" parameterType="UserLevelConfig"
+            resultMap="UserLevelConfigResult">
+        <include refid="selectUserLevelConfigVo"/>
+        <where>
+            <if test="level != null "> and level = #{level}</if>
+            <if test="teamPerformance != null "> and team_performance = #{teamPerformance}</if>
+            <if test="communityPerformance != null "> and community_performance = #{communityPerformance}</if>
+            <if test="requiredLegNum != null "> and required_leg_num = #{requiredLegNum}</if>
+            <if test="legLevelMin != null "> and leg_level_min = #{legLevelMin}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

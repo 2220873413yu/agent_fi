@@ -1,0 +1,126 @@
+# 项目相关配置
+xms:
+  # 名称
+  name: xms
+  # 版本
+  version: 3.8.5
+  # 版权年份
+  copyrightYear: 2023
+  # 实例演示开关
+  demoEnabled: true
+  # 文件路径 示例（ Windows配置D:/xms/uploadPath，Linux配置 /home/xms/uploadPath）
+  profile: ./uploadPath
+  #profile: D:/xms/uploadPath
+  # 获取ip地址开关
+  addressEnabled: false
+  # 验证码类型 math 数组计算 char 字符验证
+  captchaType: math
+  # 扫描的mapper
+  # auto-scan-mapper: com.xms.**.mapper,;com.d3code.**.mapper
+  auto-scan-mapper: com.xms.**.mapper
+  # 扫描的目录
+  # auto-scan-package: com.xms,;com.d3code
+  auto-scan-package: com.xms
+  # 验证码类型
+  captcha-type: math
+  #redis srtream配置
+  stream:
+    # redis是否开启stream 队列
+    enable: true
+    # 默认：服务名 + 环境
+    consumerGroup: xms-admin
+    # 消费者费者名称，默认：ip + 端口
+    consumerName:
+    #poll 批量大小
+    pollBatchSize:
+    #poll 超时时间 秒
+    pollTimeout:
+    #消费重试次数
+    maxAttempts: 4
+    #重试间隔时间,单位毫秒
+    backOffInitialInterval: 2000
+    #重试间隔时间的倍数  相邻两次重试之间的间隔时间的倍数。默认2，即第二次是第一次间隔时间的2倍，第三次是第二次的2倍
+    backOffMultiplier: 2
+
+# 日志配置
+logging:
+  level:
+    com.xms: debug
+    org.springframework: warn
+
+# 用户配置
+user:
+  password:
+    # 密码最大错误次数
+    maxRetryCount: 5
+    # 密码锁定时间（默认10分钟）
+    lockTime: 10
+
+# Spring配置
+spring:
+  #开启虚拟线程
+  threads:
+    virtual:
+      enabled: true
+  # 资源信息
+  messages:
+    # 国际化资源文件路径
+    basename: i18n/messages
+  profiles:
+    active: dev
+  # 文件上传
+  servlet:
+    multipart:
+      # 单个文件大小
+      max-file-size:  10MB
+      # 设置总上传的文件大小
+      max-request-size:  20MB
+      location: ./uploadPath
+  # 服务模块
+  devtools:
+    restart:
+      # 热部署开关
+      enabled: false
+
+
+# Mybatis配置
+mybatis-plus:
+  #global-config:
+  #db-config:
+  #logic-delete-field: deleted
+  #logic-delete-value: 1
+  #logic-not-delete-value: 0
+  mapper-locations: classpath*:mapper/**/*Mapper.xml
+  configuration:
+    cache-enabled: true
+    use-generated-keys: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    default-executor-type: SIMPLE
+  #type-aliases-package: com.xms.**.domain,;com.d3code.**.domain
+  type-aliases-package: com.xms.**.domain
+
+# PageHelper分页插件
+pagehelper:
+  helperDialect: mysql
+  supportMethodsArguments: true
+  params: count=countSql
+
+# Swagger配置
+swagger:
+  # 是否开启swagger
+  enabled: false
+  # 请求前缀
+  pathMapping: /dev-web
+
+# 防止XSS攻击
+xss:
+  # 过滤开关
+  enabled: true
+  # 排除链接（多个用逗号分隔）
+  excludes: /system/notice
+  # 匹配链接
+  urlPatterns: /system/*,/monitor/*,/tool/*
+
+google:
+  key: VEKS7MX4TGG2YR55
+

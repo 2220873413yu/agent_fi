@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.DiyStoreProductMapper">
+
+    <resultMap type="DiyStoreProduct" id="DiyStoreProductResult">
+        <result property="id"    column="id"    />
+        <result property="productName"    column="product_name"    />
+        <result property="productCode"    column="product_code"    />
+        <result property="coverImage"    column="cover_image"    />
+        <result property="sliderImage"    column="slider_image"    />
+        <result property="detailImage"    column="detail_image"    />
+        <result property="price"    column="price"    />
+        <result property="sales"    column="sales"    />
+        <result property="stock"    column="stock"    />
+        <result property="isEnabled"    column="is_enabled"    />
+        <result property="sort"    column="sort"    />
+        <result property="remark"    column="remark"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="deleted"    column="deleted"    />
+        <result property="specType"    column="spec_type"    />
+
+        <result property="productNameEn"    column="product_name_en"    />
+        <result property="coverImageEn"    column="cover_image_en"    />
+        <result property="sliderImageEn"    column="slider_image_en"    />
+        <result property="detailImageEn"    column="detail_image_en"    />
+
+    </resultMap>
+
+    <sql id="selectDiyStoreProductVo">
+        select product_name_en, cover_image_en, slider_image_en, detail_image_en,spec_type, id, product_name, product_code, cover_image, slider_image, detail_image, price, sales, stock, is_enabled, sort, remark, create_time, create_by, update_time, update_by, deleted from xms_diy_store_product
+    </sql>
+
+    <select id="selectDiyStoreProductList" parameterType="DiyStoreProduct"
+            resultMap="DiyStoreProductResult">
+        <include refid="selectDiyStoreProductVo"/>
+        <where>
+            <if test="productName != null  and productName != ''"> and product_name like concat('%', #{productName}, '%')</if>
+            <if test="productCode != null  and productCode != ''"> and product_code = #{productCode}</if>
+            <if test="coverImage != null  and coverImage != ''"> and cover_image = #{coverImage}</if>
+            <if test="sliderImage != null  and sliderImage != ''"> and slider_image = #{sliderImage}</if>
+            <if test="detailImage != null  and detailImage != ''"> and detail_image = #{detailImage}</if>
+            <if test="price != null "> and price = #{price}</if>
+            <if test="specType != null "> and specType = #{spec_type}</if>
+            <if test="sales != null  and sales != ''"> and sales = #{sales}</if>
+            <if test="stock != null "> and stock = #{stock}</if>
+            <if test="isEnabled != null "> and is_enabled = #{isEnabled}</if>
+            <if test="sort != null "> and sort = #{sort}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

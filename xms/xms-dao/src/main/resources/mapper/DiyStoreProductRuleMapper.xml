@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.DiyStoreProductRuleMapper">
+
+    <resultMap type="DiyStoreProductRule" id="DiyStoreProductRuleResult">
+        <result property="id"    column="id"    />
+        <result property="ruleName"    column="rule_name"    />
+        <result property="ruleNameEn"    column="rule_name_en"    />
+        <result property="ruleValue"    column="rule_value"    />
+        <result property="ruleValueEn"    column="rule_value_en"    />
+        <result property="remark"    column="remark"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="deleted"    column="deleted"    />
+    </resultMap>
+
+    <sql id="selectDiyStoreProductRuleVo">
+        select id, rule_name, rule_name_en, rule_value, rule_value_en, remark, create_time, create_by, update_time, update_by, deleted from xms_diy_store_product_rule
+    </sql>
+
+    <select id="selectDiyStoreProductRuleList" parameterType="DiyStoreProductRule"
+            resultMap="DiyStoreProductRuleResult">
+        <include refid="selectDiyStoreProductRuleVo"/>
+        <where>
+            <if test="ruleName != null  and ruleName != ''"> and rule_name like concat('%', #{ruleName}, '%')</if>
+            <if test="ruleNameEn != null  and ruleNameEn != ''"> and rule_name_en like concat('%', #{ruleNameEn}, '%')</if>
+            <if test="ruleValue != null  and ruleValue != ''"> and rule_value = #{ruleValue}</if>
+            <if test="ruleValueEn != null  and ruleValueEn != ''"> and rule_value_en = #{ruleValueEn}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

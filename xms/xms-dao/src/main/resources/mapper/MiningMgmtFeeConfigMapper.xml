@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.MiningMgmtFeeConfigMapper">
+
+    <resultMap type="MiningMgmtFeeConfig" id="MiningMgmtFeeConfigResult">
+        <result property="id"    column="id"    />
+        <result property="feePoolRatio"    column="fee_pool_ratio"    />
+        <result property="agentDiffCountyRatio"    column="agent_diff_county_ratio"    />
+        <result property="agentDiffAreaRatio"    column="agent_diff_area_ratio"    />
+        <result property="agentDiffCityRatio"    column="agent_diff_city_ratio"    />
+        <result property="agentDiffProvinceRatio"    column="agent_diff_province_ratio"    />
+        <result property="agentDiffNationalRatio"    column="agent_diff_national_ratio"    />
+        <result property="nationalSameLevelRatio"    column="national_same_level_ratio"    />
+        <result property="platformFeeRatio"    column="platform_fee_ratio"    />
+        <result property="directPushRatio"    column="direct_push_ratio"    />
+        <result property="indirectPushRatio"    column="indirect_push_ratio"    />
+        <result property="serviceCenterRatio"    column="service_center_ratio"    />
+        <result property="remark"    column="remark"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="deleted"    column="deleted"    />
+    </resultMap>
+
+    <sql id="selectMiningMgmtFeeConfigVo">
+        select id, fee_pool_ratio, agent_diff_county_ratio, agent_diff_area_ratio, agent_diff_city_ratio, agent_diff_province_ratio, agent_diff_national_ratio, national_same_level_ratio, platform_fee_ratio, direct_push_ratio, indirect_push_ratio, service_center_ratio, remark, create_time, update_time, deleted from t_mining_mgmt_fee_config
+    </sql>
+
+    <select id="selectMiningMgmtFeeConfigList" parameterType="MiningMgmtFeeConfig"
+            resultMap="MiningMgmtFeeConfigResult">
+        <include refid="selectMiningMgmtFeeConfigVo"/>
+        <where>
+            <if test="feePoolRatio != null "> and fee_pool_ratio = #{feePoolRatio}</if>
+            <if test="agentDiffCountyRatio != null "> and agent_diff_county_ratio = #{agentDiffCountyRatio}</if>
+            <if test="agentDiffAreaRatio != null "> and agent_diff_area_ratio = #{agentDiffAreaRatio}</if>
+            <if test="agentDiffCityRatio != null "> and agent_diff_city_ratio = #{agentDiffCityRatio}</if>
+            <if test="agentDiffProvinceRatio != null "> and agent_diff_province_ratio = #{agentDiffProvinceRatio}</if>
+            <if test="agentDiffNationalRatio != null "> and agent_diff_national_ratio = #{agentDiffNationalRatio}</if>
+            <if test="nationalSameLevelRatio != null "> and national_same_level_ratio = #{nationalSameLevelRatio}</if>
+            <if test="platformFeeRatio != null "> and platform_fee_ratio = #{platformFeeRatio}</if>
+            <if test="directPushRatio != null "> and direct_push_ratio = #{directPushRatio}</if>
+            <if test="indirectPushRatio != null "> and indirect_push_ratio = #{indirectPushRatio}</if>
+            <if test="serviceCenterRatio != null "> and service_center_ratio = #{serviceCenterRatio}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

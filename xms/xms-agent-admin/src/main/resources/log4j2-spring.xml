@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <Properties>
+        <!-- 日志存放路径 -->
+        <property name="log.path" value="./logs" />
+
+        <!-- 日志输出格式 -->
+        <property name="log.pattern" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{correlationId}] %-5level %logger{20}   -[%method->%line]  - %msg%n" />
+        <!-- 定义日志存储的路径 -->
+        <!--    <property name="FILE_PATH" value="logs"/>
+            <property name="FILE_NAME" value="newframe"/>-->
+    </Properties>
+
+    <Appenders>
+        <!--*********************控制台日志***********************-->
+        <Console name="consoleAppender" target="SYSTEM_OUT">
+            <!--设置日志格式及颜色-->
+            <PatternLayout pattern="${log.pattern}" charset="UTF-8"/>
+        </Console>
+
+    </Appenders>
+
+    <Loggers>
+        <!-- 减少部分debug日志 -->
+        <AsyncLogger name="springfox.bean.validators" level="ERROR"/>
+        <!-- 基础组件 -->
+        <AsyncLogger name="com.xms" level="info"/>
+        <!-- blade日志 -->
+        <AsyncLogger name="org.springframework" level="warn"/>
+
+        <AsyncRoot  level="INFO" additivity="false">
+            <AppenderRef ref="consoleAppender" />
+        </AsyncRoot >
+    </Loggers>
+
+</configuration>

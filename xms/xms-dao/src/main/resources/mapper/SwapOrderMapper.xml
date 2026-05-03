@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.SwapOrderMapper">
+
+    <resultMap type="SwapOrder" id="SwapOrderResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="address"    column="address"    />
+        <result property="swapAmount"    column="swap_amount"    />
+        <result property="availableAmount"    column="available_amount"    />
+        <result property="txHash"    column="tx_hash"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="bizStatus"    column="biz_status"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="bizStatus1"    column="biz_status1"    />
+        <result property="expireTime"    column="expire_time"    />
+    </resultMap>
+
+    <sql id="selectSwapOrderVo">
+        select available_amount, expire_time, id, user_id, address, swap_amount, tx_hash, create_time, biz_status, update_time, biz_status1 from t_swap_order
+    </sql>
+
+    <select id="selectSwapOrderList" parameterType="SwapOrder"
+            resultMap="SwapOrderResult">
+        <include refid="selectSwapOrderVo"/>
+        <where>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="address != null  and address != ''"> and address = #{address}</if>
+            <if test="swapAmount != null "> and swap_amount = #{swapAmount}</if>
+            <if test="txHash != null  and txHash != ''"> and tx_hash = #{txHash}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            <if test="bizStatus != null "> and biz_status = #{bizStatus}</if>
+            <if test="bizStatus1 != null "> and biz_status1 = #{bizStatus1}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

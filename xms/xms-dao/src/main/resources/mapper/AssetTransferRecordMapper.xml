@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.AssetTransferRecordMapper">
+
+    <resultMap type="AssetTransferRecord" id="AssetTransferRecordResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="fromAddress"    column="from_address"    />
+        <result property="toAddress"    column="to_address"    />
+        <result property="sourceOrderNo"    column="source_order_no"    />
+        <result property="coinType"    column="coin_type"    />
+        <result property="orderNo"    column="order_no"    />
+        <result property="rechargeAmount"    column="recharge_amount"    />
+        <result property="remark"    column="remark"    />
+        <result property="arrivalAmount"    column="arrival_amount"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectAssetTransferRecordVo">
+        select id, user_id, from_address, to_address, source_order_no, coin_type, order_no, recharge_amount, remark, arrival_amount, create_time, update_time from t_asset_transfer_record
+    </sql>
+
+    <select id="selectAssetTransferRecordList" parameterType="AssetTransferRecord"
+            resultMap="AssetTransferRecordResult">
+        <include refid="selectAssetTransferRecordVo"/>
+        <where>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="fromAddress != null  and fromAddress != ''"> and from_address = #{fromAddress}</if>
+            <if test="toAddress != null  and toAddress != ''"> and to_address = #{toAddress}</if>
+            <if test="sourceOrderNo != null  and sourceOrderNo != ''"> and source_order_no = #{sourceOrderNo}</if>
+            <if test="coinType != null "> and coin_type = #{coinType}</if>
+            <if test="orderNo != null  and orderNo != ''"> and order_no = #{orderNo}</if>
+            <if test="rechargeAmount != null "> and recharge_amount = #{rechargeAmount}</if>
+            <if test="arrivalAmount != null "> and arrival_amount = #{arrivalAmount}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

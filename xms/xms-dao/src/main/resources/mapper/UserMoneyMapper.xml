@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.UserMoneyMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="UserMoneyResult" type="com.xms.dao.entity.domain.UserMoney">
+        <id column="id" property="id" />
+        <result column="valid_num1" property="validNum1" />
+        <result column="valid_num2" property="validNum2" />
+        <result column="valid_num3" property="validNum3" />
+        <result column="valid_num4" property="validNum4" />
+        <result column="valid_num5" property="validNum5" />
+        <result column="valid_num6" property="validNum6" />
+        <result column="valid_num7" property="validNum7" />
+        <result column="valid_num8" property="validNum8" />
+        <result column="valid_num9" property="validNum9" />
+        <result column="update_time" property="updateTime" />
+        <result column="update_time" property="updateTime" />
+        <result property="deleted"    column="deleted"    />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="selectUserMoneyVo">
+        select deleted, id, user_id, valid_num1, valid_num2, valid_num3, valid_num4, valid_num5, valid_num6, valid_num7, valid_num8, valid_num9,  update_time from t_user_money
+    </sql>
+
+    <update id="updateUserMoney">
+        update t_user_money
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="validNum1 != null">valid_num1 = valid_num1 + #{validNum1},</if>
+            <if test="validNum2 != null">valid_num2 = valid_num2 + #{validNum2},</if>
+            <if test="validNum3 != null">valid_num3 = valid_num3 + #{validNum3},</if>
+            <if test="validNum4 != null">valid_num4 = valid_num4 + #{validNum4},</if>
+            <if test="validNum5 != null">valid_num5 = valid_num5 + #{validNum5},</if>
+            <if test="validNum6 != null">valid_num6 = valid_num6 + #{validNum6},</if>
+            <if test="validNum7 != null">valid_num7 = valid_num7 + #{validNum7},</if>
+            <if test="validNum8 != null">valid_num8 = valid_num8 + #{validNum8},</if>
+            <if test="validNum9 != null">valid_num9 = valid_num9 + #{validNum9},</if>
+            update_time = NOW(),
+            gt_id = #{gtId},
+            source_code = #{sourceCode},
+            source_type = #{sourceType},
+            source_id = #{sourceId},
+        </trim>
+        where id = #{id}
+        <if test="validNum1 != null">and valid_num1 >= 0 - #{validNum1}</if>
+        <if test="validNum2 != null">and valid_num2 >= 0 - #{validNum2}</if>
+        <if test="validNum3 != null">and valid_num3 >= 0 - #{validNum3}</if>
+        <if test="validNum4 != null">and valid_num4 >= 0 - #{validNum4}</if>
+        <if test="validNum5 != null">and valid_num5 >= 0 - #{validNum5}</if>
+        <if test="validNum6 != null">and valid_num6 >= 0 - #{validNum6}</if>
+        <if test="validNum7 != null">and valid_num7 >= 0 - #{validNum7}</if>
+        <if test="validNum8 != null">and valid_num8 >= 0 - #{validNum8}</if>
+        <if test="validNum9 != null">and valid_num9 >= 0 - #{validNum9}</if>
+    </update>
+
+    <select id="selectUserMoneyList" parameterType="com.xms.dao.entity.domain.UserMoney" resultMap="UserMoneyResult">
+        select tum.id,  tum.valid_num1, tum.valid_num2, tum.valid_num3, tum.valid_num4, tum.valid_num5, tum.valid_num6,
+        tum.valid_num7, tum.valid_num8, tum.valid_num9,  tum.update_time, tui.account as account
+        from t_user_money  tum
+        inner join t_user_info tui
+        ON tum.id = tui.user_id
+        <where>
+            tum.deleted = 0
+            <if test="id != null "> and tum.id = #{id}</if>
+            <if test="validNum1 != null "> and valid_num1 = #{validNum1}</if>
+            <if test="validNum2 != null "> and valid_num2 = #{validNum2}</if>
+            <if test="validNum3 != null "> and valid_num3 = #{validNum3}</if>
+            <if test="validNum4 != null "> and valid_num4 = #{validNum4}</if>
+            <if test="validNum5 != null "> and valid_num5 = #{validNum5}</if>
+            <if test="validNum6 != null "> and valid_num6 = #{validNum6}</if>
+            <if test="validNum7 != null "> and valid_num7 = #{validNum7}</if>
+            <if test="validNum8 != null "> and valid_num8 = #{validNum8}</if>
+            <if test="validNum9 != null "> and valid_num9 = #{validNum9}</if>
+        </where>
+        order by tum.id desc
+    </select>
+    <update id="batchUpdateUserMoney">
+        <foreach collection="list" item="item" separator=";">
+            update t_user_money
+            set
+            <if test="item.validNum1 != null">valid_num1 = valid_num1 + #{item.validNum1},</if>
+            <if test="item.validNum2 != null">valid_num2 = valid_num2 + #{item.validNum2},</if>
+            <if test="item.validNum3 != null">valid_num3 = valid_num3 + #{item.validNum3},</if>
+            <if test="item.validNum4 != null">valid_num4 = valid_num4 + #{item.validNum4},</if>
+            <if test="item.validNum5 != null">valid_num5 = valid_num5 + #{item.validNum5},</if>
+            <if test="item.validNum6 != null">valid_num6 = valid_num6 + #{item.validNum6},</if>
+            <if test="item.validNum7 != null">valid_num7 = valid_num7 + #{item.validNum7},</if>
+            <if test="item.validNum8 != null">valid_num8 = valid_num8 + #{item.validNum8},</if>
+            <if test="item.validNum9 != null">valid_num9 = valid_num9 + #{item.validNum9},</if>
+            update_time = NOW(),
+            gt_id = #{item.gtId},
+            source_code = #{item.sourceCode},
+            source_type = #{item.sourceType},
+            source_id = #{item.sourceId}
+            where id = #{item.id}
+        </foreach>
+    </update>
+
+    <select id="queryGeSourceThresholdId" resultType="com.xms.dao.entity.bo.UserMoneyValidNum4Bo">
+        SELECT
+            m.id,
+            m.valid_num4 AS amount
+        FROM
+            t_user_money m
+                INNER JOIN
+            t_user_info i ON m.id = i.user_id
+        WHERE
+            m.valid_num4 >= #{value}
+          AND i.is_valid = 1
+    </select>
+
+    <select id="querySubReward" resultType="decimal" parameterType="long">
+            SELECT IFNULL(SUM(change_balance), 0)  from t_user_money_log
+            where user_id = #{userId}
+            and coin_type = 1 and source_type = 2
+    </select>
+
+    <select id="queryIndirectReward" resultType="decimal" parameterType="long">
+            SELECT IFNULL(SUM(change_balance), 0)  from t_user_money_log
+            where user_id = #{userId}
+            and coin_type = 1 and source_type = 3
+    </select>
+
+    <select id="getTodayReward" resultType="decimal">
+        SELECT IFNULL(SUM(change_balance), 0)  from t_user_money_log
+        where user_id = #{userId}
+          and coin_type = 2
+          and create_time >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+          and source_type in(1,2,3,4,5,6,7,8,9,10)
+    </select>
+
+    <select id="getTotalReward" resultType="decimal">
+        SELECT IFNULL(SUM(change_balance), 0)  from t_user_money_log
+        where user_id = #{userId}
+          and coin_type = 2 and source_type in(1,2,3,4,5,6,7,8,9,10)
+    </select>
+</mapper>

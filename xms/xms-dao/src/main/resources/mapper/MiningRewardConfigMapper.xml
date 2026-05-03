@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.MiningRewardConfigMapper">
+
+    <resultMap type="MiningRewardConfig" id="MiningRewardConfigResult">
+        <result property="id"    column="id"    />
+        <result property="rewardLevel"    column="reward_level"    />
+        <result property="rewardRatio"    column="reward_ratio"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectMiningRewardConfigVo">
+        select remark, id, reward_level, reward_ratio, create_time, update_time, create_by, update_by from t_mining_reward_config
+    </sql>
+
+    <select id="selectMiningRewardConfigList" parameterType="MiningRewardConfig"
+            resultMap="MiningRewardConfigResult">
+        <include refid="selectMiningRewardConfigVo"/>
+        <where>
+            <if test="rewardLevel != null "> and reward_level = #{rewardLevel}</if>
+            <if test="rewardRatio != null "> and reward_ratio = #{rewardRatio}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

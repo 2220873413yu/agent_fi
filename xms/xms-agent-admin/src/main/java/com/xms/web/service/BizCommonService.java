@@ -1,0 +1,18 @@
+package com.xms.web.service;
+
+import java.math.BigDecimal;
+
+public interface BizCommonService {
+
+	/**
+	 * 获取dfc价格
+	 * @return
+	 */
+	public BigDecimal getDFcPrice();
+
+	/**
+	 * 获取oort价格
+	 * @return
+	 */
+	public BigDecimal getOortPrice();
+}

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.MiningPackageOrderMapper">
+
+    <resultMap type="MiningPackageOrder" id="MiningPackageOrderResult">
+        <result property="id"    column="id"    />
+        <result property="miningNo"    column="mining_no"    />
+        <result property="orderNo"    column="order_no"    />
+        <result property="userId"    column="user_id"    />
+        <result property="runDays"    column="run_days"    />
+        <result property="sourceType"    column="source_type"    />
+        <result property="dayReward"    column="day_reward"    />
+        <result property="totalReward"    column="total_reward"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="status"    column="status"    />
+        <result property="bizStatus"    column="biz_status"    />
+        <result property="bizStatus1"    column="biz_status1"    />
+        <result property="remark"    column="remark"    />
+
+        <result property="payValidNum1"    column="pay_valid_num1"    />
+        <result property="payValidNum2"    column="pay_valid_num2"    />
+        <result property="payValidNum4"    column="pay_valid_num4"    />
+        <result property="dfcPrice"    column="dfc_price"    />
+        <result property="payType"    column="pay_type"    />
+        <result property="orderValueUsdt"    column="order_value_usdt"    />
+        <result property="stakeType"    column="stake_type"    />
+        <result property="stakeStartupRemainingDays"    column="stake_startup_remaining_days"    />
+        <result property="stakeDfcAmount"    column="stake_dfc_amount"    />
+        <result property="masterOrderNo"    column="master_order_no"    />
+        <result property="computingPower"    column="computing_power"    />
+        <result property="stakeDate"    column="stake_date"    />
+        <result property="trackingNo"    column="tracking_no"    />
+        <result property="shippingCompany"    column="shipping_company"    />
+        <result property="shippingStatus"    column="shipping_status"    />
+    </resultMap>
+
+    <sql id="selectMiningPackageOrderVo">
+        select tracking_no, shipping_company, shipping_status, stake_date, master_order_no, computing_power, stake_dfc_amount, stake_startup_remaining_days, stake_type, order_value_usdt, pay_type, pay_valid_num1, pay_valid_num2, pay_valid_num4, dfc_price, remark, id, mining_no, order_no, user_id,  run_days, source_type, day_reward, total_reward, create_time, update_time, status, biz_status, biz_status1 from t_mining_package_order
+    </sql>
+
+    <select id="selectMiningPackageOrderList" parameterType="MiningPackageOrder"
+            resultMap="MiningPackageOrderResult">
+        <include refid="selectMiningPackageOrderVo"/>
+        <where>
+            <if test="miningNo != null  and miningNo != ''"> and mining_no = #{miningNo}</if>
+            <if test="shippingStatus != null  and shippingStatus != ''"> and shipping_status = #{shippingStatus}</if>
+            <if test="masterOrderNo != null  and masterOrderNo != ''"> and master_order_no = #{masterOrderNo}</if>
+            <if test="orderNo != null  and orderNo != ''"> and order_no = #{orderNo}</if>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="id != null "> and id = #{id}</if>
+            <if test="stakeType != null "> and stake_type = #{stakeType}</if>
+            <if test="payType != null "> and pay_type = #{payType}</if>
+            <if test="runDays != null "> and run_days = #{runDays}</if>
+            <if test="sourceType != null "> and source_type = #{sourceType}</if>
+            <if test="dayReward != null "> and day_reward = #{dayReward}</if>
+            <if test="totalReward != null "> and total_reward = #{totalReward}</if>
+            <if test="status != null "> and status = #{status}</if>
+            <if test="bizStatus != null "> and biz_status = #{bizStatus}</if>
+            <if test="bizStatus1 != null "> and biz_status1 = #{bizStatus1}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

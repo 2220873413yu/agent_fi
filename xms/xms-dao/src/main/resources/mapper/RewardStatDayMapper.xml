@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.RewardStatDayMapper">
+
+    <resultMap type="RewardStatDay" id="RewardStatDayResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="statDate"    column="stat_date"    />
+        <result property="staticAmount"    column="static_amount"    />
+        <result property="dynamicAmount"    column="dynamic_amount"    />
+        <result property="teamAmount"    column="team_amount"    />
+        <result property="totalAmount"    column="total_amount"    />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectRewardStatDayVo">
+        select id, user_id, stat_date, static_amount, dynamic_amount, team_amount, total_amount, create_time from xms_reward_stat_day
+    </sql>
+
+    <select id="selectRewardStatDayList" parameterType="RewardStatDay"
+            resultMap="RewardStatDayResult">
+        <include refid="selectRewardStatDayVo"/>
+        <where>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="statDate != null "> and stat_date = #{statDate}</if>
+            <if test="staticAmount != null "> and static_amount = #{staticAmount}</if>
+            <if test="dynamicAmount != null "> and dynamic_amount = #{dynamicAmount}</if>
+            <if test="teamAmount != null "> and team_amount = #{teamAmount}</if>
+            <if test="totalAmount != null "> and total_amount = #{totalAmount}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

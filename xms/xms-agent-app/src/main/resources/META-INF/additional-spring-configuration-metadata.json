@@ -1,0 +1,8 @@
+{
+  "properties": [
+    {
+      "name": "renegade.lock.enabled",
+      "type": "java.lang.String",
+      "description": "Description for renegade.lock.enabled."
+  }
+] }

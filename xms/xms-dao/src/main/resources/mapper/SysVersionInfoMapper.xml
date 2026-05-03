@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.SysVersionInfoMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="SysVersionInfoResult" type="com.xms.dao.entity.domain.SysVersionInfo">
+        <id column="id" property="id" />
+        <result column="version_no" property="versionNo" />
+        <result column="version_url" property="versionUrl" />
+        <result column="status" property="status" />
+        <result column="device_type" property="deviceType" />
+        <result column="note" property="note" />
+        <result column="remark" property="remark" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="active_flag" property="activeFlag" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="selectSysVersionInfoVo">
+        select id, version_no, version_url, status, device_type, note, remark, create_time, update_time, active_flag from t_sys_version_info
+    </sql>
+
+    <select id="getLastVersion" resultType="com.xms.dao.entity.bo.SysVersionInfoBo">
+    	select
+    		id,
+			version_no versionNo,
+			version_url versionUrl,
+			status,
+			device_type deviceType,
+			note,
+			remark,
+			create_time createTime
+    	from t_sys_version_info
+    	where active_flag = 1 and device_type = #{deviceType}
+    	order by id desc limit 1
+    </select>
+
+    <select id="selectSysVersionInfoList" parameterType="com.xms.dao.entity.domain.SysVersionInfo" resultMap="SysVersionInfoResult">
+        <include refid="selectSysVersionInfoVo"/>
+        <where>
+            <if test="versionNo != null  and versionNo != ''"> and version_no = #{versionNo}</if>
+            <if test="versionUrl != null  and versionUrl != ''"> and version_url = #{versionUrl}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="deviceType != null  and deviceType != ''"> and device_type = #{deviceType}</if>
+            <if test="note != null  and note != ''"> and note = #{note}</if>
+            <if test="createTime != null "> and create_time = #{createTime}</if>
+            <if test="updateTime != null "> and update_time = #{updateTime}</if>
+            and active_flag = 1
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

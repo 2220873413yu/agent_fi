@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.NodePackageMapper">
+
+    <resultMap type="NodePackage" id="NodePackageResult">
+        <result property="id"    column="id"    />
+        <result property="name"    column="name"    />
+        <result property="sales"    column="sales"    />
+        <result property="price"    column="price"    />
+        <result property="level"    column="level"    />
+        <result property="directReferralRate"    column="direct_referral_rate"    />
+        <result property="indirectReferralRate"    column="indirect_referral_rate"    />
+        <result property="weightMultiplier"    column="weight_multiplier"    />
+        <result property="predOrderFeeReliefRate"    column="pred_order_fee_relief_rate"    />
+        <result property="status"    column="status"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectNodePackageVo">
+        select id, name, sales, price, level, direct_referral_rate, indirect_referral_rate, weight_multiplier, pred_order_fee_relief_rate, status, create_time, update_time, remark from t_node_package
+    </sql>
+
+    <select id="selectNodePackageList" parameterType="NodePackage"
+            resultMap="NodePackageResult">
+        <include refid="selectNodePackageVo"/>
+        <where>
+            <if test="name != null  and name != ''"> and name like concat('%', #{name}, '%')</if>
+            <if test="sales != null  and sales != ''"> and sales = #{sales}</if>
+            <if test="price != null "> and price = #{price}</if>
+            <if test="level != null "> and level = #{level}</if>
+            <if test="directReferralRate != null "> and direct_referral_rate = #{directReferralRate}</if>
+            <if test="indirectReferralRate != null "> and indirect_referral_rate = #{indirectReferralRate}</if>
+            <if test="weightMultiplier != null "> and weight_multiplier = #{weightMultiplier}</if>
+            <if test="predOrderFeeReliefRate != null "> and pred_order_fee_relief_rate = #{predOrderFeeReliefRate}</if>
+            <if test="status != null "> and status = #{status}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

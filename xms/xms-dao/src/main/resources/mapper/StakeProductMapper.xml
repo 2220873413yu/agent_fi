@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeProductMapper">
+
+    <resultMap type="StakeProduct" id="StakeProductResult">
+        <result property="id"    column="id"    />
+        <result property="name"    column="name"    />
+        <result property="sales"    column="sales"    />
+        <result property="stakeUnitAmountMin"    column="stake_unit_amount_min"    />
+        <result property="maxStakeAmount"    column="max_stake_amount"    />
+        <result property="staticRatio"    column="static_ratio"    />
+        <result property="exitMultiplier"    column="exit_multiplier"    />
+        <result property="isEnabled"    column="is_enabled"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectStakeProductVo">
+        select id, name, sales, stake_unit_amount_min, max_stake_amount, static_ratio, exit_multiplier, is_enabled, create_time, update_time, remark from t_stake_product
+    </sql>
+
+    <select id="selectStakeProductList" parameterType="StakeProduct"
+            resultMap="StakeProductResult">
+        <include refid="selectStakeProductVo"/>
+        <where>
+            <if test="name != null  and name != ''"> and name like concat('%', #{name}, '%')</if>
+            <if test="sales != null "> and sales = #{sales}</if>
+            <if test="stakeUnitAmountMin != null "> and stake_unit_amount_min = #{stakeUnitAmountMin}</if>
+            <if test="maxStakeAmount != null "> and max_stake_amount = #{maxStakeAmount}</if>
+            <if test="staticRatio != null "> and static_ratio = #{staticRatio}</if>
+            <if test="exitMultiplier != null "> and exit_multiplier = #{exitMultiplier}</if>
+            <if test="isEnabled != null "> and is_enabled = #{isEnabled}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

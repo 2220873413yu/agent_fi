@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.UserInfoMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="UserInfoResult" type="com.xms.dao.entity.domain.UserInfo">
+        <id column="user_id" property="userId" />
+        <result column="account" property="account" />
+        <result column="user_code" property="userCode" />
+        <result column="email" property="email" />
+        <result column="game_level" property="gameLevel" />
+        <result column="node_level" property="nodeLevel" />
+        <result column="min_game_level" property="minGameLevel" />
+        <result column="invite_user_code" property="inviteUserCode" />
+        <result column="invite_user_id" property="inviteUserId" />
+        <result column="status" property="status" />
+        <result column="is_valid" property="isValid" />
+        <result column="sub_num" property="subNum" />
+        <result column="valid_sub_num" property="validSubNum" />
+        <result column="umbrella_num" property="umbrellaNum" />
+        <result column="valid_umbrella_num" property="validUmbrellaNum" />
+        <result column="performance" property="performance" />
+        <result column="sub_performance" property="subPerformance" />
+        <result column="community_performance" property="communityPerformance" />
+        <result column="umbrella_performance" property="umbrellaPerformance" />
+
+        <result column="parent_chain" property="parentChain" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="withdrawal_open_or_close" property="withdrawalOpenOrClose" />
+        <result column="last_login_ip" property="lastLoginIp" />
+        <result column="avatar" property="avatar" />
+        <result column="deleted" property="deleted" />
+
+
+        <result column="node_team_performance" property="nodeTeamPerformance" />
+        <result column="sub_node_performance" property="subNodePerformance" />
+
+
+    </resultMap>
+
+    <select id="getDirectUserList" resultType="com.xms.dao.entity.bo.DirectUserBo">
+        select
+           user_id as userId,
+           account as userAccount,
+           game_level as gameLevel
+           from t_user_info
+        where invite_user_code = #{inviteUserCode}
+        order by user_id desc
+    </select>
+
+    <select id="getParentUserList" resultMap="UserInfoResult">
+        SELECT
+            b.distance,
+            a.*
+        FROM
+            t_user_info a
+                INNER JOIN t_user_relation b ON a.user_id = b.par_user_id
+                AND b.active_flag = 1
+                AND b.pos_user_id = #{userId}
+                AND b.distance > 0
+        ORDER BY
+            b.distance ASC
+    </select>
+
+    <select id="getParentUserTaskVo" resultType="com.xms.dao.entity.vo.ParentUserTaskVo">
+        SELECT
+            a.user_id as userId,
+            a.is_valid as isValid,
+            a.min_game_level as minGameLevel,
+            a.game_level as gameLevel
+        FROM
+            t_user_info a
+                INNER JOIN t_user_relation b ON a.user_id = b.par_user_id
+                AND b.active_flag = 1
+                AND b.pos_user_id = #{userId}
+                AND b.distance > 0
+        ORDER BY
+            b.distance ASC
+    </select>
+
+    <select id="getValidParentUserTaskVo" resultType="com.xms.dao.entity.vo.ParentUserTaskVo">
+        SELECT
+            a.user_id as userId,
+            a.is_valid as isValid,
+            a.min_game_level as minGameLevel,
+            a.game_level as gameLevel
+        FROM
+            t_user_info a
+                INNER JOIN t_user_relation b ON a.user_id = b.par_user_id
+        WHERE
+            b.active_flag = 1
+            AND b.pos_user_id = #{userId}
+            AND b.distance > 0
+        ORDER BY
+            b.distance ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="getParentUserIdList" resultType="long">
+        SELECT
+            b.par_user_id
+        FROM
+            t_user_relation b
+                where b.active_flag = 1
+                AND b.pos_user_id = #{userId}
+                AND b.distance > 0
+    </select>
+
+
+
+    <select id="get20ParentUserList" resultType="com.xms.dao.entity.bo.Parent20UserBo">
+        SELECT
+            b.distance as distance,
+            a.user_id as userId,
+            a.is_valid as isValid,
+            a.game_level as gameLevel,
+            a.min_game_level as minGameLevel,
+            a.valid_sub_num as validSubNum
+        FROM
+            t_user_info a
+                INNER JOIN t_user_relation b ON a.user_id = b.par_user_id
+                AND b.active_flag = 1
+                AND b.pos_user_id = #{userId}
+                AND b.distance > 0
+        ORDER BY
+            b.distance ASC
+    </select>
+
+    <select id="getChildUserList" resultMap="UserInfoResult">
+        SELECT
+            a.*
+        FROM
+            t_user_info a
+                INNER JOIN t_user_relation b ON a.user_id = b.pos_user_id
+                AND b.active_flag = 1
+                AND b.par_user_id = #{userId}
+                AND b.distance > 0
+        ORDER BY
+            b.distance ASC
+    </select>
+
+    <select id="queryNetBodyChildUser" resultMap="UserInfoResult">
+        SELECT
+            a.*
+        FROM
+            t_user_info a
+                INNER JOIN t_user_relation b ON a.user_id = b.pos_user_id
+                and a.deleted = 0
+                AND b.active_flag = 1
+                AND b.par_user_id = #{userId}
+                AND b.distance > 0
+                AND b.distance &lt;= 5
+        ORDER BY
+            b.distance ASC
+    </select>
+
+
+    <select id="getLimitedParentUserIdList" resultType="long">
+        SELECT
+            b.par_user_id
+        FROM
+            t_user_relation b
+        where b.active_flag = 1
+          AND b.pos_user_id = #{userId}
+          AND b.distance &lt;= #{distance}
+        ORDER BY
+            b.distance ASC
+    </select>
+
+    <select id="getChildUserIdList" resultType="long">
+        SELECT
+            b.pos_user_id
+        FROM
+            t_user_relation b
+        where
+            b.active_flag = 1
+          AND b.par_user_id =#{userId}
+          AND b.distance >0
+    </select>
+
+    <select id="selectUserInfoList" parameterType="com.xms.dao.entity.domain.UserInfo" resultMap="UserInfoResult">
+        select tui.* from t_user_info tui
+        <where>
+            tui.deleted = 0
+            <if test="userId != null "> and tui.user_id = #{userId}</if>
+            <if test="account != null  and account != ''"> and tui.account like concat('%', #{account}, '%')</if>
+            <if test="userCode != null  and userCode != ''"> and tui.user_code = #{userCode}</if>
+            <if test="email != null  and email != ''"> and tui.tr_recharge_address like concat('%', #{email}, '%')</if>
+            <if test="gameLevel != null "> and tui.game_level = #{gameLevel}</if>
+            <if test="nodeLevel != null "> and tui.node_level = #{nodeLevel}</if>
+            <if test="finaGameLevel != null and finaGameLevel != '' ">
+                and GREATEST(game_level, min_game_level) = #{finaGameLevel}
+             </if>
+            <if test="minGameLevel != null "> and tui.min_game_level = #{minGameLevel}</if>
+            <if test="inviteUserCode != null  and inviteUserCode != ''"> and tui.invite_user_code = #{inviteUserCode}</if>
+            <if test="inviteUserId != null  and inviteUserId != ''"> and tui.invite_user_id = #{inviteUserId}</if>
+            <if test="status != null "> and tui.status = #{status}</if>
+            <if test="isValid != null "> and tui.is_valid = #{isValid}</if>
+            <if test="subNum != null "> and tui.sub_num = #{subNum}</if>
+            <if test="validSubNum != null "> and tui.valid_sub_num = #{validSubNum}</if>
+            <if test="umbrellaNum != null "> and tui.umbrella_num = #{umbrellaNum}</if>
+            <if test="validUmbrellaNum != null "> and tui.valid_umbrella_num = #{validUmbrellaNum}</if>
+            <if test="performance != null "> and tui.performance = #{performance}</if>
+            <if test="umbrellaPerformance != null "> and tui.umbrella_performance = #{umbrellaPerformance}</if>
+            <if test="withdrawalOpenOrClose != null "> and tui.withdrawal_open_or_close = #{withdrawalOpenOrClose}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+        </where>
+        order by tui.user_id desc
+    </select>
+
+    <select id="selectChildUserInfoList" resultMap="UserInfoResult">
+        select a.* from t_user_info a
+        inner join t_user_relation b on a.user_id = b.pos_user_id and b.par_user_id = #{params.topUserId} and b.distance > 0
+        <where>
+            <if test="userId != null "> and a.user_id = #{userId}</if>
+            <if test="account != null  and account != ''"> and a.account like concat('%', #{account}, '%')</if>
+            <if test="userCode != null  and userCode != ''"> and a.user_code = #{userCode}</if>
+            <if test="nodeLevel != null "> and a.node_level = #{nodeLevel}</if>
+            <if test="email != null  and email != ''"> and a.tr_recharge_address like concat('%', #{email}, '%')</if>
+            <if test="gameLevel != null "> and a.game_level = #{gameLevel}</if>
+            <if test="minGameLevel != null "> and a.min_game_level = #{minGameLevel}</if>
+            <if test="inviteUserCode != null  and inviteUserCode != ''"> and a.invite_user_code = #{inviteUserCode}</if>
+            <if test="inviteUserId != null  and inviteUserId != ''"> and a.invite_user_id = #{inviteUserId}</if>
+            <if test="status != null "> and a.status = #{status}</if>
+            <if test="isValid != null "> and a.is_valid = #{isValid}</if>
+            <if test="subNum != null "> and a.sub_num = #{subNum}</if>
+            <if test="validSubNum != null "> and a.valid_sub_num = #{validSubNum}</if>
+            <if test="umbrellaNum != null "> and a.umbrella_num = #{umbrellaNum}</if>
+            <if test="validUmbrellaNum != null "> and a.valid_umbrella_num = #{validUmbrellaNum}</if>
+            <if test="performance != null "> and a.performance = #{performance}</if>
+            <if test="umbrellaPerformance != null "> and a.umbrella_performance = #{umbrellaPerformance}</if>
+            <if test="withdrawalOpenOrClose != null "> and a.withdrawal_open_or_close = #{withdrawalOpenOrClose}</if>
+        </where>
+        order by a.user_id desc
+    </select>
+
+    <select id="countTodayNewTeamUsers" resultType="com.xms.dao.entity.bo.TeamUsersBo">
+        select a.user_id as userId, a.create_time as createTime from t_user_info a
+        inner join t_user_relation b on a.user_id = b.pos_user_id and b.par_user_id = #{topUserId} and b.distance > 0
+    </select>
+
+    <select id="getChangeLevelUserBo" resultType="com.xms.dao.entity.bo.ChangeLevelUserBo" parameterType="java.util.List">
+        SELECT
+        user_id as userId,
+        game_level as gameLevel,
+        valid_sub_num as validSubNum,
+        valid_umbrella_num as validUmbrellaNum
+        FROM
+        t_user_info
+        <where>
+            <if test="parentList != null and parentList.size() > 0">
+                user_id IN
+                <foreach item="userId" collection="parentList" open="(" separator="," close=")">
+                    #{userId}
+                </foreach>
+            </if>
+        </where>
+        order by user_id desc
+    </select>
+
+    <select id="queryPartnerUserId" resultType="long">
+      select user_id from t_user_info where partner_status = 1 and is_valid = 1
+    </select>
+
+    <select id="getUserByLevel" resultType="long">
+        SELECT user_id
+        FROM t_user_info
+        WHERE GREATEST(game_level, min_game_level) = #{level} and is_valid = 1
+    </select>
+
+
+    <select id="userComputingPower" resultType="com.xms.dao.entity.bo.UserComputingPowerBo">
+        select user_id as userId, performance as computingPower from t_user_info
+    </select>
+
+    <select id="getUserLevelList" resultType="com.xms.dao.entity.bo.UserLevelBo">
+        select user_id as userId, GREATEST(game_level, min_game_level) as level from t_user_info
+        where game_level > 0 or min_game_level > 0
+    </select>
+
+    <select id="getBatchUser" resultType="com.xms.dao.entity.bo.BatchUserBo">
+        select wallet_address, parent_wallet_address from bms_user
+        order by user_id asc
+    </select>
+
+    <select id="getTeamMembersLimited" resultMap="UserInfoResult">
+        SELECT
+            a.user_id,
+            a.account,
+            a.performance,
+            a.game_level,
+            a.sub_num,
+            a.umbrella_num,
+            a.valid_umbrella_num,
+            a.umbrella_performance,
+            a.create_time
+        FROM
+            t_user_info a
+                INNER JOIN t_user_relation b ON a.user_id = b.pos_user_id
+        WHERE
+            b.active_flag = 1
+            AND b.par_user_id = #{userId}
+            AND b.distance > 0
+            <if test="level != null">
+                AND game_level = #{level}
+            </if>
+        ORDER BY
+            a.user_id DESC
+        LIMIT 500
+    </select>
+</mapper>

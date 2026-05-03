@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.ContractMapper">
+
+    <resultMap type="com.xms.dao.domain.Contract" id="ContractResult">
+        <result property="id"    column="id"    />
+        <result property="type"    column="type"    />
+        <result property="bizType"    column="biz_type"    />
+        <result property="content"    column="content"    />
+        <result property="status"    column="status"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+        <result property="deleted"    column="deleted"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="updateBy"    column="update_by"    />
+    </resultMap>
+
+    <sql id="selectContractVo">
+        select biz_type, id, type, content, status, create_time, update_time, remark, deleted, create_by, update_by from t_contract
+    </sql>
+
+    <select id="selectContractList" parameterType="com.xms.dao.domain.Contract"
+            resultMap="ContractResult">
+        <include refid="selectContractVo"/>
+        <where>
+            <if test="type != null "> and type = #{type}</if>
+            <if test="bizType != null "> and biz_type = #{bizType}</if>
+            <if test="content != null  and content != ''"> and content = #{content}</if>
+            <if test="status != null "> and status = #{status}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+        </where>
+        ORDER BY id desc
+    </select>
+
+    <delete id="deleteRecordById" parameterType="long">
+        delete from t_contract where id in
+        <foreach collection="idList" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

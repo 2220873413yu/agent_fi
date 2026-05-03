@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.UserTransferMapper">
+
+    <resultMap type="UserTransfer" id="UserTransferResult">
+        <result property="id"    column="id"    />
+        <result property="fromUserId"    column="from_user_id"    />
+        <result property="fromAccount"    column="from_account"    />
+        <result property="toUserId"    column="to_user_id"    />
+        <result property="toAccount"    column="to_account"    />
+        <result property="code"    column="code"    />
+        <result property="changeBalance"    column="change_balance"    />
+        <result property="feeBalance"    column="fee_balance"    />
+        <result property="feeRatio"    column="fee_ratio"    />
+        <result property="actualAmount"    column="actual_amount"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="coinType"    column="coin_type"    />
+    </resultMap>
+
+    <sql id="selectUserTransferVo">
+        select id, from_user_id, from_account, to_user_id, to_account, code, change_balance, fee_balance, fee_ratio, actual_amount, create_time, coin_type from t_user_transfer
+    </sql>
+
+    <select id="selectUserTransferList" parameterType="UserTransfer"
+            resultMap="UserTransferResult">
+        <include refid="selectUserTransferVo"/>
+        <where>
+            <if test="fromUserId != null "> and from_user_id = #{fromUserId}</if>
+            <if test="fromAccount != null  and fromAccount != ''"> and from_account = #{fromAccount}</if>
+            <if test="toUserId != null "> and to_user_id = #{toUserId}</if>
+            <if test="toAccount != null  and toAccount != ''"> and to_account = #{toAccount}</if>
+            <if test="code != null  and code != ''"> and code = #{code}</if>
+            <if test="changeBalance != null "> and change_balance = #{changeBalance}</if>
+            <if test="feeBalance != null "> and fee_balance = #{feeBalance}</if>
+            <if test="feeRatio != null  and feeRatio != ''"> and fee_ratio = #{feeRatio}</if>
+            <if test="actualAmount != null "> and actual_amount = #{actualAmount}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            <if test="coinType != null "> and coin_type = #{coinType}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

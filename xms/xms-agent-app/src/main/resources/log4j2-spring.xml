@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <Properties>
+        <!-- 日志存放路径 -->
+        <property name="log.path" value="./logs" />
+
+        <!-- 日志输出格式  注意includeLocation 默认false C or $class, %F or %file, %l or %location, %L or %line, %M or %method 不会打印，会浪费性能-->
+        <property name="log.pattern" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{correlationId}] %-5level %logger{20}  -[%method->%line] - %msg%n" />
+        <!-- 定义日志存储的路径 -->
+        <!--    <property name="FILE_PATH" value="logs"/>
+            <property name="FILE_NAME" value="newframe"/>-->
+    </Properties>
+
+    <Appenders>
+        <!--*********************控制台日志***********************-->
+        <Console name="consoleAppender" target="SYSTEM_OUT">
+            <!--设置日志格式及颜色-->
+            <PatternLayout pattern="${log.pattern}" charset="UTF-8"/>
+        </Console>
+
+        <!--info级别日志-->
+        <!-- 这个会打印出所有的info及以上级别的信息，每次大小超过size，则这size大小的日志会自动存入按年份-月份建立的文件夹下面并进行压缩，作为存档-->
+     <!--   <RollingFile name="infoFileAppender"
+                     fileName="${FILE_PATH}/${FILE_NAME}/log_info.log"
+                     filePattern="${FILE_PATH}/${FILE_NAME}/log-info-%d{yyyy-MM-dd}_%i.log.gz"
+                     append="true">
+            &lt;!&ndash;设置日志格式&ndash;&gt;
+            <PatternLayout pattern="${LOG_PATTERN}" charset="UTF-8"/>
+            <Filters>
+                &lt;!&ndash;过滤掉warn及更高级别日志&ndash;&gt;
+                <ThresholdFilter level="warn" onMatch="DENY" onMismatch="NEUTRAL" />
+                <ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+            <Policies>
+                &lt;!&ndash; 基于时间的触发策略。该策略主要是完成周期性的log文件封存工作。有两个参数：
+               interval，integer型，指定两次封存动作之间的时间间隔。单位:以日志的命名精度来确定单位，
+                   比如yyyy-MM-dd-HH 单位为小时，yyyy-MM-dd-HH-mm 单位为分钟
+               modulate，boolean型，说明是否对封存时间进行调制。若modulate=true，
+                   则封存时间将以0点为边界进行偏移计算。比如，modulate=true，interval=4hours，
+                   那么假设上次封存日志的时间为00:00，则下次封存日志的时间为04:00，
+                   之后的封存时间依次为08:00，12:00，16:00&ndash;&gt;
+                <TimeBasedTriggeringPolicy interval="1"/>
+                <SizeBasedTriggeringPolicy size="10MB"/>
+            </Policies>
+
+            &lt;!&ndash; DefaultRolloverStrategy 属性如不设置，则默认为最多同一文件夹下当天 7 个文件后开始覆盖&ndash;&gt;
+            <DefaultRolloverStrategy max="30">
+                &lt;!&ndash; 删除处理策略，在配置的路径中搜索，maxDepth 表示往下搜索的最大深度 &ndash;&gt;
+                <Delete basePath="${FILE_PATH}/${FILE_NAME}/" maxDepth="2">
+                    &lt;!&ndash; 文件名搜索匹配，支持正则 &ndash;&gt;
+                    <IfFileName glob="*.log.gz"/>
+                    &lt;!&ndash;!Note: 这里的 age 必须和 filePattern 协调, 后者是精确到 dd, 这里就要写成 xd, xD 就不起作用
+                    另外, 数字最好 >2, 否则可能造成删除的时候, 最近的文件还处于被占用状态,导致删除不成功!&ndash;&gt;
+                    &lt;!&ndash;7天&ndash;&gt;
+                    <IfLastModified age="7d"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+
+        </RollingFile>
+
+        &lt;!&ndash;warn级别日志&ndash;&gt;
+        &lt;!&ndash; 这个会打印出所有的warn及以上级别的信息，每次大小超过size，则这size大小的日志会自动存入按年份-月份建立的文件夹下面并进行压缩，作为存档&ndash;&gt;
+        <RollingFile name="warnFileAppender"
+                     fileName="${FILE_PATH}/${FILE_NAME}/log_warn.log"
+                     filePattern="${FILE_PATH}/${FILE_NAME}/log-warn-%d{yyyy-MM-dd}_%i.log.gz"
+                     append="true">
+            &lt;!&ndash;设置日志格式&ndash;&gt;
+            <PatternLayout pattern="${LOG_PATTERN}" charset="UTF-8"/>
+            <Filters>
+                &lt;!&ndash;过滤掉error及更高级别日志&ndash;&gt;
+                <ThresholdFilter level="error" onMatch="DENY" onMismatch="NEUTRAL" />
+                <ThresholdFilter level="warn" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+            <Policies>
+                &lt;!&ndash; 基于时间的触发策略。该策略主要是完成周期性的log文件封存工作。有两个参数：
+               interval，integer型，指定两次封存动作之间的时间间隔。单位:以日志的命名精度来确定单位，
+                   比如yyyy-MM-dd-HH 单位为小时，yyyy-MM-dd-HH-mm 单位为分钟
+               modulate，boolean型，说明是否对封存时间进行调制。若modulate=true，
+                   则封存时间将以0点为边界进行偏移计算。比如，modulate=true，interval=4hours，
+                   那么假设上次封存日志的时间为00:00，则下次封存日志的时间为04:00，
+                   之后的封存时间依次为08:00，12:00，16:00&ndash;&gt;
+                <TimeBasedTriggeringPolicy interval="1"/>
+                <SizeBasedTriggeringPolicy size="10MB"/>
+            </Policies>
+
+            &lt;!&ndash; DefaultRolloverStrategy 属性如不设置，则默认为最多同一文件夹下当天 7 个文件后开始覆盖&ndash;&gt;
+            <DefaultRolloverStrategy max="30">
+                &lt;!&ndash; 删除处理策略，在配置的路径中搜索，maxDepth 表示往下搜索的最大深度 &ndash;&gt;
+                <Delete basePath="${FILE_PATH}/${FILE_NAME}/" maxDepth="2">
+                    &lt;!&ndash; 文件名搜索匹配，支持正则 &ndash;&gt;
+                    <IfFileName glob="*.log.gz"/>
+                    &lt;!&ndash;!Note: 这里的 age 必须和 filePattern 协调, 后者是精确到 dd, 这里就要写成 xd, xD 就不起作用
+                    另外, 数字最好 >2, 否则可能造成删除的时候, 最近的文件还处于被占用状态,导致删除不成功!&ndash;&gt;
+                    &lt;!&ndash;7天&ndash;&gt;
+                    <IfLastModified age="7d"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+
+
+        </RollingFile>
+
+        &lt;!&ndash;error级别日志&ndash;&gt;
+        &lt;!&ndash; 这个会打印出所有的error及以上级别的信息，每次大小超过size，则这size大小的日志会自动存入按年份-月份建立的文件夹下面并进行压缩，作为存档&ndash;&gt;
+        <RollingFile name="errorFileAppender"
+                     fileName="${FILE_PATH}/${FILE_NAME}/log_error.log"
+                     filePattern="${FILE_PATH}/${FILE_NAME}/log-error-%d{yyyy-MM-dd}_%i.log.gz"
+                     append="true">
+            &lt;!&ndash;设置日志格式&ndash;&gt;
+            <PatternLayout pattern="${LOG_PATTERN}" charset="UTF-8"/>
+            <Filters>
+                <ThresholdFilter level="error" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+            <Policies>
+                &lt;!&ndash; 基于时间的触发策略。该策略主要是完成周期性的log文件封存工作。有两个参数：
+               interval，integer型，指定两次封存动作之间的时间间隔。单位:以日志的命名精度来确定单位，
+                   比如yyyy-MM-dd-HH 单位为小时，yyyy-MM-dd-HH-mm 单位为分钟
+               modulate，boolean型，说明是否对封存时间进行调制。若modulate=true，
+                   则封存时间将以0点为边界进行偏移计算。比如，modulate=true，interval=4hours，
+                   那么假设上次封存日志的时间为00:00，则下次封存日志的时间为04:00，
+                   之后的封存时间依次为08:00，12:00，16:00&ndash;&gt;
+                <TimeBasedTriggeringPolicy interval="1"/>
+                <SizeBasedTriggeringPolicy size="10MB"/>
+            </Policies>
+
+            &lt;!&ndash; DefaultRolloverStrategy 属性如不设置，则默认为最多同一文件夹下当天 7 个文件后开始覆盖&ndash;&gt;
+            <DefaultRolloverStrategy max="30">
+                &lt;!&ndash; 删除处理策略，在配置的路径中搜索，maxDepth 表示往下搜索的最大深度 &ndash;&gt;
+                <Delete basePath="${FILE_PATH}/${FILE_NAME}/" maxDepth="2">
+                    &lt;!&ndash; 文件名搜索匹配，支持正则 &ndash;&gt;
+                    <IfFileName glob="*.log.gz"/>
+                    &lt;!&ndash;!Note: 这里的 age 必须和 filePattern 协调, 后者是精确到 dd, 这里就要写成 xd, xD 就不起作用
+                    另外, 数字最好 >2, 否则可能造成删除的时候, 最近的文件还处于被占用状态,导致删除不成功!&ndash;&gt;
+                    &lt;!&ndash;7天&ndash;&gt;
+                    <IfLastModified age="7d"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+
+        </RollingFile>
+-->
+    </Appenders>
+
+    <Loggers>
+        <!-- 减少部分debug日志 -->
+        <AsyncLogger name="springfox.bean.validators" level="ERROR"/>
+        <!-- 基础组件 -->
+        <AsyncLogger name="com.xms" level="info"/>
+        <!-- blade日志 -->
+        <AsyncLogger name="org.springframework" level="warn"/>
+
+        <AsyncRoot  level="INFO" additivity="false">
+            <AppenderRef ref="consoleAppender" />
+        </AsyncRoot >
+    </Loggers>
+
+</configuration>

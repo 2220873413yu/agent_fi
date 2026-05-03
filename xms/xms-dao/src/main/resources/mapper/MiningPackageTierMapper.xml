@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.MiningPackageTierMapper">
+
+    <resultMap type="MiningPackageTier" id="MiningPackageTierResult">
+        <result property="id"    column="id"    />
+        <result property="startIndex"    column="start_index"    />
+        <result property="endIndex"    column="end_index"    />
+        <result property="stakeAmount"    column="stake_amount"    />
+        <result property="dayReward"    column="day_reward"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectMiningPackageTierVo">
+        select id,  start_index, end_index, stake_amount, day_reward, create_time, update_time, remark from t_mining_package_tier
+    </sql>
+
+    <select id="selectMiningPackageTierList" parameterType="MiningPackageTier"
+            resultMap="MiningPackageTierResult">
+        <include refid="selectMiningPackageTierVo"/>
+        <where>
+            <if test="startIndex != null "> and start_index = #{startIndex}</if>
+            <if test="endIndex != null "> and end_index = #{endIndex}</if>
+            <if test="stakeAmount != null "> and stake_amount = #{stakeAmount}</if>
+            <if test="dayReward != null "> and day_reward = #{dayReward}</if>
+        </where>
+        order by start_index asc
+    </select>
+
+    <select id="countOverlap" resultType="int">
+        select count(1)
+        from t_mining_package_tier
+        where start_index <![CDATA[<=]]> #{endIndex}
+          and end_index <![CDATA[>=]]> #{startIndex}
+        <if test="excludeId != null">
+            and id <![CDATA[<>]]> #{excludeId}
+        </if>
+    </select>
+
+
+    <delete id="deleteRecordById" parameterType="long">
+        delete from t_mining_package_tier where id in
+        <foreach item="id" collection="list" separator="," open="(" close=")" index="">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeReleaseBucketMapper">
+
+    <resultMap type="StakeReleaseBucket" id="StakeReleaseBucketResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="linearDays"    column="linear_days"    />
+        <result property="totalAmount"    column="total_amount"    />
+        <result property="remainingAmount"    column="remaining_amount"    />
+        <result property="status"    column="status"    />
+        <result property="startTime"    column="start_time"    />
+        <result property="lastReleaseTime"    column="last_release_time"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="sourceSnapshot"    column="source_snapshot"    />
+        <result property="haveDays"    column="have_days"    />
+        <result property="dailyReleaseAmount"    column="daily_release_amount"    />
+        <result property="orderNo"    column="order_no"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectStakeReleaseBucketVo">
+        select remark, order_no, daily_release_amount, have_days, id, user_id, linear_days, total_amount, remaining_amount, status, start_time, last_release_time, create_time, update_time, source_snapshot from t_stake_release_bucket
+    </sql>
+
+    <select id="selectStakeReleaseBucketList" parameterType="StakeReleaseBucket"
+            resultMap="StakeReleaseBucketResult">
+        <include refid="selectStakeReleaseBucketVo"/>
+        <where>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="orderNo != null "> and order_no = #{orderNo}</if>
+            <if test="linearDays != null "> and linear_days = #{linearDays}</if>
+            <if test="totalAmount != null "> and total_amount = #{totalAmount}</if>
+            <if test="remainingAmount != null "> and remaining_amount = #{remainingAmount}</if>
+            <if test="status != null "> and status = #{status}</if>
+            <if test="startTime != null "> and start_time = #{startTime}</if>
+            <if test="lastReleaseTime != null "> and last_release_time = #{lastReleaseTime}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            <if test="sourceSnapshot != null  and sourceSnapshot != ''"> and source_snapshot = #{sourceSnapshot}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

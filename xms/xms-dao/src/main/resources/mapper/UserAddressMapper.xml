@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.UserAddressMapper">
+
+    <resultMap type="UserAddress" id="UserAddressResult">
+        <result property="id"    column="id"    />
+        <result property="province"    column="province"    />
+        <result property="city"    column="city"    />
+        <result property="area"    column="area"    />
+        <result property="detailed"    column="detailed"    />
+        <result property="phone"    column="phone"    />
+        <result property="userName"    column="user_name"    />
+        <result property="userId"    column="user_id"    />
+        <result property="addressState"    column="address_state"    />
+        <result property="remark"    column="remark"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="deleted"    column="deleted"    />
+    </resultMap>
+
+    <sql id="selectUserAddressVo">
+        select id, province, city, area, detailed, phone, user_name, user_id, address_state, remark, create_time, create_by, update_time, update_by, deleted from xms_user_address
+    </sql>
+
+    <select id="selectUserAddressList" parameterType="UserAddress"
+            resultMap="UserAddressResult">
+        <include refid="selectUserAddressVo"/>
+        <where>
+            <if test="province != null  and province != ''"> and province = #{province}</if>
+            <if test="city != null  and city != ''"> and city = #{city}</if>
+            <if test="area != null  and area != ''"> and area = #{area}</if>
+            <if test="detailed != null  and detailed != ''"> and detailed = #{detailed}</if>
+            <if test="phone != null  and phone != ''"> and phone = #{phone}</if>
+            <if test="userName != null  and userName != ''"> and user_name like concat('%', #{userName}, '%')</if>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="addressState != null "> and address_state = #{addressState}</if>
+        </where>
+        order by id desc
+    </select>
+
+    <delete id="deleteAddressById" >
+        delete from xms_user_address where id=#{id} and user_id=#{userId}
+    </delete>
+
+</mapper>

@@ -1,0 +1,100 @@
+# 开发环境配置
+server:
+  servlet:
+    # 应用的访问路径
+    context-path: /
+  tomcat:
+    # tomcat的URI编码
+    uri-encoding: UTF-8
+    # 连接数满后的排队数，默认为100
+    accept-count: 1000
+    threads:
+      # tomcat最大线程数，默认为200
+      max: 800
+      # Tomcat启动初始化的线程数，默认值10
+      min-spare: 100
+
+# 日志配置
+logging:
+  level:
+    com.xms: debug
+    org.springframework: warn
+
+# 用户配置
+user:
+  password:
+    # 密码最大错误次数
+    maxRetryCount: 5
+    # 密码锁定时间（默认10分钟）
+    lockTime: 10
+
+# Spring配置
+spring:
+  #开启虚拟线程
+  threads:
+    virtual:
+      enabled: true
+  # 资源信息
+  messages:
+    # 国际化资源文件路径
+    basename: i18n/messages
+  profiles:
+    active: dev
+  # 文件上传
+  servlet:
+    multipart:
+      # 单个文件大小
+      max-file-size:  10MB
+      # 设置总上传的文件大小
+      max-request-size:  20MB
+  # 服务模块
+  devtools:
+    restart:
+      # 热部署开关
+      enabled: true
+
+# MyBatis-plus配置
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*Mapper.xml
+  configuration:
+    cache-enabled: true
+    use-generated-keys: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    default-executor-type: SIMPLE
+  #type-aliases-package: com.xms.**.domain,;com.d3code.**.domain
+  type-aliases-package: com.xms.**.domain
+
+# PageHelper分页插件
+pagehelper:
+  helperDialect: mysql
+  supportMethodsArguments: true
+  params: count=countSql
+
+# 防止XSS攻击
+xss:
+  # 过滤开关
+  enabled: true
+  # 排除链接（多个用逗号分隔）
+  excludes: /system/notice
+  # 匹配链接
+  urlPatterns: /system/*,/monitor/*,/tool/*
+
+# 部分全局自定义基础配置
+xms:
+  stream:
+    # redis是否开启stream 队列
+    enable: true
+    # 默认：服务名 + 环境
+    consumerGroup: xms-app
+    # 费者名称，默认：ip + 端口
+    consumerName:
+    #poll 批量大小
+    pollBatchSize:
+    #poll 超时时间 秒
+    pollTimeout:
+    #消费重试次数
+    maxAttempts: 3
+    #重试间隔时间,单位毫秒
+    backOffInitialInterval: 2000
+    #重试间隔时间的倍数  相邻两次重试之间的间隔时间的倍数。默认2，即第二次是第一次间隔时间的2倍，第三次是第二次的2倍
+    backOffMultiplier: 2

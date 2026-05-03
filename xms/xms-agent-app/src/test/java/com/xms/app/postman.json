@@ -1,0 +1,4181 @@
+{
+  "item": [
+    {
+      "item": [
+        {
+          "request": {
+            "method": "GET",
+            "description": "「已废弃」",
+            "header": [],
+            "url": {
+              "path": [
+                "send"
+              ],
+              "query": [
+                {
+                  "key": "delay",
+                  "value": "60",
+                  "equals": true,
+                  "description": "延时时间(秒)"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/send"
+            }
+          },
+          "response": [
+            {
+              "name": "测试发送延时消息-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "「已废弃」",
+                "header": [],
+                "url": {
+                  "path": [
+                    "send"
+                  ],
+                  "query": [
+                    {
+                      "key": "delay",
+                      "value": "60",
+                      "equals": true,
+                      "description": "延时时间(秒)"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/send"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "测试发送延时消息"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "「已废弃」",
+            "header": [],
+            "url": {
+              "path": [
+                "status"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/status"
+            }
+          },
+          "response": [
+            {
+              "name": "检查队列状态-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "「已废弃」",
+                "header": [],
+                "url": {
+                  "path": [
+                    "status"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/status"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "检查队列状态"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "「已废弃」",
+            "header": [],
+            "url": {
+              "path": [
+                "start-listener"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/start-listener"
+            }
+          },
+          "response": [
+            {
+              "name": "添加队列监听器-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "「已废弃」",
+                "header": [],
+                "url": {
+                  "path": [
+                    "start-listener"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/start-listener"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "添加队列监听器"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "「已废弃」",
+            "header": [],
+            "url": {
+              "path": [
+                "testMqMsg"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/testMqMsg"
+            }
+          },
+          "response": [
+            {
+              "name": "即时消息/延迟消息收发测试demo-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "「已废弃」",
+                "header": [],
+                "url": {
+                  "path": [
+                    "testMqMsg"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/testMqMsg"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "即时消息/延迟消息收发测试demo"
+        }
+      ],
+      "name": "测速的干活",
+      "description": "测速的干活"
+    },
+    {
+      "item": [
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "userinfo",
+                "handleWord"
+              ],
+              "query": [
+                {
+                  "key": "text",
+                  "value": "",
+                  "equals": true,
+                  "description": "文本内容"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/userinfo/handleWord"
+            }
+          },
+          "response": [
+            {
+              "name": "处理带文件的对话-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "userinfo",
+                    "handleWord"
+                  ],
+                  "query": [
+                    {
+                      "key": "text",
+                      "value": "",
+                      "equals": true,
+                      "description": "文本内容"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/userinfo/handleWord"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "\"\""
+            }
+          ],
+          "name": "处理带文件的对话"
+        },
+        {
+          "request": {
+            "method": "POST",
+            "description": "",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text",
+                "description": ""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"account\": \"\",\n  \"pwd\": \"\"\n}"
+            },
+            "url": {
+              "path": [
+                "userinfo",
+                "login"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/userinfo/login"
+            }
+          },
+          "response": [
+            {
+              "name": "登录接口-Example",
+              "originalRequest": {
+                "method": "POST",
+                "description": "",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text",
+                    "description": ""
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n    \"account\": \"\", //账号\n    \"pwd\": \"\" //密码\n}"
+                },
+                "url": {
+                  "path": [
+                    "userinfo",
+                    "login"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/userinfo/login"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": { //承载数据\n        \"userId\": 0, //用户ID\n        \"token\": \"\", //用户唯一标识\n        \"grantType\": \"\", //授权类型\n        \"loginTime\": 0, //登录时间\n        \"expireTime\": 0, //过期时间\n        \"ipaddr\": \"\", //登录IP地址\n        \"loginLocation\": \"\", //登录地点\n        \"browser\": \"\", //浏览器类型\n        \"os\": \"\", //操作系统\n        \"clientId\": \"\", //客户端iD\n        \"userCode\": \"\", //对应数据库的userCode\n        \"regAddress\": \"\" //用户地址\n    },\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "登录接口"
+        },
+        {
+          "request": {
+            "method": "POST",
+            "description": "",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text",
+                "description": ""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"inviteUserCode\": \"\",\n  \"loginPwd\": \"\",\n  \"account\": \"\"\n}"
+            },
+            "url": {
+              "path": [
+                "userinfo",
+                "register"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/userinfo/register"
+            }
+          },
+          "response": [
+            {
+              "name": "注册接口-Example",
+              "originalRequest": {
+                "method": "POST",
+                "description": "",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text",
+                    "description": ""
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n    \"inviteUserCode\": \"\", //邀请用户编码\n    \"loginPwd\": \"\", //登录密码(需要md5之后,再传递过来)\n    \"account\": \"\" //账号(6-16位数字和字母组合)\n}"
+                },
+                "url": {
+                  "path": [
+                    "userinfo",
+                    "register"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/userinfo/register"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "注册接口"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "userinfo",
+                "checkAddress"
+              ],
+              "query": [
+                {
+                  "key": "address",
+                  "value": "",
+                  "equals": true,
+                  "description": ""
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/userinfo/checkAddress"
+            }
+          },
+          "response": [
+            {
+              "name": "检查账号是否注册过,返回false是没注册过,true注册过-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "userinfo",
+                    "checkAddress"
+                  ],
+                  "query": [
+                    {
+                      "key": "address",
+                      "value": "",
+                      "equals": true,
+                      "description": ""
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/userinfo/checkAddress"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": false, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "检查账号是否注册过,返回false是没注册过,true注册过"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "userinfo",
+                "getUserInfo"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/userinfo/getUserInfo"
+            }
+          },
+          "response": [
+            {
+              "name": "查询用户详情-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "userinfo",
+                    "getUserInfo"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/userinfo/getUserInfo"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": { //承载数据\n        \"userId\": 0, //用户id\n        \"account\": \"\", //用户账号\n        \"userCode\": \"\", //用户编码\n        \"trcRechargeAddress\": \"\", //trc充值地址\n        \"gameLevel\": 0, //真实等级\n        \"maxGameLevel\": 0, //历史最高等级\n        /**\n         * 保底等级\n         * 查询用户详情、查询直推用户列表、领取矿机订单奖励、返回能领几周、分复利手续费奖励\n         */\n        \"minGameLevel\": 0,\n        \"inviteUserCode\": \"\", //邀请用户编码\n        \"inviteUserId\": 0, //邀请用户id\n        \"status\": 0, //状态 1 正常 2 冻结\n        \"subNum\": 0, //直推用户数\n        \"validSubNum\": 0, //直推用户数(有效)\n        \"umbrellaNum\": 0, //团队用户数(有效)\n        \"validUmbrellaNum\": 0, //团队用户数(有效)\n        \"performance\": 0.0, //我的业绩(订单数)\n        \"subPerformance\": 0.0, //直推业绩(订单数)\n        \"umbrellaPerformance\": 0.0, //团队业绩(订单数)\n        \"teamRewardRatio\": 0.0, //体验式基金购买数量\n        \"rechargeAmount\": 0.0, //充值金额\n        \"maxInvestmentLimit\": 0.0, //最大投入金额\n        \"parentId\": 0,\n        \"googleCode\": \"\" //谷歌code\n    },\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "查询用户详情"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "userinfo",
+                "logout"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/userinfo/logout"
+            }
+          },
+          "response": [
+            {
+              "name": "退出登录-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "userinfo",
+                    "logout"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/userinfo/logout"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": \"\", //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "退出登录"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "userinfo",
+                "getGoogleKey"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/userinfo/getGoogleKey"
+            }
+          },
+          "response": [
+            {
+              "name": "获取谷歌秘钥 32位的-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "userinfo",
+                    "getGoogleKey"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/userinfo/getGoogleKey"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "获取谷歌秘钥 32位的"
+        },
+        {
+          "request": {
+            "method": "POST",
+            "description": "",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text",
+                "description": ""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"googleKey\": \"\",\n  \"googleCode\": \"\"\n}"
+            },
+            "url": {
+              "path": [
+                "userinfo",
+                "bindGoogleCode"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/userinfo/bindGoogleCode"
+            }
+          },
+          "response": [
+            {
+              "name": "绑定谷歌-Example",
+              "originalRequest": {
+                "method": "POST",
+                "description": "",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text",
+                    "description": ""
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n    \"googleKey\": \"\", //谷歌秘钥\n    \"googleCode\": \"\" //谷歌验证码\n}"
+                },
+                "url": {
+                  "path": [
+                    "userinfo",
+                    "bindGoogleCode"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/userinfo/bindGoogleCode"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "绑定谷歌"
+        },
+        {
+          "request": {
+            "method": "POST",
+            "description": "",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text",
+                "description": ""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"newPwd\": \"\",\n  \"googleCode\": \"\"\n}"
+            },
+            "url": {
+              "path": [
+                "userinfo",
+                "updatePwd"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/userinfo/updatePwd"
+            }
+          },
+          "response": [
+            {
+              "name": "修改密码-Example",
+              "originalRequest": {
+                "method": "POST",
+                "description": "",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text",
+                    "description": ""
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n    \"newPwd\": \"\", //新密码(MD5加密)\n    \"googleCode\": \"\"\n}"
+                },
+                "url": {
+                  "path": [
+                    "userinfo",
+                    "updatePwd"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/userinfo/updatePwd"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": \"\", //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "修改密码"
+        },
+        {
+          "request": {
+            "method": "POST",
+            "description": "",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text",
+                "description": ""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"nickName\": \"\",\n  \"avatar\": \"\"\n}"
+            },
+            "url": {
+              "path": [
+                "userinfo",
+                "updateBaseInfo"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/userinfo/updateBaseInfo"
+            }
+          },
+          "response": [
+            {
+              "name": "修改用户基础信息-Example",
+              "originalRequest": {
+                "method": "POST",
+                "description": "",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text",
+                    "description": ""
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n    \"nickName\": \"\", //昵称\n    \"avatar\": \"\" //头像\n}"
+                },
+                "url": {
+                  "path": [
+                    "userinfo",
+                    "updateBaseInfo"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/userinfo/updateBaseInfo"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "修改用户基础信息"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "userinfo",
+                "getTeamInfo"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/userinfo/getTeamInfo"
+            }
+          },
+          "response": [
+            {
+              "name": "我的团队页面-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "userinfo",
+                    "getTeamInfo"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/userinfo/getTeamInfo"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": [ //承载数据\n        {\n            \"nickName\": \"\", //昵称\n            \"avatar\": \"\", //头像\n            \"userCode\": \"\", //用户编号\n            \"gameLevel\": 0, //等级\n            \"umbrellaPerformance\": 0.0, //团队业绩\n            \"hasOrdered\": 0 //是否下过单 0=否,1=是\n        }\n    ],\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "我的团队页面"
+        }
+      ],
+      "name": "用户信息表 前端控制器",
+      "description": "用户信息表 前端控制器"
+    },
+    {
+      "item": [
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "usermoney",
+                "queryPtbLast7Price"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/usermoney/queryPtbLast7Price"
+            }
+          },
+          "response": [
+            {
+              "name": "查询平台币最近7天价格-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "usermoney",
+                    "queryPtbLast7Price"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/usermoney/queryPtbLast7Price"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": [ //承载数据\n        {\n            \"date\": 0, //价格日期 格式为:20250809 年月日\n            \"price\": 0.0 //当日价格\n        }\n    ],\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "查询平台币最近7天价格"
+        },
+        {
+          "request": {
+            "method": "POST",
+            "description": "",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text",
+                "description": ""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"amount\": 0.0,\n  \"bizType\": 0\n}"
+            },
+            "url": {
+              "path": [
+                "usermoney",
+                "swap"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/usermoney/swap"
+            }
+          },
+          "response": [
+            {
+              "name": "闪兑-Example",
+              "originalRequest": {
+                "method": "POST",
+                "description": "",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text",
+                    "description": ""
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n    \"amount\": 0.0, //trc划转到bsc\n    \"bizType\": 0 //业务类型 0:usdt划转成为平台币,1:平台币划转成为usdt\n}"
+                },
+                "url": {
+                  "path": [
+                    "usermoney",
+                    "swap"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/usermoney/swap"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "闪兑"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "usermoney",
+                "getUserMoney"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/usermoney/getUserMoney"
+            }
+          },
+          "response": [
+            {
+              "name": "查询钱包余额-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "usermoney",
+                    "getUserMoney"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/usermoney/getUserMoney"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": { //承载数据\n        \"validNum1\": 0.0, //TRC/USDT\n        \"validNum2\": 0.0, //BSC/USDT\n        \"validNum3\": 0.0 //佣金钱包\n    },\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "查询钱包余额"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "usermoney",
+                "getUserMoneyLogList"
+              ],
+              "query": [
+                {
+                  "key": "pageIndex",
+                  "value": "1",
+                  "equals": true,
+                  "description": "当前页 默认10"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "equals": true,
+                  "description": "每页长度 默认20(最大20)"
+                },
+                {
+                  "key": "coinType",
+                  "value": "",
+                  "equals": true,
+                  "description": "币种类型"
+                },
+                {
+                  "key": "sourceType",
+                  "value": "",
+                  "equals": true,
+                  "description": "来源类型 1.充值 2.提现 3.推荐奖 4.级差奖 5.平级奖 6.购买套餐 7.平台扣拨 8.提现手续费 9 提现拒绝 10 提现手续费退回 11 日分润 12 全球分润 13 能量池分红 14 芯奖励"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/usermoney/getUserMoneyLogList"
+            }
+          },
+          "response": [
+            {
+              "name": "钱包流水列表-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "usermoney",
+                    "getUserMoneyLogList"
+                  ],
+                  "query": [
+                    {
+                      "key": "pageIndex",
+                      "value": "1",
+                      "equals": true,
+                      "description": "当前页 默认10"
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "20",
+                      "equals": true,
+                      "description": "每页长度 默认20(最大20)"
+                    },
+                    {
+                      "key": "coinType",
+                      "value": "",
+                      "equals": true,
+                      "description": "币种类型"
+                    },
+                    {
+                      "key": "sourceType",
+                      "value": "",
+                      "equals": true,
+                      "description": "来源类型 1.充值 2.提现 3.推荐奖 4.级差奖 5.平级奖 6.购买套餐 7.平台扣拨 8.提现手续费 9 提现拒绝 10 提现手续费退回 11 日分润 12 全球分润 13 能量池分红 14 芯奖励"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/usermoney/getUserMoneyLogList"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": { //承载数据\n        \"total\": 0,\n        \"list\": [\n            {\n                \"createTime\": \"\", //创建时间\n                \"updateTime\": \"\", //更新时间\n                \"autoCode\": \"\", //谷歌验证码\n                \"params\": { //请求参数\n                    \"key\": {}\n                },\n                \"id\": 0,\n                \"userId\": 0,\n                \"coinType\": 0,\n                \"changeBalance\": 0.0,\n                \"beforeBalance\": 0.0,\n                \"afterBalance\": 0.0,\n                \"serialCode\": \"\",\n                \"sourceCode\": \"\",\n                \"sourceType\": 0,\n                \"remark\": \"\",\n                \"activeFlag\": 0,\n                \"gtId\": \"\", //binlog对应唯一ID 必填\n                \"sourceId\": 0 //来源用户ID\n            }\n        ],\n        \"pageNum\": 0,\n        \"pageSize\": 0,\n        \"size\": 0,\n        \"startRow\": 0,\n        \"endRow\": 0,\n        \"pages\": 0,\n        \"prePage\": 0,\n        \"nextPage\": 0,\n        \"isFirstPage\": false,\n        \"isLastPage\": false,\n        \"hasPreviousPage\": false,\n        \"hasNextPage\": false,\n        \"navigatePages\": 0,\n        \"navigatepageNums\": [\n            0\n        ],\n        \"navigateFirstPage\": 0,\n        \"navigateLastPage\": 0\n    },\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "钱包流水列表"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "usermoney",
+                "listRecordBiz"
+              ],
+              "query": [
+                {
+                  "key": "dictType",
+                  "value": "",
+                  "equals": true,
+                  "description": "字典类型：账单流水  t_user_money_log_source_type"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/usermoney/listRecordBiz"
+            }
+          },
+          "response": [
+            {
+              "name": "根据类型获取明细业务类型-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "usermoney",
+                    "listRecordBiz"
+                  ],
+                  "query": [
+                    {
+                      "key": "dictType",
+                      "value": "",
+                      "equals": true,
+                      "description": "字典类型：账单流水  t_user_money_log_source_type"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/usermoney/listRecordBiz"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": [ //承载数据\n        {\n            \"createBy\": \"\", //创建者\n            \"createTime\": \"\", //创建时间\n            \"deleted\": 0,\n            \"updateBy\": \"\", //更新者\n            \"updateTime\": \"\", //更新时间\n            \"remark\": \"\", //备注\n            \"params\": { //请求参数\n                \"key\": {}\n            },\n            \"dictCode\": 0, //字典编码\n            \"dictSort\": 0, //字典排序\n            \"dictLabel\": \"\", //字典标签\n            \"dictValue\": \"\", //字典键值\n            \"dictType\": \"\", //字典类型\n            \"cssClass\": \"\", //样式属性（其他样式扩展）\n            \"listClass\": \"\", //表格字典样式\n            \"isDefault\": \"\", //是否默认（Y是 N否）\n            \"status\": \"\" //状态（0正常 1停用）\n        }\n    ],\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "根据类型获取明细业务类型"
+        }
+      ],
+      "name": "用户钱包表 前端控制器",
+      "description": "用户钱包表 前端控制器"
+    },
+    {
+      "item": [
+        {
+          "request": {
+            "method": "POST",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "udun",
+                "callback"
+              ],
+              "query": [
+                {
+                  "key": "timestamp",
+                  "value": "",
+                  "equals": true,
+                  "description": ""
+                },
+                {
+                  "key": "nonce",
+                  "value": "",
+                  "equals": true,
+                  "description": ""
+                },
+                {
+                  "key": "sign",
+                  "value": "",
+                  "equals": true,
+                  "description": ""
+                },
+                {
+                  "key": "body",
+                  "value": "",
+                  "equals": true,
+                  "description": ""
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/udun/callback"
+            }
+          },
+          "response": [
+            {
+              "name": "U盾回调地址-Example",
+              "originalRequest": {
+                "method": "POST",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "udun",
+                    "callback"
+                  ],
+                  "query": [
+                    {
+                      "key": "timestamp",
+                      "value": "",
+                      "equals": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "nonce",
+                      "value": "",
+                      "equals": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "sign",
+                      "value": "",
+                      "equals": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "body",
+                      "value": "",
+                      "equals": true,
+                      "description": ""
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/udun/callback"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "null"
+            }
+          ],
+          "name": "U盾回调地址"
+        }
+      ],
+      "name": "udun 控制器",
+      "description": "udun 控制器"
+    },
+    {
+      "item": [
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "common",
+                "qiniu",
+                "token"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/common/qiniu/token"
+            }
+          },
+          "response": [
+            {
+              "name": "查询七牛token-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "common",
+                    "qiniu",
+                    "token"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/common/qiniu/token"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": { //承载数据\n        \"token\": \"\", //token\n        \"domain\": \"\" //域名\n    },\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "查询七牛token"
+        },
+        {
+          "request": {
+            "method": "POST",
+            "description": "",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data",
+                "type": "text",
+                "description": ""
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "value": "",
+                  "type": "file",
+                  "description": ""
+                }
+              ]
+            },
+            "url": {
+              "path": [
+                "api",
+                "common",
+                "upload"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/common/upload"
+            }
+          },
+          "response": [
+            {
+              "name": "通用上传请求（单个）-Example",
+              "originalRequest": {
+                "method": "POST",
+                "description": "",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "multipart/form-data",
+                    "type": "text",
+                    "description": ""
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "value": "",
+                      "type": "file",
+                      "description": ""
+                    }
+                  ]
+                },
+                "url": {
+                  "path": [
+                    "api",
+                    "common",
+                    "upload"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/common/upload"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "通用上传请求（单个）"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "common",
+                "getLastVersion"
+              ],
+              "query": [
+                {
+                  "key": "deviceType",
+                  "value": "",
+                  "equals": true,
+                  "description": "设备类型：ios android"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/common/getLastVersion"
+            }
+          },
+          "response": [
+            {
+              "name": "查询最新的版本号-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "common",
+                    "getLastVersion"
+                  ],
+                  "query": [
+                    {
+                      "key": "deviceType",
+                      "value": "",
+                      "equals": true,
+                      "description": "设备类型：ios android"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/common/getLastVersion"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": { //承载数据\n        \"createTime\": \"\", //创建时间\n        \"updateTime\": \"\", //更新时间\n        \"autoCode\": \"\", //谷歌验证码\n        \"params\": { //请求参数\n            \"key\": {}\n        },\n        \"id\": 0, //主键id\n        \"versionNo\": \"\", //版本号\n        \"versionUrl\": \"\", //版本下载路径\n        \"status\": \"\", //是否强制更新（0：否，1：是）\n        \"deviceType\": \"\", //设备类型：ios android\n        \"note\": \"\", //更新内容备注\n        \"remark\": \"\", //热更新链接\n        \"activeFlag\": 0 //是否删除（1:否,2:是）\n    },\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "查询最新的版本号"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "common",
+                "value"
+              ],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "",
+                  "equals": true,
+                  "description": "WITHDRAWAL_MIN\t提现最小数量\nmine_trade_time_limit\t系统结算时间，不允许交易\nall_share_num\t全网能量池分红数量\nDIRECT_RATIO\t直推奖比例\nWITHDRAWAL_RATIO\t提现手续费比例\nWITHDRAWAL_OPEN_OR_CLOSE\t提现开关(1.关 2.开)\nwechat_account\t客服微信账号\nqq_account\t客服QQ账号"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/common/value"
+            }
+          },
+          "response": [
+            {
+              "name": "查询系统参数-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "common",
+                    "value"
+                  ],
+                  "query": [
+                    {
+                      "key": "code",
+                      "value": "",
+                      "equals": true,
+                      "description": "WITHDRAWAL_MIN\t提现最小数量\nmine_trade_time_limit\t系统结算时间，不允许交易\nall_share_num\t全网能量池分红数量\nDIRECT_RATIO\t直推奖比例\nWITHDRAWAL_RATIO\t提现手续费比例\nWITHDRAWAL_OPEN_OR_CLOSE\t提现开关(1.关 2.开)\nwechat_account\t客服微信账号\nqq_account\t客服QQ账号"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/common/value"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": \"\", //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "查询系统参数"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "common",
+                "getBannerList"
+              ],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "",
+                  "equals": true,
+                  "description": "语言 1:简体中文,2:繁体,3:英文,4:日文,5:韩文"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/common/getBannerList"
+            }
+          },
+          "response": [
+            {
+              "name": "查询广告轮播图-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "common",
+                    "getBannerList"
+                  ],
+                  "query": [
+                    {
+                      "key": "locale",
+                      "value": "",
+                      "equals": true,
+                      "description": "语言 1:简体中文,2:繁体,3:英文,4:日文,5:韩文"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/common/getBannerList"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": { //承载数据\n        \"createTime\": \"\", //创建时间\n        \"updateTime\": \"\", //更新时间\n        \"autoCode\": \"\", //谷歌验证码\n        \"params\": { //请求参数\n            \"key\": {}\n        },\n        \"id\": 0, //id\n        \"image\": \"\", //图片路径\n        \"url\": \"\", //图片url\n        \"noticeId\": 0, //公告id(废弃)\n        \"type\": 0, //语言 1:简体中文,2:繁体,3:英文,4:日文,5:韩文\n        \"sort\": 0, //图片排序\n        \"content\": \"\", //图片说明\n        \"enable\": \"\" //状态（0正常 1停用）\n    },\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "查询广告轮播图"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "common",
+                "getLastNotice"
+              ],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "",
+                  "equals": true,
+                  "description": "语言 1:简体中文,2:繁体,3:英文,4:日文,5:韩文"
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "equals": true,
+                  "description": "公告类型 1:公告,2:咨询中心,3:基金百科"
+                },
+                {
+                  "key": "lastId",
+                  "value": "",
+                  "equals": true,
+                  "description": ""
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/common/getLastNotice"
+            }
+          },
+          "response": [
+            {
+              "name": "查询公告列表 默认分5条-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "common",
+                    "getLastNotice"
+                  ],
+                  "query": [
+                    {
+                      "key": "locale",
+                      "value": "",
+                      "equals": true,
+                      "description": "语言 1:简体中文,2:繁体,3:英文,4:日文,5:韩文"
+                    },
+                    {
+                      "key": "type",
+                      "value": "",
+                      "equals": true,
+                      "description": "公告类型 1:公告,2:咨询中心,3:基金百科"
+                    },
+                    {
+                      "key": "lastId",
+                      "value": "",
+                      "equals": true,
+                      "description": ""
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/common/getLastNotice"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": [ //承载数据\n        {\n            \"noticeId\": 0, //公告ID\n            \"noticeTitle\": \"\", //公告标题\n            \"noticeType\": 0, //通知类型 1:公告,2:咨询中心,3:基金百科\n            \"noticeContent\": \"\", //公告内容\n            \"status\": \"\", //公告状态（0正常 1关闭）\n            \"createBy\": \"\", //创建者\n            \"createTime\": \"\", //创建时间\n            \"updateBy\": \"\", //更新者\n            \"updateTime\": \"\", //更新时间\n            \"remark\": \"\", //备注\n            \"type\": 0 //语言 1:简体中文,2:繁体,3:英文,4:日文,5:韩文\n        }\n    ],\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "查询公告列表 默认分5条"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "common",
+                "listParamValues"
+              ],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "",
+                  "equals": true,
+                  "description": "WITHDRAWAL_MIN\t提现最小数量\nmine_trade_time_limit\t系统结算时间，不允许交易\nall_share_num\t全网能量池分红数量\nDIRECT_RATIO\t直推奖比例\nWITHDRAWAL_RATIO\t提现手续费比例\nWITHDRAWAL_OPEN_OR_CLOSE\t提现开关(1.关 2.开)\nwechat_account\t客服微信账号\nqq_account\t客服QQ账号"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/common/listParamValues"
+            }
+          },
+          "response": [
+            {
+              "name": "批量查询系统参数，多个以英文逗号拼接-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "common",
+                    "listParamValues"
+                  ],
+                  "query": [
+                    {
+                      "key": "code",
+                      "value": "",
+                      "equals": true,
+                      "description": "WITHDRAWAL_MIN\t提现最小数量\nmine_trade_time_limit\t系统结算时间，不允许交易\nall_share_num\t全网能量池分红数量\nDIRECT_RATIO\t直推奖比例\nWITHDRAWAL_RATIO\t提现手续费比例\nWITHDRAWAL_OPEN_OR_CLOSE\t提现开关(1.关 2.开)\nwechat_account\t客服微信账号\nqq_account\t客服QQ账号"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/common/listParamValues"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": [ //承载数据\n        {\n            \"createTime\": \"\", //创建时间\n            \"updateTime\": \"\", //更新时间\n            \"autoCode\": \"\", //谷歌验证码\n            \"params\": { //请求参数\n                \"key\": {}\n            },\n            \"sysParaId\": 0,\n            \"paraCode\": \"\",\n            \"paraValue\": \"\",\n            \"paraDesc\": \"\",\n            \"remark\": \"\",\n            \"activeFlag\": 0\n        }\n    ],\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "批量查询系统参数，多个以英文逗号拼接"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "common",
+                "listCodeMsg"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/common/listCodeMsg"
+            }
+          },
+          "response": [
+            {
+              "name": "获取系统所有的状态码，以及对应的msg-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "common",
+                    "listCodeMsg"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/common/listCodeMsg"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": [ //承载数据\n        {\n            \"0\": \"\"\n        }\n    ],\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "获取系统所有的状态码，以及对应的msg"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "common",
+                "getContract"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "",
+                  "equals": true,
+                  "description": "协议类型  1:隐私协议  3:服务协议"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/common/getContract"
+            }
+          },
+          "response": [
+            {
+              "name": "查询合同协议-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "common",
+                    "getContract"
+                  ],
+                  "query": [
+                    {
+                      "key": "type",
+                      "value": "",
+                      "equals": true,
+                      "description": "协议类型  1:隐私协议  3:服务协议"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/common/getContract"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": { //承载数据\n        \"createBy\": \"\", //创建者\n        \"createTime\": \"\", //创建时间\n        \"deleted\": 0,\n        \"updateBy\": \"\", //更新者\n        \"updateTime\": \"\", //更新时间\n        \"remark\": \"\", //备注\n        \"params\": { //请求参数\n            \"key\": {}\n        },\n        \"id\": 0, //主键id\n        \"type\": 0, //协议类型  1:用户协议  2:第三方基金交易协议 3:隐私协议 4:平仓协议 5:股票交易协议 6:借贷协议\n        \"bizType\": 0, //语言类型 0:繁体中文,1:英文\n        \"content\": \"\", //内容\n        \"status\": 0 //状态 1: 上架 2:下架\n    },\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "查询合同协议"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "common",
+                "getCurrentDate"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/common/getCurrentDate"
+            }
+          },
+          "response": [
+            {
+              "name": "查询服务器现在的时间-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "common",
+                    "getCurrentDate"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/common/getCurrentDate"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": \"\", //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "查询服务器现在的时间"
+        }
+      ],
+      "name": "公用控制层",
+      "description": "公用控制层"
+    },
+    {
+      "item": [
+        {
+          "request": {
+            "method": "POST",
+            "description": "",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text",
+                "description": ""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"amount\": 0.0,\n  \"coinType\": 0,\n  \"toUserAccount\": \"\",\n  \"googleCode\": \"\"\n}"
+            },
+            "url": {
+              "path": [
+                "api",
+                "transfer",
+                "createOrder"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/transfer/createOrder"
+            }
+          },
+          "response": [
+            {
+              "name": "发起转账,通过userCode转账-Example",
+              "originalRequest": {
+                "method": "POST",
+                "description": "",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text",
+                    "description": ""
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n    \"amount\": 0.0, //转账金额,转账金额最多保留2位小数点\n    \"coinType\": 0, //转账币种 1:USDT\n    \"toUserAccount\": \"\", //收款人用户UserCode\n    \"googleCode\": \"\" //谷歌验证码\n}"
+                },
+                "url": {
+                  "path": [
+                    "api",
+                    "transfer",
+                    "createOrder"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/transfer/createOrder"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "发起转账,通过userCode转账"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "transfer",
+                "listTransferRecord"
+              ],
+              "query": [
+                {
+                  "key": "lastId",
+                  "value": "",
+                  "equals": true,
+                  "description": "当前记录最后一个ID"
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "equals": true,
+                  "description": "1:转账,2:接收,3:查询转账+接收记录"
+                },
+                {
+                  "key": "coinType",
+                  "value": "",
+                  "equals": true,
+                  "description": "转账币种 1:USDT"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/transfer/listTransferRecord"
+            }
+          },
+          "response": [
+            {
+              "name": "转账记录-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "transfer",
+                    "listTransferRecord"
+                  ],
+                  "query": [
+                    {
+                      "key": "lastId",
+                      "value": "",
+                      "equals": true,
+                      "description": "当前记录最后一个ID"
+                    },
+                    {
+                      "key": "type",
+                      "value": "",
+                      "equals": true,
+                      "description": "1:转账,2:接收,3:查询转账+接收记录"
+                    },
+                    {
+                      "key": "coinType",
+                      "value": "",
+                      "equals": true,
+                      "description": "转账币种 1:USDT"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/transfer/listTransferRecord"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": [ //承载数据\n        {\n            \"createBy\": \"\", //创建者\n            \"createTime\": \"\", //创建时间\n            \"deleted\": 0,\n            \"updateBy\": \"\", //更新者\n            \"updateTime\": \"\", //更新时间\n            \"remark\": \"\", //备注\n            \"params\": { //请求参数\n                \"key\": {}\n            },\n            \"id\": 0, //主键id\n            \"fromUserId\": 0, //转账用户ID\n            \"fromAccount\": \"\", //转账用户账号\n            \"toUserId\": 0, //接收用户ID\n            \"toAccount\": \"\", //接收用户账号\n            \"code\": \"\", //转账订单号\n            \"coinType\": 0, //转账币种 1:USDT,2PTB\n            \"changeBalance\": 0.0, //转账额度\n            \"feeBalance\": 0.0, //手续费\n            \"feeRatio\": \"\", //手续费率\n            \"actualAmount\": 0.0 //到账金额，用户实际收到的金额（扣除手续费后的金额）\n        }\n    ],\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "转账记录"
+        }
+      ],
+      "name": "用户转账相关 前端控制器",
+      "description": "用户转账相关 前端控制器"
+    },
+    {
+      "item": [
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "recharge",
+                "getRechargeInfo"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/recharge/getRechargeInfo"
+            }
+          },
+          "response": [
+            {
+              "name": "获取充值地址相关信息-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "recharge",
+                    "getRechargeInfo"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/recharge/getRechargeInfo"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": [ //承载数据\n        {\n            \"createBy\": \"\", //创建者\n            \"createTime\": \"\", //创建时间\n            \"deleted\": 0,\n            \"updateBy\": \"\", //更新者\n            \"updateTime\": \"\", //更新时间\n            \"remark\": \"\", //备注\n            \"params\": { //请求参数\n                \"key\": {}\n            },\n            \"id\": 0, //主键\n            \"userId\": 0, //用户id\n            \"chainId\": 0, //链 0:暂无,2510:BEP-20,60:ERC-20,195:TRC-20\n            \"address\": \"\" //充值地址\n        }\n    ],\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "获取充值地址相关信息"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "recharge",
+                "listRechargeRecord"
+              ],
+              "query": [
+                {
+                  "key": "lastId",
+                  "value": "",
+                  "equals": true,
+                  "description": "当前记录最后一个ID"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/recharge/listRechargeRecord"
+            }
+          },
+          "response": [
+            {
+              "name": "充值记录-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "recharge",
+                    "listRechargeRecord"
+                  ],
+                  "query": [
+                    {
+                      "key": "lastId",
+                      "value": "",
+                      "equals": true,
+                      "description": "当前记录最后一个ID"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/recharge/listRechargeRecord"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": [ //承载数据\n        {\n            \"createBy\": \"\", //创建者\n            \"createTime\": \"\", //创建时间\n            \"deleted\": 0,\n            \"updateBy\": \"\", //更新者\n            \"updateTime\": \"\", //更新时间\n            \"remark\": \"\", //备注\n            \"params\": { //请求参数\n                \"key\": {}\n            },\n            \"id\": \"\", //主键id\n            \"userId\": 0, //用户ID\n            \"orderNo\": \"\", //充值订单号\n            \"chainId\": 0, //链 0:暂无,2510:BEP-20,60:ERC-20,195:TRC-20\n            \"rechargeAmount\": 0.0, //充值金额\n            \"status\": 0, //状态(0:待审核 1:已通过 2:已拒绝)\n            \"txId\": \"\"\n        }\n    ],\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "充值记录"
+        }
+      ],
+      "name": "用户充值相关 前端控制器",
+      "description": "用户充值相关 前端控制器"
+    },
+    {
+      "item": [
+        {
+          "request": {
+            "method": "GET",
+            "description": "「已废弃」",
+            "header": [],
+            "url": {
+              "path": [
+                "queue",
+                "send"
+              ],
+              "query": [
+                {
+                  "key": "delay",
+                  "value": "60",
+                  "equals": true,
+                  "description": "延时时间(秒)"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/queue/send"
+            }
+          },
+          "response": [
+            {
+              "name": "测试发送延时消息-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "「已废弃」",
+                "header": [],
+                "url": {
+                  "path": [
+                    "queue",
+                    "send"
+                  ],
+                  "query": [
+                    {
+                      "key": "delay",
+                      "value": "60",
+                      "equals": true,
+                      "description": "延时时间(秒)"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/queue/send"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "测试发送延时消息"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "「已废弃」",
+            "header": [],
+            "url": {
+              "path": [
+                "queue",
+                "status"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/queue/status"
+            }
+          },
+          "response": [
+            {
+              "name": "检查队列状态-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "「已废弃」",
+                "header": [],
+                "url": {
+                  "path": [
+                    "queue",
+                    "status"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/queue/status"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "检查队列状态"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "「已废弃」",
+            "header": [],
+            "url": {
+              "path": [
+                "queue",
+                "start-listener"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/queue/start-listener"
+            }
+          },
+          "response": [
+            {
+              "name": "添加队列监听器-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "「已废弃」",
+                "header": [],
+                "url": {
+                  "path": [
+                    "queue",
+                    "start-listener"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/queue/start-listener"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "添加队列监听器"
+        }
+      ],
+      "name": "延时队列测试控制器",
+      "description": "延时队列测试控制器"
+    },
+    {
+      "item": [
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "mining",
+                "getPackageList"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "",
+                  "equals": true,
+                  "description": "0:活期,1:定期.不传查询所有"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/mining/getPackageList"
+            }
+          },
+          "response": [
+            {
+              "name": "获取基金套餐-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "mining",
+                    "getPackageList"
+                  ],
+                  "query": [
+                    {
+                      "key": "type",
+                      "value": "",
+                      "equals": true,
+                      "description": "0:活期,1:定期.不传查询所有"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/mining/getPackageList"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": [ //承载数据\n        {\n            \"createBy\": \"\", //创建者\n            \"createTime\": \"\", //创建时间\n            \"deleted\": 0,\n            \"updateBy\": \"\", //更新者\n            \"updateTime\": \"\", //更新时间\n            \"remark\": \"\", //备注\n            \"params\": { //请求参数\n                \"key\": {}\n            },\n            \"id\": 0, //主键id\n            \"nameCn\": \"\", //基金名称_cn\n            \"type\": 0, //基金类型 0:活期,1:定期\n            \"day\": 0, //基金有效期天数\n            \"dayRatio\": 0.0, //日利率\n            \"buyNum\": 0, //销量\n            \"minBuyPrice\": 0.0, //最少购买金额限制\n            \"dailyPenaltyReduction\": 0.0, //每日违约金递减率(如0.5%)\n            \"penaltyRate\": 0.0, //违约金比例(如20%)\n            \"nameHk\": \"\", //基金名称_hk 繁体\n            \"nameEn\": \"\", //基金名称_en 英文\n            \"nameJa\": \"\", //基金名称_ja 日文\n            \"nameKr\": \"\", //基金名称_kr 韩文\n            \"status\": 0, //是否上架 0:否,1:是\n            \"sort\": 0, //排序\n            \"descriptionCn\": \"\", //描述_中文\n            \"descriptionHk\": \"\", //描述_hk 繁体\n            \"descriptionEn\": \"\", //描述_en 英文\n            \"descriptionJa\": \"\", //描述_ja 日文\n            \"descriptionKr\": \"\" //描述_kr 韩文\n        }\n    ],\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "获取基金套餐"
+        },
+        {
+          "request": {
+            "method": "POST",
+            "description": "",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text",
+                "description": ""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"id\": 0,\n  \"amount\": 0.0\n}"
+            },
+            "url": {
+              "path": [
+                "api",
+                "mining",
+                "createOrder"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/mining/createOrder"
+            }
+          },
+          "response": [
+            {
+              "name": "购买基金套餐-Example",
+              "originalRequest": {
+                "method": "POST",
+                "description": "",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text",
+                    "description": ""
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n    \"id\": 0, //质押套餐id\n    \"amount\": 0.0 //质押金额\n}"
+                },
+                "url": {
+                  "path": [
+                    "api",
+                    "mining",
+                    "createOrder"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/mining/createOrder"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "购买基金套餐"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "mining",
+                "packageOrderList"
+              ],
+              "query": [
+                {
+                  "key": "lastId",
+                  "value": "",
+                  "equals": true,
+                  "description": ""
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "equals": true,
+                  "description": "0:活期,1:定期"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/mining/packageOrderList"
+            }
+          },
+          "response": [
+            {
+              "name": "基金购买记录-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "mining",
+                    "packageOrderList"
+                  ],
+                  "query": [
+                    {
+                      "key": "lastId",
+                      "value": "",
+                      "equals": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "type",
+                      "value": "",
+                      "equals": true,
+                      "description": "0:活期,1:定期"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/mining/packageOrderList"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": [ //承载数据\n        {\n            \"id\": 0, //主键id\n            \"orderNo\": \"\", //订单号\n            \"buyPrice\": 0.0, //购买金额(本金)\n            \"days\": 0, //矿机天数\n            \"haveDays\": 0, //剩余天数\n            \"runDays\": 0, //运行天数\n            \"type\": 0, //矿机类型 0:活期,1:固定\n            \"dayRatio\": 0.0, //日利率\n            \"totalReward\": 0.0, //累计收益\n            \"maxReward\": 0.0, //最大收益\n            \"status\": 0, //状态 0:释放中,1:已经达到最大倍数,2:已结束\n            \"dailyPenaltyReduction\": 0.0, //订单每日违约金递减率(如0.5%)\n            \"penaltyRate\": 0.0, //订单违约金比例(如20%)\n            \"currentPenaltyRate\": 0.0, //当前违约金比例\n            \"principalReturned\": 0, //是否退本 0:否,1:是\n            \"createTime\": \"\" //创建时间\n        }\n    ],\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "基金购买记录"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "mining",
+                "totalEarnings"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "",
+                  "equals": true,
+                  "description": "0:活期,1:定期"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/mining/totalEarnings"
+            }
+          },
+          "response": [
+            {
+              "name": "基金收益信息-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "mining",
+                    "totalEarnings"
+                  ],
+                  "query": [
+                    {
+                      "key": "type",
+                      "value": "",
+                      "equals": true,
+                      "description": "0:活期,1:定期"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/mining/totalEarnings"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": { //承载数据\n        \"totalEarnings\": 0.0, //订单总收益\n        \"currentEarnings\": 0.0, //当前已释放\n        \"remainingEarnings\": 0.0 //剩余未释放\n    },\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "基金收益信息"
+        },
+        {
+          "request": {
+            "method": "POST",
+            "description": "",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text",
+                "description": ""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"id\": 0\n}"
+            },
+            "url": {
+              "path": [
+                "api",
+                "mining",
+                "redeem"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/mining/redeem"
+            }
+          },
+          "response": [
+            {
+              "name": "基金赎回-Example",
+              "originalRequest": {
+                "method": "POST",
+                "description": "",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text",
+                    "description": ""
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n    \"id\": 0 //订单id\n}"
+                },
+                "url": {
+                  "path": [
+                    "api",
+                    "mining",
+                    "redeem"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/mining/redeem"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "基金赎回"
+        }
+      ],
+      "name": "基金相关 前端控制器",
+      "description": "基金相关 前端控制器"
+    },
+    {
+      "item": [
+        {
+          "request": {
+            "method": "POST",
+            "description": "",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text",
+                "description": ""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"changeBalance\": 0.0,\n  \"coinType\": 0,\n  \"address\": \"\",\n  \"chainId\": 0,\n  \"googleCode\": \"\"\n}"
+            },
+            "url": {
+              "path": [
+                "api",
+                "withdrawal",
+                "addWithdrawal"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/withdrawal/addWithdrawal"
+            }
+          },
+          "response": [
+            {
+              "name": "发起体现.目前支持USDT-Example",
+              "originalRequest": {
+                "method": "POST",
+                "description": "",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text",
+                    "description": ""
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n    \"changeBalance\": 0.0, //提现金额\n    \"coinType\": 0, //币种 1:USDT\n    \"address\": \"\", //提现地址\n    /**\n     * 链ID\n     * 195 trc-20\n     * 2510 bsc\n     */\n    \"chainId\": 0,\n    \"googleCode\": \"\"\n}"
+                },
+                "url": {
+                  "path": [
+                    "api",
+                    "withdrawal",
+                    "addWithdrawal"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/withdrawal/addWithdrawal"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": {}, //承载数据\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "发起体现.目前支持USDT"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "api",
+                "withdrawal",
+                "listWithdrawRecord"
+              ],
+              "query": [
+                {
+                  "key": "lastId",
+                  "value": "",
+                  "equals": true,
+                  "description": "当前记录最后一个ID"
+                },
+                {
+                  "key": "coinType",
+                  "value": "",
+                  "equals": true,
+                  "description": "币种类型    2:BSC/USDT,3:佣金钱包"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/api/withdrawal/listWithdrawRecord"
+            }
+          },
+          "response": [
+            {
+              "name": "提现记录-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "api",
+                    "withdrawal",
+                    "listWithdrawRecord"
+                  ],
+                  "query": [
+                    {
+                      "key": "lastId",
+                      "value": "",
+                      "equals": true,
+                      "description": "当前记录最后一个ID"
+                    },
+                    {
+                      "key": "coinType",
+                      "value": "",
+                      "equals": true,
+                      "description": "币种类型    2:BSC/USDT,3:佣金钱包"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/api/withdrawal/listWithdrawRecord"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": [ //承载数据\n        {\n            \"createTime\": \"\", //创建时间\n            \"updateTime\": \"\", //更新时间\n            \"autoCode\": \"\", //谷歌验证码\n            \"params\": { //请求参数\n                \"key\": {}\n            },\n            \"id\": 0, //id\n            \"userId\": 0, //用户id\n            \"code\": \"\", //提现单号\n            \"coinType\": 0, //提现币种 1:USDT\n            \"chainId\": 0, //链id\n            \"changeBalance\": 0.0, //提现额度\n            \"feeBalance\": 0.0, //手续费额度\n            \"feeRatio\": 0.0, //手续费率\n            \"accountNo\": \"\", //提现地址\n            \"status\": 0, //状态(0.待审核1.审核成功2.审核驳回)\n            \"activeFlag\": 0, //废弃\n            \"remark\": \"\" //备注\n        }\n    ],\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "提现记录"
+        }
+      ],
+      "name": "用户提现相关 前端控制器",
+      "description": "用户提现相关 前端控制器"
+    },
+    {
+      "item": [
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "sysnotice",
+                "getSysNoticeList"
+              ],
+              "query": [
+                {
+                  "key": "pageIndex",
+                  "value": "1",
+                  "equals": true,
+                  "description": "当前页 默认1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "equals": true,
+                  "description": "每页长度 默认20(最大20)"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/sysnotice/getSysNoticeList"
+            }
+          },
+          "response": [
+            {
+              "name": "公告列表-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "sysnotice",
+                    "getSysNoticeList"
+                  ],
+                  "query": [
+                    {
+                      "key": "pageIndex",
+                      "value": "1",
+                      "equals": true,
+                      "description": "当前页 默认1"
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "20",
+                      "equals": true,
+                      "description": "每页长度 默认20(最大20)"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/sysnotice/getSysNoticeList"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": { //承载数据\n        \"total\": 0,\n        \"list\": [\n            {\n                \"noticeId\": 0, //公告ID\n                \"noticeTitle\": \"\", //公告标题\n                \"noticeType\": 0, //通知类型 1:公告,2:咨询中心,3:基金百科\n                \"noticeContent\": \"\", //公告内容\n                \"status\": \"\", //公告状态（0正常 1关闭）\n                \"createBy\": \"\", //创建者\n                \"createTime\": \"\", //创建时间\n                \"updateBy\": \"\", //更新者\n                \"updateTime\": \"\", //更新时间\n                \"remark\": \"\", //备注\n                \"type\": 0 //语言 1:简体中文,2:繁体,3:英文,4:日文,5:韩文\n            }\n        ],\n        \"pageNum\": 0,\n        \"pageSize\": 0,\n        \"size\": 0,\n        \"startRow\": 0,\n        \"endRow\": 0,\n        \"pages\": 0,\n        \"prePage\": 0,\n        \"nextPage\": 0,\n        \"isFirstPage\": false,\n        \"isLastPage\": false,\n        \"hasPreviousPage\": false,\n        \"hasNextPage\": false,\n        \"navigatePages\": 0,\n        \"navigatepageNums\": [\n            0\n        ],\n        \"navigateFirstPage\": 0,\n        \"navigateLastPage\": 0\n    },\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "公告列表"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "sysnotice",
+                "getSysNoticeInfo"
+              ],
+              "query": [
+                {
+                  "key": "noticeId",
+                  "value": "",
+                  "equals": true,
+                  "description": "公告id"
+                }
+              ],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/sysnotice/getSysNoticeInfo"
+            }
+          },
+          "response": [
+            {
+              "name": "根据公告id查询详情-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "sysnotice",
+                    "getSysNoticeInfo"
+                  ],
+                  "query": [
+                    {
+                      "key": "noticeId",
+                      "value": "",
+                      "equals": true,
+                      "description": "公告id"
+                    }
+                  ],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/sysnotice/getSysNoticeInfo"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": { //承载数据\n        \"noticeId\": 0, //公告ID\n        \"noticeTitle\": \"\", //公告标题\n        \"noticeType\": 0, //通知类型 1:公告,2:咨询中心,3:基金百科\n        \"noticeContent\": \"\", //公告内容\n        \"status\": \"\", //公告状态（0正常 1关闭）\n        \"createBy\": \"\", //创建者\n        \"createTime\": \"\", //创建时间\n        \"updateBy\": \"\", //更新者\n        \"updateTime\": \"\", //更新时间\n        \"remark\": \"\", //备注\n        \"type\": 0 //语言 1:简体中文,2:繁体,3:英文,4:日文,5:韩文\n    },\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "根据公告id查询详情"
+        },
+        {
+          "request": {
+            "method": "GET",
+            "description": "",
+            "header": [],
+            "url": {
+              "path": [
+                "sysnotice",
+                "getLastNoticeInfo"
+              ],
+              "query": [],
+              "host": [
+                "{{blockPay-app}}"
+              ],
+              "raw": "{{blockPay-app}}/sysnotice/getLastNoticeInfo"
+            }
+          },
+          "response": [
+            {
+              "name": "获取最新一条公告信息-Example",
+              "originalRequest": {
+                "method": "GET",
+                "description": "",
+                "header": [],
+                "url": {
+                  "path": [
+                    "sysnotice",
+                    "getLastNoticeInfo"
+                  ],
+                  "query": [],
+                  "host": [
+                    "{{blockPay-app}}"
+                  ],
+                  "raw": "{{blockPay-app}}/sysnotice/getLastNoticeInfo"
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "name": "date",
+                  "key": "date",
+                  "value": "周一, 11 8月 202516:58:35 GMT",
+                  "description": "The date and time that the message was sent"
+                },
+                {
+                  "name": "server",
+                  "key": "server",
+                  "value": "Apache-Coyote/1.1",
+                  "description": "A name for the server"
+                },
+                {
+                  "name": "transfer-encoding",
+                  "key": "transfer-encoding",
+                  "value": "chunked",
+                  "description": "The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity."
+                },
+                {
+                  "name": "content-type",
+                  "key": "content-type",
+                  "value": "application/json;charset=UTF-8"
+                }
+              ],
+              "body": "{\n    \"code\": 0, //状态码\n    \"success\": false, //是否成功\n    \"data\": { //承载数据\n        \"noticeId\": 0, //公告ID\n        \"noticeTitle\": \"\", //公告标题\n        \"noticeType\": 0, //通知类型 1:公告,2:咨询中心,3:基金百科\n        \"noticeContent\": \"\", //公告内容\n        \"status\": \"\", //公告状态（0正常 1关闭）\n        \"createBy\": \"\", //创建者\n        \"createTime\": \"\", //创建时间\n        \"updateBy\": \"\", //更新者\n        \"updateTime\": \"\", //更新时间\n        \"remark\": \"\", //备注\n        \"type\": 0 //语言 1:简体中文,2:繁体,3:英文,4:日文,5:韩文\n    },\n    \"msg\": \"\" //返回消息\n}"
+            }
+          ],
+          "name": "获取最新一条公告信息"
+        }
+      ],
+      "name": "通知公告表 前端控制器",
+      "description": "通知公告表 前端控制器"
+    }
+  ],
+  "info": {
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "name": "blockPay-app-20250811165835",
+    "description": "exported at 2025-08-11 16:58:35"
+  }
+}

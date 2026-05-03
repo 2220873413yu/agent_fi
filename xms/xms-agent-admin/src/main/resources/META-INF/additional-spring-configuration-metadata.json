@@ -1,0 +1,24 @@
+{
+  "properties": [
+    {
+      "name": "renegade.lock.address",
+      "type": "java.lang.String",
+      "description": "Description for renegade.lock.address."
+    },
+    {
+      "name": "renegade.lock.password",
+      "type": "java.lang.String",
+      "description": "Description for renegade.lock.password."
+    },
+    {
+      "name": "renegade.lock.enabled",
+      "type": "java.lang.String",
+      "description": "Description for renegade.lock.enabled."
+    },
+
+    {
+      "name": "swagger.enabled",
+      "type": "java.lang.String",
+      "description": "Description for swagger.enabled."
+    }
+  ] }

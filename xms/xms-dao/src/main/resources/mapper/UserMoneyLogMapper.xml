@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.UserMoneyLogMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="UserMoneyLogResult" type="com.xms.dao.entity.domain.UserMoneyLog">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="coin_type" property="coinType" />
+        <result column="change_balance" property="changeBalance" />
+        <result column="before_balance" property="beforeBalance" />
+        <result column="after_balance" property="afterBalance" />
+        <result column="serial_code" property="serialCode" />
+        <result column="source_code" property="sourceCode" />
+        <result column="source_type" property="sourceType" />
+        <result column="remark" property="remark" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="active_flag" property="activeFlag" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="selectUserMoneyLogVo">
+        select id, user_id, coin_type, change_balance, before_balance, after_balance, serial_code, source_code, source_type, remark, create_time, update_time, active_flag from t_user_money_log
+    </sql>
+
+    <select id="getUserMoneyLogList" resultType="com.xms.dao.entity.bo.UserMoneyLogBo">
+        SELECT
+        id,
+        user_id userId,
+        coin_type coinType,
+        change_balance changeBalance,
+        before_balance beforeBalance,
+        after_balance afterBalance,
+        serial_code serialCode,
+        source_code sourceCode,
+        source_type sourceType,
+        remark,
+        create_time createTime
+        FROM
+        t_user_money_log
+        WHERE active_flag = 1 and user_id = #{userId}
+        <if test="coinType != null">
+            and coin_type = #{coinType}
+        </if>
+        <if test="sourceType != null">
+            and source_type = #{sourceType}
+        </if>
+        ORDER BY id desc
+    </select>
+
+
+    <select id="selectUserMoneyLogList" parameterType="com.xms.dao.entity.domain.UserMoneyLog" resultMap="UserMoneyLogResult">
+        <include refid="selectUserMoneyLogVo"/>
+        <where>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="coinType != null "> and coin_type = #{coinType}</if>
+            <if test="changeBalance != null "> and change_balance = #{changeBalance}</if>
+            <if test="beforeBalance != null "> and before_balance = #{beforeBalance}</if>
+            <if test="afterBalance != null "> and after_balance = #{afterBalance}</if>
+            <if test="serialCode != null  and serialCode != ''"> and serial_code = #{serialCode}</if>
+            <if test="sourceCode != null  and sourceCode != ''"> and source_code = #{sourceCode}</if>
+            <if test="sourceType != null "> and source_type = #{sourceType}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''">
+                and create_time &gt;= #{params.beginCreateTime}
+                and create_time &lt; DATE_FORMAT(DATE_ADD(#{params.endCreateTime}, INTERVAL 1 DAY),'%Y-%m-%d')
+            </if>
+            and active_flag = 1
+        </where>
+        order by id desc
+    </select>
+
+    <select id="queryYesterdayReward" parameterType="long" resultType="decimal">
+        SELECT
+            COALESCE(SUM(change_balance), 0) AS yesterday_income
+        FROM
+            t_user_money_log
+        WHERE
+            user_id = #{userId} -- 这里替换为具体的用户ID
+          AND coin_type = 3
+          AND source_type IN (8, 11, 12)
+          AND DATE(create_time) = DATE(DATE_SUB(CURDATE(), INTERVAL 1 DAY))
+          AND active_flag = 1;
+    </select>
+
+    <select id="queryCurrentMonthReward" parameterType="long" resultType="decimal">
+        SELECT
+        COALESCE(SUM(change_balance), 0) AS current_month_income
+        FROM
+        t_user_money_log
+        WHERE
+        user_id = #{userId}
+        AND coin_type = 3
+        AND source_type IN (8, 11, 12)
+        AND create_time &gt;= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+        AND create_time &lt;= NOW()
+        AND active_flag = 1;
+    </select>
+
+    <select id="totalAmountV9" resultType="decimal">
+        SELECT
+            COALESCE(SUM(change_balance), 0) AS totalAmount
+        FROM
+            t_user_money_log
+        WHERE coin_type = 2 AND source_type = 8
+    </select>
+</mapper>

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.RewardRecordMapper">
+
+    <resultMap type="RewardRecord" id="RewardRecordResult">
+        <result property="id"    column="id"    />
+        <result property="coinType"    column="coin_type"    />
+        <result property="orderCode"    column="order_code"    />
+        <result property="userId"    column="user_id"    />
+        <result property="amount"    column="amount"    />
+        <result property="businessType"    column="business_type"    />
+        <result property="sourceType"    column="source_type"    />
+        <result property="sourceOrderCode"    column="source_order_code"    />
+        <result property="sourceUserId"    column="source_user_id"    />
+        <result property="gtId"    column="gt_id"    />
+        <result property="settlementStatus"    column="settlement_status"    />
+        <result property="realTimePrice"    column="real_time_price"    />
+        <result property="remark"    column="remark"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectRewardRecordVo">
+        select coin_type, id, order_code, user_id, amount, business_type, source_type, source_order_code, source_user_id, gt_id, settlement_status, real_time_price, remark, create_time, update_time from xms_reward_record
+    </sql>
+
+    <select id="selectRewardRecordList" parameterType="RewardRecord"
+            resultMap="RewardRecordResult">
+        <include refid="selectRewardRecordVo"/>
+        <where>
+            <if test="orderCode != null  and orderCode != ''"> and order_code = #{orderCode}</if>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="coinType != null "> and coin_type = #{coinType}</if>
+            <if test="amount != null "> and amount = #{amount}</if>
+            <if test="businessType != null "> and business_type = #{businessType}</if>
+            <if test="sourceType != null "> and source_type = #{sourceType}</if>
+            <if test="sourceOrderCode != null  and sourceOrderCode != ''"> and source_order_code = #{sourceOrderCode}</if>
+            <if test="sourceUserId != null "> and source_user_id = #{sourceUserId}</if>
+            <if test="gtId != null  and gtId != ''"> and gt_id = #{gtId}</if>
+            <if test="settlementStatus != null "> and settlement_status = #{settlementStatus}</if>
+            <if test="realTimePrice != null "> and real_time_price = #{realTimePrice}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+        </where>
+        order by id desc
+    </select>
+
+
+    <select id="rewardList" resultType="com.xms.dao.entity.bo.RewardRecordBo">
+        select order_code as orderCode, amount,  source_type as sourceType, create_time from xms_reward_record
+        where user_id = #{userId}
+        <if test="bizType == -1"> and business_type in (1,2,3)</if>
+        <if test="bizType == 1"> and business_type = 1</if>
+        <if test="bizType == 2"> and business_type = 2</if>
+        <if test="bizType == 3"> and business_type = 3</if>
+        <if test="startTime != null"> and create_time <![CDATA[ >= ]]> #{startTime}</if>
+        <if test="endTime != null"> and create_time <![CDATA[ <= ]]> #{endTime}</if>
+        order by id desc
+    </select>
+</mapper>

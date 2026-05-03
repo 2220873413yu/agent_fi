@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.DiyStoreProductAttrMapper">
+
+    <resultMap type="DiyStoreProductAttr" id="DiyStoreProductAttrResult">
+        <result property="id"    column="id"    />
+        <result property="productId"    column="product_id"    />
+        <result property="attrName"    column="attr_name"    />
+        <result property="attrValues"    column="attr_values"    />
+        <result property="remark"    column="remark"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="deleted"    column="deleted"    />
+    </resultMap>
+
+    <sql id="selectDiyStoreProductAttrVo">
+        select id, product_id, attr_name, attr_values, remark, create_time, create_by, update_time, update_by, deleted from xms_diy_store_product_attr
+    </sql>
+
+    <select id="selectDiyStoreProductAttrList" parameterType="DiyStoreProductAttr"
+            resultMap="DiyStoreProductAttrResult">
+        <include refid="selectDiyStoreProductAttrVo"/>
+        <where>
+            <if test="productId != null  and productId != ''"> and product_id = #{productId}</if>
+            <if test="attrName != null  and attrName != ''"> and attr_name like concat('%', #{attrName}, '%')</if>
+            <if test="attrValues != null  and attrValues != ''"> and attr_values = #{attrValues}</if>
+        </where>
+        order by id desc
+    </select>
+
+	<delete id="deletePhysicalByProductId">
+		DELETE FROM xms_diy_store_product_attr WHERE product_id = #{productId}
+	</delete>
+
+</mapper>

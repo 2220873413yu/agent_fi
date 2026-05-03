@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.WithdrawalMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="WithdrawalResult" type="com.xms.dao.entity.domain.Withdrawal">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="code" property="code" />
+        <result column="change_balance" property="changeBalance" />
+        <result column="fee_balance" property="feeBalance" />
+        <result column="fee_ratio" property="feeRatio" />
+        <result column="status" property="status" />
+        <result column="remark" property="remark" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="account_no" property="accountNo" />
+        <result column="coin_type" property="coinType" />
+        <result column="credited_time" property="creditedTime" />
+        <result column="biz_status" property="bizStatus" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="selectWithdrawalVo">
+        select * from t_withdrawal
+    </sql>
+
+    <select id="selectWithdrawalList" parameterType="com.xms.dao.entity.domain.Withdrawal" resultMap="WithdrawalResult">
+        <include refid="selectWithdrawalVo"/>
+        <where>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="coinType != null "> and coin_type = #{coinType}</if>
+            <if test="bizStatus != null "> and biz_status = #{bizStatus}</if>
+            <if test="code != null  and code != ''"> and code = #{code}</if>
+            <if test="changeBalance != null "> and change_balance = #{changeBalance}</if>
+            <if test="feeBalance != null "> and fee_balance = #{feeBalance}</if>
+            <if test="status != null "> and status = #{status}</if>
+            <if test="remark != null "> and remark = #{remark}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''">
+                and create_time &gt;= #{params.beginCreateTime}
+                and create_time &lt; DATE_FORMAT(DATE_ADD(#{params.endCreateTime}, INTERVAL 1 DAY),'%Y-%m-%d')
+            </if>
+            <if test="childUserIds != null and childUserIds.size() > 0">
+                and user_id IN
+                <foreach collection="childUserIds" item="userId" open="(" separator="," close=")">
+                    #{userId}
+                </foreach>
+            </if>
+        </where>
+        order by id desc
+    </select>
+
+    <select id="listWithdrawRecord" resultType="com.xms.dao.entity.bo.WithdrawalBo">
+        select status, code, change_balance as changeBalance, fee_balance as feeBalance,
+               fee_balance as feeBalance, credited_time as creditedTime,remark as hash,
+               create_time as createTime from t_withdrawal where user_id = #{userId} and coin_type = #{coinType}
+        order by id desc
+    </select>
+</mapper>

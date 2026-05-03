@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.web.mapper.DataBoardMapper">
+
+
+    <select id="listUserGroupTotal" resultType="com.xms.web.domain.LineDataDO">
+        select  count(1) expectedData,DATE_FORMAT(create_time, '%Y-%m-%d') xkey from  t_user_info where  create_time &lt; CURDATE() and deleted = 0
+        group  by  DATE_FORMAT(create_time, '%Y-%m-%d') ;
+    </select>
+    <select id="getLineWdwChartData" resultType="com.xms.web.domain.LineDataDO">
+        select  sum(change_balance) expectedRewardData,DATE_FORMAT(create_time, '%Y-%m-%d') xkey from  t_withdrawal where
+        status=1  AND   create_time &lt; CURDATE()  AND create_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+        group  by  DATE_FORMAT(create_time, '%Y-%m-%d') ;
+    </select>
+
+    <select id="listRewardGroupTotal" resultType="com.xms.web.domain.LineDataDO">
+        select  sum(amount) expectedRewardDataV2,DATE_FORMAT(create_time, '%Y-%m-%d') xkey from  xms_reward_record where
+        create_time  &lt; CURDATE() AND  create_time >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
+        group  by  DATE_FORMAT(create_time, '%Y-%m-%d') ;
+    </select>
+</mapper>

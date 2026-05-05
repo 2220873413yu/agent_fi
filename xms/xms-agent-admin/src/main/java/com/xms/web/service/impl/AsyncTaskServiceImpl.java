@@ -371,6 +371,71 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 			throw new RuntimeException("任务类型101 每天发放质押奖励任务插入失败");
 		}
 	}
+	public void saveUserMoneyLog(List<StakeOrder> stakeOrderList, BigDecimal todayRatio){
+		List<UserMoney> userMoneyValidNum1List = new ArrayList<>(stakeOrderList.size() > 1000 ? 1000 : stakeOrderList.size());
+		List<RewardRecord> rewardRecordList = new ArrayList<>(stakeOrderList.size() > 1000 ? 1000 : stakeOrderList.size());
+		int batchSize = 1000;
+		int rewardBatchCount = 0;
+		Date now = new Date();
+
+		for (StakeOrder stakeOrder : stakeOrderList) {
+			BigDecimal userReward = stakeOrder.getStakeUsdtAmount().multiply(todayRatio)
+				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			if(userReward.compareTo(BigDecimal.ZERO) <= 0){
+				continue;
+			}
+			// 实际发放金额不能超过订单剩余可产出额度。
+			BigDecimal actualReward = userReward.min(stakeOrder.getRemainingOutAmount())
+				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			BigDecimal newRemainingOutAmount = stakeOrder.getRemainingOutAmount().subtract(actualReward)
+				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			stakeOrder.setTodayReward(actualReward);
+			stakeOrder.setRemainingOutAmount(newRemainingOutAmount);
+			// 本次发放后剩余可产出归零，则该订单本轮出局。
+			if(newRemainingOutAmount.compareTo(BigDecimal.ZERO) <= 0){
+				stakeOrder.setStatus(2);
+			}
+			stakeOrder.setUpdateTime(now);
+
+			// 静态收益当前发 U，入账到 valid_num1。
+			UserMoney entity = new UserMoney();
+			entity.setId(stakeOrder.getUserId());
+			entity.setValidNum1(actualReward);
+			entity.setGtId(IDUtils.getSnowflakeStr());
+			entity.setSourceCode(stakeOrder.getOrderNo());
+			entity.setSourceId(stakeOrder.getUserId());
+			entity.setSourceType(ConstantType.user_money_log_source_type.type_8);
+			entity.setUpdateTime(now);
+			userMoneyValidNum1List.add(entity);
+
+			// 奖励记录也按 U 奖励落库，方便后续收益明细查询。
+			RewardRecord rewardRecord = new RewardRecord();
+			rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
+			rewardRecord.setUserId(stakeOrder.getUserId());
+			rewardRecord.setAmount(actualReward);
+			rewardRecord.setCoinType(ConstantType.user_money_coin_type.type_1);
+			rewardRecord.setSourceType(ConstantType.xms_reward_record_source_type.type_6);
+			rewardRecord.setSourceOrderCode(stakeOrder.getOrderNo());
+			rewardRecord.setSourceUserId(stakeOrder.getUserId());
+			rewardRecord.setCreateTime(now);
+			rewardRecordList.add(rewardRecord);
+
+			// 钱包、奖励记录、订单更新都按批次提交，避免单次事务对象过大。
+			rewardBatchCount++;
+			if(rewardBatchCount >= batchSize){
+				bachUpdateMoneyValid1(userMoneyValidNum1List);
+				userMoneyValidNum1List.clear();
+				rewardRecordService.saveBatch(rewardRecordList);
+				rewardRecordList.clear();
+				rewardBatchCount = 0;
+			}
+		}
+
+		if(CollectionUtil.isNotEmpty(userMoneyValidNum1List)){
+			bachUpdateMoneyValid1(userMoneyValidNum1List);
+			userMoneyValidNum1List.clear();
+		}
+	}
 
 	/**
 	 * 每日质押静态收益发放。

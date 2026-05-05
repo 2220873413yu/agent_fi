@@ -177,7 +177,8 @@ public class UserInfo extends BaseXmsEntity {
 	//@Excel(name = "小区业绩", sort = 14)
 	private BigDecimal communityPerformance;
 
-
+	@TableField(exist = false)
+	private BigDecimal maxLegPerformance;
 
 	/**
 	 * 直推有效用户数(暂时废弃)

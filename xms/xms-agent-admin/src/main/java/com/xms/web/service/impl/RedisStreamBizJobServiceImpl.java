@@ -372,7 +372,6 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 						rewardRecordService.save(rewardRecordEntity);
 					}
 				}
-
 			}
 
 			//间推奖励

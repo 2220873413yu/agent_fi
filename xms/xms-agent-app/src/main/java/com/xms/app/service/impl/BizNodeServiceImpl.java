@@ -76,6 +76,16 @@ public class BizNodeServiceImpl implements BizNodeService {
 	private AsyncDynamicOrderSettlementService asyncDynamicOrderSettlementServiceImpl;
 
 
+	@Autowired(required = false)
+	private TelegramNotifyService telegramNotifyService;
+
+	@Autowired
+	private AsyncTelegramMessageService asyncTelegramMessageService;
+
+	@Value("${telegram.chat-id:}")
+	private String telegramChatId;
+
+
 	@Value("${lq.md5Key}")
 	private String md5Key;
 
@@ -345,8 +355,28 @@ public class BizNodeServiceImpl implements BizNodeService {
 				orderMsgDO.setBizType(1);
 				orderMsgDOList.add(orderMsgDO);
 				asyncDynamicOrderSettlementServiceImpl.sendMessage(orderMsgDOList);
+
+				// Telegram 改为提交后入 Redis Stream，避免回调线程直接等待外部 HTTP。
+				sendNodePurchaseTelegramAsync(packageOrder);
+
 			}
 		});
 		return ResultPista.data("success");
 	}
+
+	private void sendNodePurchaseTelegramAsync(NodePackageOrder packageOrder) {
+		// 这里只负责组装推送内容并入队，真正发送由后台 Stream 消费者处理。
+		String address = packageOrder.getAddress();
+		String nodeLevelText = "A" + packageOrder.getPackageLevel() + "节点";
+		String amountText = packageOrder.getOrderValueUsdt() == null
+			? "0"
+			: packageOrder.getOrderValueUsdt().stripTrailingZeros().toPlainString();
+		String text = String.format("备注:%s，购买 %s，%su", address, nodeLevelText, amountText);
+		TelegramMessageDTO telegramMessageDTO = new TelegramMessageDTO();
+		telegramMessageDTO.setChatId(telegramChatId);
+		telegramMessageDTO.setText(text);
+		asyncTelegramMessageService.sendMessage(telegramMessageDTO);
+	}
+
+
 }

@@ -153,6 +153,9 @@ public interface RedisConstant {
 
 		String XMS_ASYNC_REWARD = REDIS_STREAM + "XMS_ASYNC_REWARD";
 
+		String TELEGRAM_MESSAGE = REDIS_STREAM + "telegram:message";
+
+
 		/**
 		 * 获取基金订单延时到账
 		 */

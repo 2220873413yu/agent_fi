@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeHostingRewardSettlementMapper">
+
+    <resultMap type="StakeHostingRewardSettlement" id="StakeHostingRewardSettlementResult">
+        <result property="id" column="id" />
+        <result property="settlementNo" column="settlement_no" />
+        <result property="sourceOrderId" column="source_order_id" />
+        <result property="sourceOrderNo" column="source_order_no" />
+        <result property="sourceUserId" column="source_user_id" />
+        <result property="receiveUserId" column="receive_user_id" />
+        <result property="rewardType" column="reward_type" />
+        <result property="rewardLevel" column="reward_level" />
+        <result property="rewardBaseAmount" column="reward_base_amount" />
+        <result property="rewardRatio" column="reward_ratio" />
+        <result property="rewardAmount" column="reward_amount" />
+        <result property="grossStaticReward" column="gross_static_reward" />
+        <result property="serviceFeeRatio" column="service_fee_ratio" />
+        <result property="serviceFeeAmount" column="service_fee_amount" />
+        <result property="netStaticReward" column="net_static_reward" />
+        <result property="arrivalStatus" column="arrival_status" />
+        <result property="skipReason" column="skip_reason" />
+        <result property="settlementDay" column="settlement_day" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <sql id="selectStakeHostingRewardSettlementVo">
+        select id, settlement_no, source_order_id, source_order_no, source_user_id, receive_user_id,
+               reward_type, reward_level, reward_base_amount, reward_ratio, reward_amount,
+               gross_static_reward, service_fee_ratio, service_fee_amount, net_static_reward,
+               arrival_status, skip_reason, settlement_day, create_by, create_time, update_by,
+               update_time, remark, deleted
+        from t_stake_hosting_reward_settlement
+    </sql>
+
+    <select id="selectStakeHostingRewardSettlementList" parameterType="StakeHostingRewardSettlement" resultMap="StakeHostingRewardSettlementResult">
+        <include refid="selectStakeHostingRewardSettlementVo"/>
+        <where>
+            <if test="settlementNo != null and settlementNo != ''"> and settlement_no = #{settlementNo}</if>
+            <if test="sourceOrderNo != null and sourceOrderNo != ''"> and source_order_no = #{sourceOrderNo}</if>
+            <if test="sourceUserId != null"> and source_user_id = #{sourceUserId}</if>
+            <if test="receiveUserId != null"> and receive_user_id = #{receiveUserId}</if>
+            <if test="rewardType != null"> and reward_type = #{rewardType}</if>
+            <if test="rewardLevel != null"> and reward_level = #{rewardLevel}</if>
+            <if test="arrivalStatus != null"> and arrival_status = #{arrivalStatus}</if>
+            <if test="skipReason != null"> and skip_reason = #{skipReason}</if>
+            <if test="settlementDay != null"> and settlement_day = #{settlementDay}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            and deleted = 0
+        </where>
+        order by id desc
+    </select>
+</mapper>

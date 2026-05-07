@@ -104,12 +104,17 @@ public class UserInfo extends BaseXmsEntity {
 	private Integer gameLevel;
 
 	/**
-	 * 虚拟等级 (0:暂无,1:区代,2:县代,3:省代)
-	 * 查询用户详情、查询直推用户列表
-	 *
+	 * 赠送等级 (0:暂无,1:区代,2:县代,3:省代)
+	 * 查询用户详情、查询直推用户列表时作为保底等级参与展示。
 	 */
-	//@Excel(name = "虚拟等级", sort = 9, dictType = "t_user_info_game_level")
+	//@Excel(name = "赠送等级", sort = 9, dictType = "t_user_info_game_level")
 	private Integer minGameLevel;
+
+	/**
+	 * 管理员保底等级 (0:暂无,1:F1,2:F2,3:F3,4:F4,5:F5,6:F6,7:F7,8:F8,9:F9)
+	 */
+	//@Excel(name = "管理员保底等级", sort = 10, dictType = "t_user_info_game_level")
+	private Integer adminGameLevel;
 
 	/**
 	 * 直推用户数
@@ -134,6 +139,11 @@ public class UserInfo extends BaseXmsEntity {
 	 */
 	//@Excel(name = "团队业绩(质押量)", sort = 15)
 	private BigDecimal umbrellaPerformance;
+
+	/**
+	 * 团队托管业绩兼容字段
+	 */
+	private BigDecimal performanceMining;
 
 
 

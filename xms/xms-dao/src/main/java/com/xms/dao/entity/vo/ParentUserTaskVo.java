@@ -21,9 +21,14 @@ public class ParentUserTaskVo {
 	private Integer gameLevel;
 
 	/**
-	 * 虚拟等级
+	 * 赠送等级
 	 */
 	private Integer minGameLevel;
+
+	/**
+	 * 管理员保底等级
+	 */
+	private Integer adminGameLevel;
 
 
 	/**

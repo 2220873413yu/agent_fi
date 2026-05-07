@@ -205,7 +205,7 @@ public class IndexDataServiceImpl implements IndexDataService {
 				.eq(UserInfo::getNodeLevel,3)
 				.count());
 			/*BigDecimal v31 = BigDecimal.valueOf(userInfoService.lambdaQuery()
-				.apply("GREATEST(IFNULL(game_level, 0), IFNULL(min_game_level, 0)) = 4")
+				.apply("GREATEST(IFNULL(game_level, 0), IFNULL(min_game_level, 0), IFNULL(admin_game_level, 0)) = 4")
 				.count());*/
 			indexDataPanelVo.setV28(v28);
 			indexDataPanelVo.setV29(v29);

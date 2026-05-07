@@ -21,6 +21,7 @@ public class XmsTask {
 	private final IAsyncTaskService asyncTaskServiceImpl;
 	private final IAsyncUserUpgradeService asyncUserUpgradeServiceImpl;
 	private final ScheduleTaskService scheduleTaskServiceImpl;
+	private final com.xms.web.service.IStakeHostingTaskService stakeHostingTaskServiceImpl;
 	@Deprecated
 	public void ryMultipleParams(String s, Boolean b, Long l, Double d, Integer i) {
 		System.out.println(StringUtils.format("执行多参方法： 字符串类型{}，布尔类型{}，长整型{}，浮点型{}，整形{}", s, b, l, d, i));
@@ -76,8 +77,10 @@ public class XmsTask {
 	 *
 	 */
 	public void distributePtbInterest101() {
-		log.info("任务类型100 每天发放质押奖励");
-		asyncTaskServiceImpl.distributePtbInterest101();
+//		log.info("任务类型100 每天发放质押奖励");
+//		asyncTaskServiceImpl.distributePtbInterest101();
+		log.info("任务类型101 每天发放托管静态收益");
+		stakeHostingTaskServiceImpl.distributeDailyStaticReward();
 	}
 
 	/**

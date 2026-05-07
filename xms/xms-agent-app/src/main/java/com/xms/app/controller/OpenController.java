@@ -35,6 +35,9 @@ public class OpenController {
 	@Autowired
 	private BizNodeService bizNodeService;
 
+	@Autowired
+	private BizStakeHostingService bizStakeHostingService;
+
 //	/**
 //	 * df资产划转
 //	 * 从旧系统的df资产划转到本系统锁定usdt资产
@@ -93,6 +96,15 @@ public class OpenController {
 	@Anonymous
 	public ResultPista<String> nodeOrderCallback(@Validated @RequestBody StakeOrderBo req) {
 		return bizNodeService.nodeOrderCallback(req);
+	}
+
+	/**
+	 * 托管订单回调
+	 */
+	@PostMapping("/stakeHostingOrder/callback")
+	@Anonymous
+	public ResultPista<String> stakeHostingOrderCallback(@Validated @RequestBody StakeOrderBo req) {
+		return bizStakeHostingService.orderCallback(req);
 	}
 //
 //	/**

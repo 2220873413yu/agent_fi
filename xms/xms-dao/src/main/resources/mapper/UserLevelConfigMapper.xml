@@ -10,6 +10,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="teamPerformance"    column="team_performance"    />
         <result property="performance"    column="performance"    />
         <result property="communityPerformance"    column="community_performance"    />
+        <result property="teamRewardRatio"    column="team_reward_ratio"    />
+        <result property="globalFeeDividendRatio"    column="global_fee_dividend_ratio"    />
         <result property="requiredLegNum"    column="required_leg_num"    />
         <result property="legLevelMin"    column="leg_level_min"    />
         <result property="createTime"    column="create_time"    />
@@ -22,7 +24,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectUserLevelConfigVo">
-        select performance, leg_level_count, id, level, team_performance, community_performance, required_leg_num, leg_level_min, create_time, update_time, remark, deleted, create_by, update_by from t_user_level_config
+        select performance, leg_level_count, id, level, team_performance, community_performance, team_reward_ratio, global_fee_dividend_ratio, required_leg_num, leg_level_min, create_time, update_time, remark, deleted, create_by, update_by from t_user_level_config
     </sql>
 
     <select id="selectUserLevelConfigList" parameterType="UserLevelConfig"
@@ -35,7 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="requiredLegNum != null "> and required_leg_num = #{requiredLegNum}</if>
             <if test="legLevelMin != null "> and leg_level_min = #{legLevelMin}</if>
         </where>
-        order by id desc
+        order by level asc, id desc
     </select>
 
 </mapper>

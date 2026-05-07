@@ -163,73 +163,39 @@ public class StakeOrderServiceImpl extends XmsDataServiceImpl<StakeOrderMapper, 
 	 */
 	@Override
 	public void callUserLevel(UserInfo info, List<UserLevelConfig> userLevelConfigList) {
-	/*
-		Integer origLevel = info.getGameLevel();
+		if (info == null || info.getUserId() == null) {
+			return;
+		}
+		Integer origLevel = defaultLevel(info.getGameLevel());
 		Integer currentLevel = 0;
-		if(info.getPerformance().compareTo(BigDecimal.ZERO)>0){
-			// 计算直推线数量
-			List<UserInfo> directUserList = userInfoService.lambdaQuery()
-				.eq(UserInfo::getInviteUserId, info.getUserId())
-				.select(UserInfo::getUserId,UserInfo::getGameLevel,UserInfo::getPerformance,
-					UserInfo::getMaxLegPerformance,UserInfo::getUmbrellaPerformance)
-				.list();
-			Map<Long, List<UserInfo>> childUserListMap = new HashMap<>();
+		BigDecimal performance = defaultAmount(info.getPerformance());
+		BigDecimal communityPerformance = defaultAmount(info.getCommunityPerformance());
+		if (CollectionUtil.isNotEmpty(userLevelConfigList)) {
 			for (UserLevelConfig userLevelConfig : userLevelConfigList) {
-				// 大区业绩+小区业绩+自身业绩满足档位条件
-				//计算大区业绩
-				if(info.getMaxLegPerformance().compareTo(userLevelConfig.getTeamPerformance())>=0
-					//小区业绩
-					&& info.getCommunityPerformance().compareTo(userLevelConfig.getCommunityPerformance())>=0
-					//自身业绩大于1
-					&& info.getPerformance().compareTo(userLevelConfig.getPerformance())>=0){
-					if(userLevelConfig.getLevel()>1){
-						if(cn.hutool.core.collection.CollectionUtil.isEmpty(directUserList) || directUserList.size()<userLevelConfig.getRequiredLegNum()){
-							continue;
-						}
-
-						Integer legLevelMin = userLevelConfig.getLegLevelMin();
-						Integer legLevelCount = userLevelConfig.getLegLevelCount();
-						int hitLines = 0;
-						// 逐条线统计是否满足“该等级人数”要求
-						for (UserInfo childUser : directUserList) {
-							List<UserInfo> childUserList = childUserListMap.computeIfAbsent(childUser.getUserId(), userId -> {
-								List<UserInfo> list = userInfoService.getChildUserList(userId);
-								if (list == null) {
-									list = new ArrayList<>();
-								}
-								// 该线包含直推本人
-								list.add(childUser);
-								return list;
-							});
-							long matchCount = childUserList.stream()
-								.filter(u -> u.getGameLevel() != null && legLevelMin != null && u.getGameLevel() >= legLevelMin)
-								.count();
-							// 该线满足人数要求则计为命中
-							if (legLevelCount == null || matchCount >= legLevelCount) {
-								hitLines++;
-							}
-							// 命中线数已满足要求，提前结束
-							if (hitLines >= userLevelConfig.getRequiredLegNum()) {
-								break;
-							}
-						}
-						// 命中线数不足，跳过该档位
-						if (hitLines < userLevelConfig.getRequiredLegNum()) {
-							continue;
-						}
-					}
-					// 记录当前满足的最高档位
+				if (userLevelConfig == null || userLevelConfig.getLevel() == null || userLevelConfig.getLevel() <= 0) {
+					continue;
+				}
+				// 新托管等级只考核个人业绩和小区业绩；大区和线数条件为历史字段，不参与判断。
+				if (performance.compareTo(defaultAmount(userLevelConfig.getPerformance())) >= 0
+					&& communityPerformance.compareTo(defaultAmount(userLevelConfig.getCommunityPerformance())) >= 0) {
 					currentLevel = userLevelConfig.getLevel();
 				}
 			}
 		}
-
-		if(currentLevel !=origLevel){
+		if (!Objects.equals(currentLevel, origLevel)) {
 			userInfoService.lambdaUpdate()
 				.eq(UserInfo::getUserId, info.getUserId())
 				.set(UserInfo::getGameLevel, currentLevel)
 				.update();
-		}*/
+		}
+	}
+
+	private Integer defaultLevel(Integer level) {
+		return level == null ? 0 : level;
+	}
+
+	private BigDecimal defaultAmount(BigDecimal amount) {
+		return amount == null ? BigDecimal.ZERO : amount;
 	}
 
 	@Override
@@ -349,8 +315,8 @@ public class StakeOrderServiceImpl extends XmsDataServiceImpl<StakeOrderMapper, 
 				BigDecimal totalChildPerformance = BigDecimal.ZERO;
 				BigDecimal maxChildPerformance = BigDecimal.ZERO;
 				for (UserInfo child : children) {
-					BigDecimal childUmbrella = child.getUmbrellaPerformance();
-					BigDecimal performance = child.getPerformance();
+					BigDecimal childUmbrella = defaultAmount(child.getUmbrellaPerformance());
+					BigDecimal performance = defaultAmount(child.getPerformance());
 					childUmbrella = childUmbrella.add(performance);
 
 					totalChildPerformance = totalChildPerformance.add(childUmbrella);

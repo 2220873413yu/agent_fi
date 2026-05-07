@@ -78,7 +78,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 		userInfoBo.setUserId(userInfo.getUserId());
 		userInfoBo.setNodeLevel(userInfo.getNodeLevel());
 //		userInfoBo.setUserCode(userInfo.getUserCode());
-		userInfoBo.setGameLevel(userInfo.getGameLevel() > userInfo.getMinGameLevel()? userInfo.getGameLevel() : userInfo.getMinGameLevel());
+		userInfoBo.setGameLevel(maxLevel(userInfo.getGameLevel(), userInfo.getMinGameLevel(), userInfo.getAdminGameLevel()));
 		if(userInfo.getInviteUserId()!=null){
 			UserInfo inviteUserInfo = lambdaQuery()
 				.eq(UserInfo::getUserId, userInfo.getInviteUserId())
@@ -98,6 +98,19 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 		//userInfoBo.setPerformance(userInfo.getPerformance());
 		//userInfoBo.setCommunityPerformance(userInfo.getCommunityPerformance());
 		return userInfoBo;
+	}
+
+	private Integer maxLevel(Integer... levels) {
+		Integer max = 0;
+		if (levels == null) {
+			return max;
+		}
+		for (Integer level : levels) {
+			if (level != null && level > max) {
+				max = level;
+			}
+		}
+		return max;
 	}
 
 	/**

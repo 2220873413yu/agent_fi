@@ -1087,7 +1087,7 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 					// 上一个拿奖用户的等级
 					Integer lastRewardLevel = null;
 					for (ParentUserTaskVo p : parentUserTaskVos) {
-						p.setGameLevel(p.getGameLevel()>p.getMinGameLevel()?p.getGameLevel():p.getMinGameLevel());
+						p.setGameLevel(maxLevel(p.getGameLevel(), p.getMinGameLevel(), p.getAdminGameLevel()));
 						// 无效用户不参与
 						if (p.getIsValid() == null || p.getIsValid() == 0) {
 							continue;
@@ -2067,6 +2067,19 @@ public Long getEndTime(Date current, Date endTime) {
 		// 转换为秒
 		return diffMillis / 1000;
 	}
+}
+
+private Integer maxLevel(Integer... levels) {
+	Integer max = 0;
+	if (levels == null) {
+		return max;
+	}
+	for (Integer level : levels) {
+		if (level != null && level > max) {
+			max = level;
+		}
+	}
+	return max;
 }
 
 

@@ -11,6 +11,7 @@
         <result column="game_level" property="gameLevel" />
         <result column="node_level" property="nodeLevel" />
         <result column="min_game_level" property="minGameLevel" />
+        <result column="admin_game_level" property="adminGameLevel" />
         <result column="invite_user_code" property="inviteUserCode" />
         <result column="invite_user_id" property="inviteUserId" />
         <result column="status" property="status" />
@@ -68,6 +69,7 @@
             a.user_id as userId,
             a.is_valid as isValid,
             a.min_game_level as minGameLevel,
+            a.admin_game_level as adminGameLevel,
             a.game_level as gameLevel
         FROM
             t_user_info a
@@ -84,6 +86,7 @@
             a.user_id as userId,
             a.is_valid as isValid,
             a.min_game_level as minGameLevel,
+            a.admin_game_level as adminGameLevel,
             a.game_level as gameLevel
         FROM
             t_user_info a
@@ -116,6 +119,7 @@
             a.is_valid as isValid,
             a.game_level as gameLevel,
             a.min_game_level as minGameLevel,
+            a.admin_game_level as adminGameLevel,
             a.valid_sub_num as validSubNum
         FROM
             t_user_info a
@@ -190,9 +194,10 @@
             <if test="gameLevel != null "> and tui.game_level = #{gameLevel}</if>
             <if test="nodeLevel != null "> and tui.node_level = #{nodeLevel}</if>
             <if test="finaGameLevel != null and finaGameLevel != '' ">
-                and GREATEST(game_level, min_game_level) = #{finaGameLevel}
+                and GREATEST(IFNULL(game_level, 0), IFNULL(min_game_level, 0), IFNULL(admin_game_level, 0)) = #{finaGameLevel}
              </if>
             <if test="minGameLevel != null "> and tui.min_game_level = #{minGameLevel}</if>
+            <if test="adminGameLevel != null "> and tui.admin_game_level = #{adminGameLevel}</if>
             <if test="inviteUserCode != null  and inviteUserCode != ''"> and tui.invite_user_code = #{inviteUserCode}</if>
             <if test="inviteUserId != null  and inviteUserId != ''"> and tui.invite_user_id = #{inviteUserId}</if>
             <if test="status != null "> and tui.status = #{status}</if>
@@ -220,6 +225,7 @@
             <if test="email != null  and email != ''"> and a.tr_recharge_address like concat('%', #{email}, '%')</if>
             <if test="gameLevel != null "> and a.game_level = #{gameLevel}</if>
             <if test="minGameLevel != null "> and a.min_game_level = #{minGameLevel}</if>
+            <if test="adminGameLevel != null "> and a.admin_game_level = #{adminGameLevel}</if>
             <if test="inviteUserCode != null  and inviteUserCode != ''"> and a.invite_user_code = #{inviteUserCode}</if>
             <if test="inviteUserId != null  and inviteUserId != ''"> and a.invite_user_id = #{inviteUserId}</if>
             <if test="status != null "> and a.status = #{status}</if>
@@ -266,7 +272,7 @@
     <select id="getUserByLevel" resultType="long">
         SELECT user_id
         FROM t_user_info
-        WHERE GREATEST(game_level, min_game_level) = #{level} and is_valid = 1
+        WHERE GREATEST(IFNULL(game_level, 0), IFNULL(min_game_level, 0), IFNULL(admin_game_level, 0)) = #{level} and is_valid = 1
     </select>
 
 
@@ -275,8 +281,8 @@
     </select>
 
     <select id="getUserLevelList" resultType="com.xms.dao.entity.bo.UserLevelBo">
-        select user_id as userId, GREATEST(game_level, min_game_level) as level from t_user_info
-        where game_level > 0 or min_game_level > 0
+        select user_id as userId, GREATEST(IFNULL(game_level, 0), IFNULL(min_game_level, 0), IFNULL(admin_game_level, 0)) as level from t_user_info
+        where game_level > 0 or min_game_level > 0 or admin_game_level > 0
     </select>
 
     <select id="getBatchUser" resultType="com.xms.dao.entity.bo.BatchUserBo">

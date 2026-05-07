@@ -250,7 +250,7 @@
           </template>
       </el-table-column>
 
-      <el-table-column align="center" label="等级信息" width="180">
+      <el-table-column align="center" label="等级信息" width="220">
         <template slot-scope="scope">
           <div style="text-align: left;">
             <div style="display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; margin-bottom: 6px;">
@@ -260,6 +260,10 @@
             <div style="display: flex; align-items: center; flex-wrap: nowrap; gap: 4px;">
               <span>节点赠送:</span>
               <dict-tag :options="dict.type.t_user_info_game_level" :value="scope.row.minGameLevel"/>
+            </div>
+            <div style="display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; margin-top: 6px;">
+              <span>后台保底:</span>
+              <dict-tag :options="dict.type.t_user_info_game_level" :value="scope.row.adminGameLevel" />
             </div>
           </div>
         </template>
@@ -329,7 +333,7 @@
           </div>
         </template>
       </el-table-column>-->
-      <el-table-column align="center" label="团队相关"width="150">
+      <el-table-column align="center" label="团队相关" width="150">
         <template slot-scope="scope">
           <div class="exchange-info" style="text-align: left;">
             直推用户数: {{ scope.row.subNum }}<br>
@@ -338,7 +342,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column align="center" label="节点业绩"width="150">
+      <el-table-column align="center" label="节点业绩" width="150">
         <template slot-scope="scope">
           <div class="exchange-info" style="text-align: left;">
             直推: {{ scope.row.subNodePerformance }}<br>
@@ -347,16 +351,14 @@
         </template>
       </el-table-column>
 
-<!--      <el-table-column align="center" label="质押业绩"width="150">
+      <el-table-column align="center" label="托管业绩" width="170">
         <template slot-scope="scope">
           <div class="exchange-info" style="text-align: left;">
-            我的业绩: {{ scope.row.performance }}<br>
-            团队业绩: {{ scope.row.umbrellaPerformance }}<br>
-            大区业绩: {{ scope.row.maxLegPerformance }}<br>
-            小区业绩: {{ scope.row.communityPerformance }}<br>
+            个人: {{ scope.row.performance || 0 }}<br>
+            团队: {{ scope.row.umbrellaPerformance || 0 }}<br>
           </div>
         </template>
-      </el-table-column>-->
+      </el-table-column>
 
 <!--      <el-table-column label="提现信息" align="center"width="150">
         <template slot-scope="scope">
@@ -433,21 +435,19 @@
           <el-input v-model="form.account" type="textarea"/>
         </el-form-item>
 
-<!--        <el-form-item label="等级" prop="gameLevel">
-          <el-select v-model="form.gameLevel" placeholder="请选择">
+        <el-form-item label="真实等级">
+          <el-select v-model="form.gameLevel" disabled placeholder="系统自动计算">
             <el-option
               v-for="dict in dict.type.t_user_info_game_level"
               :key="dict.value"
-              :disabled="true"
               :label="dict.label"
               :value="parseInt(dict.value)"
             ></el-option>
           </el-select>
         </el-form-item>
 
-
-        <el-form-item label="虚拟等级" prop="minGameLevel">
-          <el-select v-model="form.minGameLevel" placeholder="请选择">
+        <el-form-item label="节点赠送等级">
+          <el-select v-model="form.minGameLevel" disabled placeholder="买节点后自动赠送">
             <el-option
               v-for="dict in dict.type.t_user_info_game_level"
               :key="dict.value"
@@ -455,7 +455,18 @@
               :value="parseInt(dict.value)"
             ></el-option>
           </el-select>
-        </el-form-item>-->
+        </el-form-item>
+
+        <el-form-item label="管理员保底等级" prop="adminGameLevel">
+          <el-select v-model="form.adminGameLevel" placeholder="请选择管理员保底等级">
+            <el-option
+              v-for="dict in dict.type.t_user_info_game_level"
+              :key="dict.value"
+              :label="dict.label"
+              :value="parseInt(dict.value)"
+            ></el-option>
+          </el-select>
+        </el-form-item>
 
         <el-form-item label="提现状态" prop="withdrawalOpenOrClose">
           <el-select v-model="form.withdrawalOpenOrClose" placeholder="请选择">
@@ -679,6 +690,7 @@ export default {
         recAddress: null,
         gameLevel: null,
         minGameLevel: null,
+        adminGameLevel: null,
         isValid: null,
         loginPwd: null,
         loginSalt: null,
@@ -709,8 +721,8 @@ export default {
         status: [
           { required: true, message: "状态不能为空", trigger: "change" }
         ],
-        minGameLevel: [
-          { required: true, message: "保底等级不能为空", trigger: "change" }
+        adminGameLevel: [
+          { required: true, message: '管理员保底等级不能为空', trigger: 'change' }
         ],
         email: [
           { required: true, message: "邮箱不能为空", trigger: "change" }
@@ -731,6 +743,13 @@ export default {
   methods: {
     toSubUser(row){
       this.$router.push("/xms/userinfo/subUserindex/list/" + row.userId);
+    },
+    getEffectiveLevel(row) {
+      return Math.max(
+        Number(row.gameLevel || 0),
+        Number(row.minGameLevel || 0),
+        Number(row.adminGameLevel || 0)
+      )
     },
     toChildUser(row){
       this.$router.push("/xms/userinfo/childindex/list/" + row.userId);
@@ -774,6 +793,7 @@ export default {
         mnemonic: null,
         googleKey: null,
         minGameLevel: null,
+        adminGameLevel: null,
         withdrawalOpenOrClose: null,
         teamRewardRatio: null,
         loginSalt: null,

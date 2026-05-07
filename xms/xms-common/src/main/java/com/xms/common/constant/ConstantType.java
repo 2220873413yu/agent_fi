@@ -24,7 +24,7 @@ public class ConstantType {
 		public static final int type_2 = 2;
 	}
 
-	//等级(0.无 1.V1 2.V2 3.V3 4.V4 5.V5 6.V6)
+	//等级(0.无 1.F1 2.F2 3.F3 4.F4 5.F5 6.F6 7.F7 8.F8 9.F9)
 	public class user_info_game_level{
 		public static final int type_0 = 0;
 		public static final int type_1 = 1;
@@ -33,6 +33,9 @@ public class ConstantType {
 		public static final int type_4 = 4;
 		public static final int type_5 = 5;
 		public static final int type_6 = 6;
+		public static final int type_7 = 7;
+		public static final int type_8 = 8;
+		public static final int type_9 = 9;
 	}
 
 	//奖励等级(1.V1 2.V2 3.V3 4.V4 5.V5 6.V6)
@@ -91,6 +94,14 @@ public class ConstantType {
 		public static final int type_24 = 24;
 		public static final int type_25 = 25;
 		public static final int type_26 = 26;
+		//托管静态收益
+		public static final int type_27 = 27;
+		//托管直推奖
+		public static final int type_28 = 28;
+		//托管极差奖
+		public static final int type_29 = 29;
+		//托管平级奖
+		public static final int type_30 = 30;
 	}
 
 	/**
@@ -151,7 +162,14 @@ public class ConstantType {
 		public static final int type_28 = 28;
 		public static final int type_29 = 29;
 		public static final int type_30 = 30;
+		//托管静态收益
+		public static final int type_31 = 31;
+		//托管直推奖
 		public static final int type_32 = 32;
+		//托管极差奖
+		public static final int type_33 = 33;
+		//托管平级奖
+		public static final int type_34 = 34;
 		public static final int type_44 = 44;
 	}
 

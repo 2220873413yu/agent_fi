@@ -37,47 +37,68 @@ public class UserLevelConfigServiceImpl extends XmsDataServiceImpl<UserLevelConf
 
 	@Override
 	public int updateRecordById(UserLevelConfig req) {
-		if(req.getLevel() == 1){
-			if(req.getPerformance().compareTo(BigDecimal.ZERO)<=0){
-				throw new ServiceException("个人业绩不能小于等于0");
-			}
-		}else if(req.getLevel() == 2){
-			if(req.getTeamPerformance().compareTo(BigDecimal.ZERO)<=0){
-				throw new ServiceException("大区业绩(质押量)不能小于等于0");
-			}
-			if(req.getCommunityPerformance().compareTo(BigDecimal.ZERO)<=0){
-				throw new ServiceException("小区业绩(质押量)不能小于等于0");
-			}
-		}else{
-			if(req.getRequiredLegNum()<=0){
-				throw new ServiceException("需要满足的线数量不能小于等于0");
-			}
-
-			if(req.getLegLevelMin()<=0){
-				throw new ServiceException("线内代理最小等级最少为区代理");
-			}
-
-			if(req.getLegLevelCount()<=0){
-				throw new ServiceException("每条线里需要几个该等级不能小于等于0");
+		if (req == null || req.getId() == null) {
+			throw new ServiceException("等级配置ID不能为空");
+		}
+		if (req.getPerformance() == null || req.getPerformance().compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException("个人托管业绩不能小于等于0");
+		}
+		if (req.getCommunityPerformance() == null || req.getCommunityPerformance().compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException("小区托管业绩不能小于等于0");
+		}
+		if (req.getTeamRewardRatio() == null || req.getTeamRewardRatio().compareTo(BigDecimal.ZERO) < 0) {
+			throw new ServiceException("团队奖励比例不能小于0");
+		}
+		if (req.getGlobalFeeDividendRatio() == null || req.getGlobalFeeDividendRatio().compareTo(BigDecimal.ZERO) < 0) {
+			throw new ServiceException("全球手续费分红比例不能小于0");
+		}
+		UserLevelConfig current = getById(req.getId());
+		if (current == null || current.getLevel() == null || current.getLevel() <= 0) {
+			throw new ServiceException("等级配置不存在");
+		}
+		List<UserLevelConfig> configs = lambdaQuery()
+			.gt(UserLevelConfig::getLevel, 0)
+			.orderByAsc(UserLevelConfig::getLevel)
+			.list();
+		for (UserLevelConfig config : configs) {
+			if (config.getId().equals(req.getId())) {
+				config.setPerformance(req.getPerformance());
+				config.setCommunityPerformance(req.getCommunityPerformance());
+				config.setTeamRewardRatio(req.getTeamRewardRatio());
+				config.setGlobalFeeDividendRatio(req.getGlobalFeeDividendRatio());
+				break;
 			}
 		}
-		req.setUpdateTime(new Date());
-		updateById(req);
-		if(req.getLevel() == 1){
-			//修改个人业绩
-			lambdaUpdate()
-				.gt(UserLevelConfig::getLevel,0)
-				.set(UserLevelConfig::getPerformance,req.getPerformance())
-				.update();
-		}
-		if(req.getLevel() == 2){
-			//如果是区代理更新、小区、团队业绩考核条件、县代理、市代理、省代理、全国代理的业绩考核条件同样更新
-			lambdaUpdate()
-				.gt(UserLevelConfig::getLevel,1)
-				.set(UserLevelConfig::getTeamPerformance,req.getTeamPerformance())
-				.set(UserLevelConfig::getCommunityPerformance,req.getCommunityPerformance())
-				.update();
-		}
+		validateLevelThreshold(configs);
+		lambdaUpdate()
+			.eq(UserLevelConfig::getId, req.getId())
+			.set(UserLevelConfig::getPerformance, req.getPerformance())
+			.set(UserLevelConfig::getCommunityPerformance, req.getCommunityPerformance())
+			.set(UserLevelConfig::getTeamRewardRatio, req.getTeamRewardRatio())
+			.set(UserLevelConfig::getGlobalFeeDividendRatio, req.getGlobalFeeDividendRatio())
+			.set(UserLevelConfig::getUpdateTime, new Date())
+			.update();
 		return 1;
+	}
+
+	private void validateLevelThreshold(List<UserLevelConfig> configs) {
+		for (int i = 1; i < configs.size(); i++) {
+			UserLevelConfig prev = configs.get(i - 1);
+			UserLevelConfig current = configs.get(i);
+			if (defaultAmount(current.getPerformance()).compareTo(defaultAmount(prev.getPerformance())) < 0) {
+				throw new ServiceException(levelName(current.getLevel()) + "的个人托管业绩不能小于" + levelName(prev.getLevel()));
+			}
+			if (defaultAmount(current.getCommunityPerformance()).compareTo(defaultAmount(prev.getCommunityPerformance())) < 0) {
+				throw new ServiceException(levelName(current.getLevel()) + "的小区托管业绩不能小于" + levelName(prev.getLevel()));
+			}
+		}
+	}
+
+	private BigDecimal defaultAmount(BigDecimal amount) {
+		return amount == null ? BigDecimal.ZERO : amount;
+	}
+
+	private String levelName(Integer level) {
+		return level == null || level <= 0 ? "暂无" : "F" + level;
 	}
 }

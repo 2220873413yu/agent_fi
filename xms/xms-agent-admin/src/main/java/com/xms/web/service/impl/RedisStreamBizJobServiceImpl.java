@@ -80,6 +80,9 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	private IStakeOrderService stakeOrderService;
 
 	@Autowired
+	private IStakeHostingOrderService stakeHostingOrderService;
+
+	@Autowired
 	private ISysParaService sysParaService;
 
 	@Autowired
@@ -116,9 +119,50 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			}else if(orderMsgDO.getBizType().equals(3)){
 				//处理领取了空投 需要更改订单状态、计算等级、修改订单状态
 				handleBizType3(orderMsgDO);
+			}else if(orderMsgDO.getBizType().equals(4)){
+				//托管订单支付/拨付/结束后重算小区业绩和真实等级
+				handleBizType4(orderMsgDO);
 			}
 		}
 		return 1;
+	}
+
+	/**
+	 * 托管订单等级重算：只根据个人托管业绩和小区托管业绩刷新真实等级。
+	 */
+	private void handleBizType4(OrderMsgDO orderMsgDO) {
+		StakeHostingOrder order = stakeHostingOrderService.lambdaQuery()
+			.eq(StakeHostingOrder::getId, orderMsgDO.getId())
+			.and(wrapper -> wrapper.eq(StakeHostingOrder::getPayStatus, 1).or().eq(StakeHostingOrder::getPayStatus, 2))
+			.one();
+		if (order == null) {
+			log.info("托管等级重算跳过，订单不存在或未支付 orderId:{}", orderMsgDO.getId());
+			return;
+		}
+		UserInfo userInfo = userInfoService.lambdaQuery()
+			.eq(UserInfo::getUserId, order.getUserId())
+			.one();
+		if (userInfo == null) {
+			log.info("托管等级重算跳过，用户不存在 userId:{}", order.getUserId());
+			return;
+		}
+		LinkedHashSet<Long> recalculateUserIds = new LinkedHashSet<>();
+		recalculateUserIds.add(userInfo.getUserId());
+		List<Long> parentIds = userInfo.getParentIds();
+		if (CollectionUtil.isNotEmpty(parentIds)) {
+			recalculateUserIds.addAll(parentIds);
+		}
+		stakeOrderService.calculateCommunityPerformance(new ArrayList<>(recalculateUserIds));
+		List<UserLevelConfig> userLevelConfigList = userLevelConfigService.lambdaQuery()
+			.gt(UserLevelConfig::getLevel, 0)
+			.orderByAsc(UserLevelConfig::getLevel)
+			.list();
+		List<UserInfo> userInfoList = userInfoService.lambdaQuery()
+			.in(UserInfo::getUserId, recalculateUserIds)
+			.list();
+		for (UserInfo item : userInfoList) {
+			stakeOrderService.callUserLevel(item, userLevelConfigList);
+		}
 	}
 
 	/**
@@ -163,8 +207,8 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew)
 				.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 			List<UserInfo> userInfoList = userInfoService.list(new QueryWrapper<UserInfo>()
-				.select("user_id", "has_active_stake_order", "GREATEST(game_level, min_game_level) AS game_level")
-				.apply("GREATEST(game_level, min_game_level) > 0 AND has_active_stake_order = 1"));
+				.select("user_id", "has_active_stake_order", "GREATEST(IFNULL(game_level, 0), IFNULL(min_game_level, 0), IFNULL(admin_game_level, 0)) AS game_level")
+				.apply("GREATEST(IFNULL(game_level, 0), IFNULL(min_game_level, 0), IFNULL(admin_game_level, 0)) > 0 AND has_active_stake_order = 1"));
 			if(CollectionUtil.isNotEmpty(userInfoList) && fee.compareTo(BigDecimal.ZERO) > 0){
 				WithdrawalConfig withdrawalConfig = withdrawalConfigService.lambdaQuery()
 					.eq(WithdrawalConfig::getCoinType, withdrawal.getCoinType())
@@ -474,9 +518,9 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 
 		//查询市代、省代、全国代人数
 		List<UserInfo> userInfoList = userInfoService.list(new QueryWrapper<UserInfo>()
-			.select("user_id", "is_valid","GREATEST(game_level, min_game_level) AS game_level")
-			// 虚拟等级：取 game_level 与 min_game_level 的较大值
-			.apply("GREATEST(game_level, min_game_level) IN (3,4,5)"));
+			.select("user_id", "is_valid","GREATEST(IFNULL(game_level, 0), IFNULL(min_game_level, 0), IFNULL(admin_game_level, 0)) AS game_level")
+			// 实际等级：取真实等级、赠送等级、管理员保底等级的最大值
+			.apply("GREATEST(IFNULL(game_level, 0), IFNULL(min_game_level, 0), IFNULL(admin_game_level, 0)) IN (3,4,5)"));
 		if(CollectionUtil.isNotEmpty(userInfoList)){
 			Map<Integer, List<UserInfo>> levelMap = userInfoList.stream()
 				.collect(Collectors.groupingBy(UserInfo::getGameLevel));

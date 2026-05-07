@@ -109,7 +109,7 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 
 		UserInfo updateUser = new UserInfo();
 
-		updateUser.setMinGameLevel(req.getMinGameLevel());
+		updateUser.setAdminGameLevel(req.getAdminGameLevel());
 		updateUser.setUserId(req.getUserId());
 
 		if(StrUtil.isNotBlank(req.getAccount())){

@@ -134,4 +134,7 @@ public class ConstantSys {
 
 	//质押间推奖励 例如: 1就是1%
 	public static final String biz_stake_indirect_ratio = "biz_stake_indirect_ratio";
+
+	//托管直推奖励比例 例如:10就是10%
+	public static final String biz_stake_hosting_direct_reward_ratio = "biz_stake_hosting_direct_reward_ratio";
 }

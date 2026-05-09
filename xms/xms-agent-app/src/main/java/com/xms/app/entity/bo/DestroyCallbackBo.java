@@ -32,12 +32,12 @@ public class DestroyCallbackBo {
     @NotBlank(message = "sign not null")
     private String sign;
 
-	/**
-     * 币种类型 1:usdt,2,dfc,3:oort
-     */
-	@ValidDiyStatus(values = {1, 2, 3})
-	@NotNull(message = "coinType not null")
-	private Integer coinType;
+//	/**
+//     * 币种类型 2:afi
+//     */
+//	@ValidDiyStatus(values = {2})
+//	@NotNull(message = "coinType not null")
+//	private Integer coinType;
 
     /**
      * 充值代币数量

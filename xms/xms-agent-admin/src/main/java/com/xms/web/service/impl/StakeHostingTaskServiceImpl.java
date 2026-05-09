@@ -10,21 +10,31 @@ import com.xms.common.constant.SysConstant;
 import com.xms.common.exception.ServiceException;
 import com.xms.common.utils.uuid.IDUtils;
 import com.xms.dao.domain.RewardRecord;
+import com.xms.dao.domain.StakeHostingAfiPledge;
+import com.xms.dao.domain.StakeHostingGlobalDividendBatch;
+import com.xms.dao.domain.StakeHostingGlobalDividendDetail;
 import com.xms.dao.domain.StakeHostingOrder;
 import com.xms.dao.domain.StakeHostingPackage;
 import com.xms.dao.domain.StakeHostingRewardSettlement;
+import com.xms.dao.domain.StakeHostingWeeklyCommunityPerformance;
 import com.xms.dao.domain.UserLevelConfig;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.entity.vo.ParentUserTaskVo;
 import com.xms.dao.service.IRewardRecordService;
+import com.xms.dao.service.IStakeHostingAfiPledgeService;
 import com.xms.dao.service.IStakeHostingPackageService;
 import com.xms.dao.service.IStakeHostingOrderService;
 import com.xms.dao.service.IStakeHostingRewardSettlementService;
+import com.xms.dao.service.IStakeHostingGlobalDividendPoolService;
+import com.xms.dao.service.IStakeHostingGlobalDividendBatchService;
+import com.xms.dao.service.IStakeHostingGlobalDividendDetailService;
+import com.xms.dao.service.IStakeHostingWeeklyCommunityPerformanceService;
 import com.xms.dao.service.ISysParaService;
 import com.xms.dao.service.IUserLevelConfigService;
 import com.xms.dao.service.UserInfoService;
 import com.xms.dao.service.UserWalletService;
 import com.xms.dao.service.impl.StakeHostingOrderServiceImpl;
+import com.xms.dao.service.impl.StakeHostingWeeklyCommunityPerformanceServiceImpl;
 import com.xms.web.service.IAsyncTaskService;
 import com.xms.web.service.IStakeHostingTaskService;
 import lombok.AllArgsConstructor;
@@ -33,10 +43,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 托管定时任务Service实现
@@ -56,7 +69,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	private final IRewardRecordService rewardRecordService;
 	private final IAsyncTaskService asyncTaskServiceImpl;
 	private final IStakeHostingPackageService stakeHostingPackageService;
+	private final IStakeHostingAfiPledgeService stakeHostingAfiPledgeService;
 	private final IStakeHostingRewardSettlementService stakeHostingRewardSettlementService;
+	private final IStakeHostingGlobalDividendPoolService stakeHostingGlobalDividendPoolService;
+	private final IStakeHostingGlobalDividendBatchService stakeHostingGlobalDividendBatchService;
+	private final IStakeHostingGlobalDividendDetailService stakeHostingGlobalDividendDetailService;
+	private final IStakeHostingWeeklyCommunityPerformanceService stakeHostingWeeklyCommunityPerformanceService;
 	private final UserInfoService userInfoService;
 	private final IUserLevelConfigService userLevelConfigService;
 	private final ISysParaService sysParaServiceImpl;
@@ -70,6 +88,9 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	private static final int ARRIVAL_YES = 1;
 	private static final int SKIP_NO_ACTIVE_ORDER = 2;
 	private static final int SKIP_INVALID_USER = 4;
+	private static final int GLOBAL_DIVIDEND_BATCH_PROCESSING = 0;
+	private static final int GLOBAL_DIVIDEND_BATCH_FINISHED = 1;
+	private static final int WEEKLY_PERFORMANCE_SETTLED = 2;
 
 	/**
 	 * 每日发放托管订单静态收益。
@@ -101,9 +122,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			return;
 		}
 		Date now = new Date();
+		BigDecimal dailyServiceFee = BigDecimal.ZERO;
 		for (StakeHostingOrder order : orderList) {
-			distributeOne(order, rewardDay, now);
+			dailyServiceFee = dailyServiceFee.add(distributeOne(order, rewardDay, now));
 		}
+		stakeHostingGlobalDividendPoolService.incomeDailyServiceFee(rewardDay,
+			dailyServiceFee.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew), "task101");
 		// 所有订单处理完成后再写入任务记录，避免中途失败造成当天任务被误标记完成。
 		addDailyTask(strDate);
 	}
@@ -119,19 +143,215 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 每周发放托管全球分红。
+	 *
+	 * <p>当前先按用户现有小区业绩作为权重，后续每周新增业绩快照确认后再替换权重来源。</p>
+	 */
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public void distributeWeeklyGlobalDividend() {
+		String strDate = DateUtil.format(DateUtil.date(), "yyyyMMdd");
+		int settlementDay = Integer.parseInt(strDate);
+		Map<String, Object> task = asyncTaskServiceImpl.getTask(SysConstant.TSK_TYPE_102, strDate);
+		if (!CollectionUtil.isEmpty(task)) {
+			log.debug("任务类型102 每周托管全球分红任务已存在跳过");
+			return;
+		}
+		BigDecimal poolAmount = stakeHostingGlobalDividendPoolService.getOrInitPool().getBalanceAmount();
+		if (poolAmount == null || poolAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			log.info("托管全球分红：奖池余额为0，跳过发放");
+			addWeeklyTask(strDate);
+			return;
+		}
+
+		Date now = new Date();
+		String batchNo = IDUtils.getSnowflakeStr();
+		StakeHostingGlobalDividendBatch batch = new StakeHostingGlobalDividendBatch();
+		batch.setBatchNo(batchNo);
+		batch.setSettlementDay(settlementDay);
+		Date weekReference = DateUtil.offsetDay(now, -1);
+		Long referenceTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.formatDate(weekReference);
+		Long weekStartTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.weekStartTimeOf(referenceTime);
+		Long weekEndTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.weekEndTimeOf(referenceTime);
+		Date weekStartDate = DateUtil.parse(String.valueOf(weekStartTime), "yyyyMMddHHmmss");
+		Date weekEndDate = DateUtil.parse(String.valueOf(weekEndTime), "yyyyMMddHHmmss");
+		batch.setPeriodStartTime(weekStartDate);
+		batch.setPeriodEndTime(weekEndDate);
+		batch.setPlanAmount(poolAmount);
+		batch.setActualAmount(BigDecimal.ZERO);
+		batch.setUserCount(0);
+		batch.setStatus(GLOBAL_DIVIDEND_BATCH_PROCESSING);
+		batch.setCreateTime(now);
+		stakeHostingGlobalDividendBatchService.save(batch);
+
+		List<StakeHostingGlobalDividendDetail> details = buildGlobalDividendDetails(batchNo, poolAmount, weekStartTime);
+		BigDecimal actualAmount = BigDecimal.ZERO;
+		for (StakeHostingGlobalDividendDetail detail : details) {
+			actualAmount = actualAmount.add(detail.getRewardAmount());
+		}
+		actualAmount = actualAmount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		if (actualAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			log.info("托管全球分红：无满足小区业绩权重的用户，batchNo={}", batchNo);
+			finishGlobalDividendBatch(batch.getId(), actualAmount, 0, now);
+			addWeeklyTask(strDate);
+			return;
+		}
+
+		stakeHostingGlobalDividendDetailService.saveBatch(details);
+		for (StakeHostingGlobalDividendDetail detail : details) {
+			grantGlobalDividend(batchNo, detail, now);
+		}
+		stakeHostingGlobalDividendPoolService.expenseWeeklyDividend(batchNo, actualAmount, "task102");
+		markWeeklyPerformanceSettled(batchNo, weekStartTime, details, now);
+		finishGlobalDividendBatch(batch.getId(), actualAmount, details.size(), now);
+		addWeeklyTask(strDate);
+	}
+
+	private void addWeeklyTask(String strDate) {
+		int rows = asyncTaskServiceImpl.addTask(SysConstant.TSK_TYPE_102, strDate);
+		if (rows != 1) {
+			throw new RuntimeException("任务类型102 每周托管全球分红任务插入失败");
+		}
+	}
+
+	private List<StakeHostingGlobalDividendDetail> buildGlobalDividendDetails(String batchNo, BigDecimal poolAmount, Long weekStartTime) {
+		List<UserLevelConfig> configs = userLevelConfigService.lambdaQuery()
+			.gt(UserLevelConfig::getLevel, 0)
+			.gt(UserLevelConfig::getGlobalFeeDividendRatio, BigDecimal.ZERO)
+			.list();
+		if (CollectionUtil.isEmpty(configs)) {
+			return new ArrayList<>();
+		}
+		List<StakeHostingWeeklyCommunityPerformance> performances = stakeHostingWeeklyCommunityPerformanceService.lambdaQuery()
+			.eq(StakeHostingWeeklyCommunityPerformance::getWeekStartTime, weekStartTime)
+			.eq(StakeHostingWeeklyCommunityPerformance::getDeleted, 0)
+			.gt(StakeHostingWeeklyCommunityPerformance::getCommunityNewPerformance, BigDecimal.ZERO)
+			.list();
+		if (CollectionUtil.isEmpty(performances)) {
+			return new ArrayList<>();
+		}
+		Map<Long, StakeHostingWeeklyCommunityPerformance> performanceMap = performances.stream()
+			.collect(Collectors.toMap(StakeHostingWeeklyCommunityPerformance::getUserId, Function.identity(), (a, b) -> a));
+		List<UserInfo> users = userInfoService.lambdaQuery()
+			.eq(UserInfo::getIsValid, 1)
+			.in(UserInfo::getUserId, new ArrayList<>(performanceMap.keySet()))
+			.list();
+		if (CollectionUtil.isEmpty(users)) {
+			return new ArrayList<>();
+		}
+		Map<Integer, List<UserInfo>> userMap = users.stream()
+			.filter(user -> effectiveLevel(user) > 0)
+			.collect(Collectors.groupingBy(this::effectiveLevel));
+		List<StakeHostingGlobalDividendDetail> details = new ArrayList<>();
+		for (UserLevelConfig config : configs) {
+			List<UserInfo> levelUsers = userMap.get(config.getLevel());
+			if (CollectionUtil.isEmpty(levelUsers)) {
+				continue;
+			}
+			BigDecimal levelPool = poolAmount.multiply(config.getGlobalFeeDividendRatio())
+				.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			if (levelPool.compareTo(BigDecimal.ZERO) <= 0) {
+				continue;
+			}
+			BigDecimal levelPerformance = levelUsers.stream()
+				.map(user -> weeklyCommunityPerformance(performanceMap, user.getUserId()))
+				.reduce(BigDecimal.ZERO, BigDecimal::add);
+			if (levelPerformance.compareTo(BigDecimal.ZERO) <= 0) {
+				continue;
+			}
+			for (UserInfo user : levelUsers) {
+				BigDecimal userPerformance = weeklyCommunityPerformance(performanceMap, user.getUserId());
+				BigDecimal rewardAmount = levelPool.multiply(userPerformance)
+					.divide(levelPerformance, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+				if (rewardAmount.compareTo(BigDecimal.ZERO) <= 0) {
+					continue;
+				}
+				StakeHostingGlobalDividendDetail detail = new StakeHostingGlobalDividendDetail();
+				detail.setBatchNo(batchNo);
+				detail.setUserId(user.getUserId());
+				detail.setAccount(user.getAccount());
+				detail.setRewardLevel(config.getLevel());
+				detail.setLevelDividendRatio(config.getGlobalFeeDividendRatio());
+				detail.setLevelPoolAmount(levelPool);
+				detail.setUserCommunityPerformance(userPerformance);
+				detail.setLevelCommunityPerformance(levelPerformance);
+				detail.setRewardAmount(rewardAmount);
+				detail.setCreateTime(new Date());
+				details.add(detail);
+			}
+		}
+		return details;
+	}
+
+	private BigDecimal weeklyCommunityPerformance(Map<Long, StakeHostingWeeklyCommunityPerformance> performanceMap, Long userId) {
+		StakeHostingWeeklyCommunityPerformance performance = performanceMap.get(userId);
+		if (performance == null || performance.getCommunityNewPerformance() == null) {
+			return BigDecimal.ZERO;
+		}
+		return performance.getCommunityNewPerformance();
+	}
+
+	private void markWeeklyPerformanceSettled(String batchNo, Long weekStartTime, List<StakeHostingGlobalDividendDetail> details, Date now) {
+		if (CollectionUtil.isEmpty(details)) {
+			return;
+		}
+		List<Long> userIds = details.stream()
+			.map(StakeHostingGlobalDividendDetail::getUserId)
+			.collect(Collectors.toList());
+		stakeHostingWeeklyCommunityPerformanceService.lambdaUpdate()
+			.eq(StakeHostingWeeklyCommunityPerformance::getWeekStartTime, weekStartTime)
+			.in(StakeHostingWeeklyCommunityPerformance::getUserId, userIds)
+			.set(StakeHostingWeeklyCommunityPerformance::getSettleStatus, WEEKLY_PERFORMANCE_SETTLED)
+			.set(StakeHostingWeeklyCommunityPerformance::getBatchNo, batchNo)
+			.set(StakeHostingWeeklyCommunityPerformance::getUpdateTime, now)
+			.update();
+	}
+
+	private void grantGlobalDividend(String batchNo, StakeHostingGlobalDividendDetail detail, Date now) {
+		int rows = userWalletService.handerUserMoney(detail.getRewardAmount(), batchNo, detail.getUserId(), detail.getUserId(),
+			ConstantType.user_money_log_source_type.type_37, ConstantType.user_money_coin_type.type_1);
+		if (rows != 1) {
+			throw new ServiceException("托管全球分红入账失败，userId=" + detail.getUserId());
+		}
+		RewardRecord rewardRecord = new RewardRecord();
+		rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
+		rewardRecord.setUserId(detail.getUserId());
+		rewardRecord.setAmount(detail.getRewardAmount());
+		rewardRecord.setCoinType(ConstantType.user_money_coin_type.type_1);
+		rewardRecord.setSourceType(ConstantType.xms_reward_record_source_type.type_31);
+		rewardRecord.setSourceOrderCode(batchNo);
+		rewardRecord.setSourceUserId(detail.getUserId());
+		rewardRecord.setGtId(IDUtils.getSnowflakeStr());
+		rewardRecord.setCreateTime(now);
+		rewardRecordService.save(rewardRecord);
+	}
+
+	private void finishGlobalDividendBatch(Long batchId, BigDecimal actualAmount, int userCount, Date now) {
+		StakeHostingGlobalDividendBatch update = new StakeHostingGlobalDividendBatch();
+		update.setId(batchId);
+		update.setActualAmount(actualAmount);
+		update.setUserCount(userCount);
+		update.setStatus(GLOBAL_DIVIDEND_BATCH_FINISHED);
+		update.setUpdateTime(now);
+		stakeHostingGlobalDividendBatchService.updateById(update);
+	}
+
+	/**
 	 * 给单笔产出中的托管订单发放一次静态收益。
 	 *
 	 * <p>主要步骤：</p>
-	 * <p>1. 按当前静态收益率计算本次收益。</p>
+	 * <p>1. 按当前静态收益率计算本次收益，并叠加已生效 AFI 加速倍率。</p>
 	 * <p>2. 收益入账用户 USDT 钱包，并写入奖励记录。</p>
 	 * <p>3. 累加订单已发收益和运行天数，更新最近发放日期。</p>
 	 * <p>4. 判断是否回本、是否达到套餐天数。</p>
-	 * <p>5. 订单发满后改为已完成，并扣减对应托管业绩。</p>
+	 * <p>5. 订单发满后改为已完成，扣减对应托管业绩，并自动退还绑定的 AFI。</p>
 	 */
-	private void distributeOne(StakeHostingOrder order, int rewardDay, Date now) {
+	private BigDecimal distributeOne(StakeHostingOrder order, int rewardDay, Date now) {
 		BigDecimal todayRate = calculatePlaceholderStaticRate(order);
-		BigDecimal grossReward = order.getStakeUsdtAmount().multiply(todayRate)
+		BigDecimal baseGrossReward = order.getStakeUsdtAmount().multiply(todayRate)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		StakeHostingAfiPledge effectiveAfiPledge = getEffectiveAfiPledge(order.getId(), rewardDay);
+		BigDecimal grossReward = applyAfiAccelerate(baseGrossReward, effectiveAfiPledge);
 		BigDecimal serviceFeeRatio = getServiceFeeRatio(order);
 		BigDecimal serviceFee = grossReward.multiply(serviceFeeRatio)
 			.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
@@ -185,7 +405,37 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		}
 		if (finished) {
 			stakeHostingOrderService.subtractHostingPerformance(order.getUserId(), order.getStakeUsdtAmount(), order.getId());
+			stakeHostingAfiPledgeService.returnPledgeByOrderId(order.getId());
 		}
+		return serviceFee;
+	}
+
+	private StakeHostingAfiPledge getEffectiveAfiPledge(Long orderId, int rewardDay) {
+		if (orderId == null) {
+			return null;
+		}
+		StakeHostingAfiPledge pledge = stakeHostingAfiPledgeService.lambdaQuery()
+			.eq(StakeHostingAfiPledge::getStakeHostingOrderId, orderId)
+			.le(StakeHostingAfiPledge::getEffectiveDay, rewardDay)
+			.ne(StakeHostingAfiPledge::getStatus, 2)
+			.one();
+		if (pledge != null && pledge.getStatus() != null && pledge.getStatus() == 0) {
+			stakeHostingAfiPledgeService.lambdaUpdate()
+				.eq(StakeHostingAfiPledge::getId, pledge.getId())
+				.eq(StakeHostingAfiPledge::getStatus, 0)
+				.set(StakeHostingAfiPledge::getStatus, 1)
+				.set(StakeHostingAfiPledge::getUpdateTime, new Date())
+				.update();
+		}
+		return pledge;
+	}
+
+	private BigDecimal applyAfiAccelerate(BigDecimal baseGrossReward, StakeHostingAfiPledge pledge) {
+		if (pledge == null || pledge.getAccelerateRate() == null || pledge.getAccelerateRate().compareTo(BigDecimal.ZERO) <= 0) {
+			return baseGrossReward;
+		}
+		return baseGrossReward.multiply(pledge.getAccelerateRate())
+			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 	}
 
 	private BigDecimal calculatePlaceholderStaticRate(StakeHostingOrder order) {
@@ -345,6 +595,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	private Integer effectiveLevel(ParentUserTaskVo user) {
+		return Math.max(Math.max(defaultLevel(user.getGameLevel()), defaultLevel(user.getMinGameLevel())), defaultLevel(user.getAdminGameLevel()));
+	}
+
+	private int effectiveLevel(UserInfo user) {
 		return Math.max(Math.max(defaultLevel(user.getGameLevel()), defaultLevel(user.getMinGameLevel())), defaultLevel(user.getAdminGameLevel()));
 	}
 

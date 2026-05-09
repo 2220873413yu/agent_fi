@@ -48,7 +48,7 @@ public class ConstantType {
 		public static final int type_6 = 6;
 	}
 
-	//币种1:USDT
+	//币种1:USDT,2:AFI
 	public class user_money_coin_type {
 		public static final int type_1 = 1;
 		public static final int type_2 = 2;
@@ -102,6 +102,8 @@ public class ConstantType {
 		public static final int type_29 = 29;
 		//托管平级奖
 		public static final int type_30 = 30;
+		//托管全球分红
+		public static final int type_31 = 31;
 	}
 
 	/**
@@ -170,6 +172,12 @@ public class ConstantType {
 		public static final int type_33 = 33;
 		//托管平级奖
 		public static final int type_34 = 34;
+		//AFI质押扣减
+		public static final int type_35 = 35;
+		//AFI质押退还
+		public static final int type_36 = 36;
+		//托管全球分红
+		public static final int type_37 = 37;
 		public static final int type_44 = 44;
 	}
 

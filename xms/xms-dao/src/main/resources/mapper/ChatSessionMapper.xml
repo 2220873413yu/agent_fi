@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.ChatSessionMapper">
+	<resultMap type="com.xms.dao.domain.ChatSession" id="ChatSessionResult">
+		<id property="id" column="id"/>
+		<result property="userId" column="user_id"/>
+		<result property="title" column="title"/>
+		<result property="status" column="status"/>
+		<result property="createBy" column="create_by"/>
+		<result property="createTime" column="create_time"/>
+		<result property="updateBy" column="update_by"/>
+		<result property="updateTime" column="update_time"/>
+		<result property="remark" column="remark"/>
+		<result property="deleted" column="deleted"/>
+	</resultMap>
+
+	<select id="selectUserSessionList" resultMap="ChatSessionResult">
+		select id, user_id, title, status, create_by, create_time, update_by, update_time, remark, deleted
+		from t_chat_session
+		where deleted = 0
+		  and user_id = #{userId}
+		<if test="lastId != null">
+		  and id &lt; #{lastId}
+		</if>
+		order by update_time desc, id desc
+		limit #{limit}
+	</select>
+</mapper>

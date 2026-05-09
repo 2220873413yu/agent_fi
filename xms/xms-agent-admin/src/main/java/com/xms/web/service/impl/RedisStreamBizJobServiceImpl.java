@@ -83,6 +83,9 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	private IStakeHostingOrderService stakeHostingOrderService;
 
 	@Autowired
+	private IStakeHostingWeeklyCommunityPerformanceService stakeHostingWeeklyCommunityPerformanceService;
+
+	@Autowired
 	private ISysParaService sysParaService;
 
 	@Autowired
@@ -122,6 +125,9 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			}else if(orderMsgDO.getBizType().equals(4)){
 				//托管订单支付/拨付/结束后重算小区业绩和真实等级
 				handleBizType4(orderMsgDO);
+			}else if(orderMsgDO.getBizType().equals(5)){
+				//托管订单周新增业绩统计
+				stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(orderMsgDO.getId());
 			}
 		}
 		return 1;

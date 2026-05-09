@@ -98,3 +98,9 @@ xms:
     backOffInitialInterval: 2000
     #重试间隔时间的倍数  相邻两次重试之间的间隔时间的倍数。默认2，即第二次是第一次间隔时间的2倍，第三次是第二次的2倍
     backOffMultiplier: 2
+
+# OpenAI聊天配置，生产环境请通过环境变量配置API Key
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  base-url: https://api.openai.com/v1
+  model: gpt-4o-mini

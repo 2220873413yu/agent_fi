@@ -139,7 +139,7 @@ canal:
   destination: xms_agent
   #服务地址
   #  server: 192.168.110.200:11111
-  server: 127.0.0.1:11111
+  server: 127.0.0.1:21111
   # 模式  内嵌：simpleDiy  关闭：simpleDiyOff 其他的自己代码层看
   mode: simpleDiy
   # 订阅监听的库表。一定要设置

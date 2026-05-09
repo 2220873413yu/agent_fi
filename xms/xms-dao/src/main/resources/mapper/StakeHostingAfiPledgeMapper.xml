@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeHostingAfiPledgeMapper">
+
+    <resultMap type="StakeHostingAfiPledge" id="StakeHostingAfiPledgeResult">
+        <result property="id" column="id" />
+        <result property="pledgeNo" column="pledge_no" />
+        <result property="stakeHostingOrderId" column="stake_hosting_order_id" />
+        <result property="stakeHostingOrderNo" column="stake_hosting_order_no" />
+        <result property="userId" column="user_id" />
+        <result property="account" column="account" />
+        <result property="stakeUsdtAmount" column="stake_usdt_amount" />
+        <result property="afiAmount" column="afi_amount" />
+        <result property="afiPrice" column="afi_price" />
+        <result property="afiUsdtAmount" column="afi_usdt_amount" />
+        <result property="pledgeRatio" column="pledge_ratio" />
+        <result property="accelerateRate" column="accelerate_rate" />
+        <result property="pledgeTime" column="pledge_time" />
+        <result property="effectiveDay" column="effective_day" />
+        <result property="returnTime" column="return_time" />
+        <result property="status" column="status" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <sql id="selectStakeHostingAfiPledgeVo">
+        select id, pledge_no, stake_hosting_order_id, stake_hosting_order_no, user_id, account,
+               stake_usdt_amount, afi_amount, afi_price, afi_usdt_amount, pledge_ratio, accelerate_rate,
+               pledge_time, effective_day, return_time, status, create_by, create_time, update_by, update_time,
+               remark, deleted
+        from t_stake_hosting_afi_pledge
+    </sql>
+
+    <select id="selectStakeHostingAfiPledgeList" parameterType="StakeHostingAfiPledge" resultMap="StakeHostingAfiPledgeResult">
+        <include refid="selectStakeHostingAfiPledgeVo"/>
+        <where>
+            <if test="pledgeNo != null and pledgeNo != ''"> and pledge_no = #{pledgeNo}</if>
+            <if test="stakeHostingOrderId != null"> and stake_hosting_order_id = #{stakeHostingOrderId}</if>
+            <if test="stakeHostingOrderNo != null and stakeHostingOrderNo != ''"> and stake_hosting_order_no = #{stakeHostingOrderNo}</if>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="account != null and account != ''"> and account = #{account}</if>
+            <if test="status != null"> and status = #{status}</if>
+            <if test="effectiveDay != null"> and effective_day = #{effectiveDay}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            and deleted = 0
+        </where>
+        order by id desc
+    </select>
+</mapper>

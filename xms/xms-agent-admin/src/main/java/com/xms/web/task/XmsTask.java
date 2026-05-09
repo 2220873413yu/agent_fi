@@ -84,6 +84,15 @@ public class XmsTask {
 	}
 
 	/**
+	 * 任务类型102 每周天晚上24点结算
+	 *
+	 */
+	public void distributePtbInterest102() {
+		log.info("任务类型102 每周天晚上24点结算");
+		stakeHostingTaskServiceImpl.distributeWeeklyGlobalDividend();
+	}
+
+	/**
 	 * 查询没有处理的节点订单
 	 */
 	public void processOverdueMiningOrders() {

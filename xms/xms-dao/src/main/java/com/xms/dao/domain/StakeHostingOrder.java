@@ -129,13 +129,29 @@ public class StakeHostingOrder extends BaseEntity {
 	@ApiModelProperty(value = "是否回本 0:否 1:是")
 	private Integer isReturnPrincipal;
 
+	/** 是否已绑定AFI加速 0:否 1:是 */
+	@Excel(name = "AFI加速", sort = 21, dictType = "t_stake_hosting_order_afi_accelerated")
+	@ApiModelProperty(value = "是否已绑定AFI加速 0:否 1:是")
+	private Integer afiAccelerated;
+
 	/** 最近一次发放日期，格式yyyyMMdd */
-	@Excel(name = "最近发放日期", sort = 21)
+	@Excel(name = "最近发放日期", sort = 22)
 	@ApiModelProperty(value = "最近一次发放日期，格式yyyyMMdd")
 	private Integer lastRewardDay;
 
 	/** 创建日期，格式yyyyMMdd */
-	@Excel(name = "创建日期", sort = 22)
+	@Excel(name = "创建日期", sort = 23)
 	@ApiModelProperty(value = "创建日期，格式yyyyMMdd")
+	private Long performanceStartTime;
+
+	private Long performanceEndTime;
+
+	private Integer weeklyPerformanceStatus;
+
+	private String weeklyPerformanceSkipReason;
+
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	private Date weeklyPerformanceTime;
+
 	private Integer createDay;
 }

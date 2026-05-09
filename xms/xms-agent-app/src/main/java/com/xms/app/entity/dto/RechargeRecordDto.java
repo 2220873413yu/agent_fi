@@ -28,7 +28,7 @@ public class RechargeRecordDto {
 	private BigDecimal rechargeAmount;
 
 	/**
-	 * 币种类型 1:USDT
+	 * 币种类型 2:AFI
 	 */
 	private Integer coinType;
 

@@ -46,7 +46,11 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	public static final int STATUS_RUNNING = 1;
 	public static final int STATUS_FINISHED = 2;
 	public static final int STATUS_PAUSED = 3;
+	public static final int WEEKLY_STATUS_WAIT = 0;
+	public static final int WEEKLY_STATUS_QUEUED = 1;
+	public static final int WEEKLY_STATUS_DONE = 3;
 	private static final int DAILY_WAIT_PAY_LIMIT = 10;
+	private static final String WEEKLY_SKIP_EXPIRED_IN_WEEK = "本周内到期，不计入周新增业绩";
 
 	private final IStakeHostingPackageService stakeHostingPackageService;
 	private final UserInfoService userInfoService;
@@ -106,6 +110,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			throw new ServiceException("支付金额小于托管金额");
 		}
 		Date now = new Date();
+		WeeklyPerformancePrepare weeklyPrepare = prepareWeeklyPerformance(now, order.getPackageDays());
 		boolean update = lambdaUpdate()
 			.eq(StakeHostingOrder::getId, order.getId())
 			.eq(StakeHostingOrder::getPayStatus, PAY_WAIT)
@@ -116,12 +121,20 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.set(StakeHostingOrder::getPayAmount, payAmount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew))
 			.set(StakeHostingOrder::getPayTime, now)
 			.set(StakeHostingOrder::getEffectiveTime, now)
+			.set(StakeHostingOrder::getPerformanceStartTime, weeklyPrepare.startTime)
+			.set(StakeHostingOrder::getPerformanceEndTime, weeklyPrepare.endTime)
+			.set(StakeHostingOrder::getWeeklyPerformanceStatus, weeklyPrepare.status)
+			.set(StakeHostingOrder::getWeeklyPerformanceSkipReason, weeklyPrepare.skipReason)
+			.set(StakeHostingOrder::getWeeklyPerformanceTime, weeklyPrepare.done ? now : null)
 			.set(StakeHostingOrder::getUpdateTime, now)
 			.update();
 		if (!update) {
 			throw new ServiceException("托管订单状态已变更");
 		}
 		addHostingPerformance(order.getUserId(), order.getStakeUsdtAmount());
+		if (weeklyPrepare.shouldSend) {
+			sendStakeHostingWeeklyPerformanceAfterCommit(order.getId());
+		}
 		sendStakeHostingLevelRecalculateAfterCommit(order.getId());
 		return 1;
 	}
@@ -145,11 +158,20 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setPayAmount(req.getStakeUsdtAmount().setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
 		order.setPayTime(now);
 		order.setEffectiveTime(now);
+		WeeklyPerformancePrepare weeklyPrepare = prepareWeeklyPerformance(now, order.getPackageDays());
+		order.setPerformanceStartTime(weeklyPrepare.startTime);
+		order.setPerformanceEndTime(weeklyPrepare.endTime);
+		order.setWeeklyPerformanceStatus(weeklyPrepare.status);
+		order.setWeeklyPerformanceSkipReason(weeklyPrepare.skipReason);
+		order.setWeeklyPerformanceTime(weeklyPrepare.done ? now : null);
 		order.setRemark(req.getRemark());
 		if (!save(order)) {
 			throw new ServiceException("后台拨付托管订单失败");
 		}
 		addHostingPerformance(order.getUserId(), order.getStakeUsdtAmount());
+		if (weeklyPrepare.shouldSend) {
+			sendStakeHostingWeeklyPerformanceAfterCommit(order.getId());
+		}
 		sendStakeHostingLevelRecalculateAfterCommit(order.getId());
 		return 1;
 	}
@@ -229,6 +251,14 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	}
 
 	private void sendStakeHostingLevelRecalculateAfterCommit(Long orderId) {
+		sendStakeHostingOrderMsgAfterCommit(orderId, 4);
+	}
+
+	private void sendStakeHostingWeeklyPerformanceAfterCommit(Long orderId) {
+		sendStakeHostingOrderMsgAfterCommit(orderId, 5);
+	}
+
+	private void sendStakeHostingOrderMsgAfterCommit(Long orderId, Integer bizType) {
 		if (orderId == null) {
 			return;
 		}
@@ -236,7 +266,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			List<OrderMsgDO> orderMsgDOList = new ArrayList<>();
 			OrderMsgDO orderMsgDO = new OrderMsgDO();
 			orderMsgDO.setId(orderId);
-			orderMsgDO.setBizType(4);
+			orderMsgDO.setBizType(bizType);
 			orderMsgDOList.add(orderMsgDO);
 			asyncDynamicOrderSettlementServiceImpl.sendMessage(orderMsgDOList);
 		};
@@ -252,6 +282,34 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		sendTask.run();
 	}
 
+	private WeeklyPerformancePrepare prepareWeeklyPerformance(Date startDate, Integer packageDays) {
+		Long startTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.formatDate(startDate);
+		int days = packageDays == null ? 0 : packageDays;
+		Long endTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.plusDays(startTime, days);
+		Long weekEndTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.weekEndTimeOf(startTime);
+		WeeklyPerformancePrepare prepare = new WeeklyPerformancePrepare();
+		prepare.startTime = startTime;
+		prepare.endTime = endTime;
+		if (endTime <= weekEndTime) {
+			prepare.status = WEEKLY_STATUS_DONE;
+			prepare.skipReason = WEEKLY_SKIP_EXPIRED_IN_WEEK;
+			prepare.done = true;
+			return prepare;
+		}
+		prepare.status = WEEKLY_STATUS_QUEUED;
+		prepare.shouldSend = true;
+		return prepare;
+	}
+
+	private static class WeeklyPerformancePrepare {
+		private Long startTime;
+		private Long endTime;
+		private Integer status;
+		private String skipReason;
+		private boolean done;
+		private boolean shouldSend;
+	}
+
 	private StakeHostingOrder buildBaseOrder(UserInfo userInfo, StakeHostingPackage hostingPackage, BigDecimal amount, int createDay) {
 		StakeHostingOrder order = new StakeHostingOrder();
 		order.setOrderNo(IDUtils.getSnowflakeStr());
@@ -265,6 +323,8 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setTodayReward(BigDecimal.ZERO);
 		order.setTotalStaticReward(BigDecimal.ZERO);
 		order.setIsReturnPrincipal(0);
+		order.setAfiAccelerated(0);
+		order.setWeeklyPerformanceStatus(WEEKLY_STATUS_WAIT);
 		order.setCreateDay(createDay);
 		order.setCreateTime(new Date());
 		return order;

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeHostingAfiAccelerateConfigMapper">
+
+    <resultMap type="StakeHostingAfiAccelerateConfig" id="StakeHostingAfiAccelerateConfigResult">
+        <result property="id" column="id" />
+        <result property="pledgeRatio" column="pledge_ratio" />
+        <result property="accelerateRate" column="accelerate_rate" />
+        <result property="sort" column="sort" />
+        <result property="status" column="status" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <sql id="selectStakeHostingAfiAccelerateConfigVo">
+        select id, pledge_ratio, accelerate_rate, sort, status, create_by, create_time, update_by, update_time, remark, deleted
+        from t_stake_hosting_afi_accelerate_config
+    </sql>
+
+    <select id="selectStakeHostingAfiAccelerateConfigList" parameterType="StakeHostingAfiAccelerateConfig" resultMap="StakeHostingAfiAccelerateConfigResult">
+        <include refid="selectStakeHostingAfiAccelerateConfigVo"/>
+        <where>
+            <if test="pledgeRatio != null"> and pledge_ratio = #{pledgeRatio}</if>
+            <if test="accelerateRate != null"> and accelerate_rate = #{accelerateRate}</if>
+            <if test="status != null"> and status = #{status}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            and deleted = 0
+        </where>
+        order by sort asc, pledge_ratio asc, id desc
+    </select>
+</mapper>

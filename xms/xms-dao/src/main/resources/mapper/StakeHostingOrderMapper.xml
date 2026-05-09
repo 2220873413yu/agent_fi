@@ -25,7 +25,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="todayReward" column="today_reward" />
         <result property="totalStaticReward" column="total_static_reward" />
         <result property="isReturnPrincipal" column="is_return_principal" />
+        <result property="afiAccelerated" column="afi_accelerated" />
         <result property="lastRewardDay" column="last_reward_day" />
+        <result property="performanceStartTime" column="performance_start_time" />
+        <result property="performanceEndTime" column="performance_end_time" />
+        <result property="weeklyPerformanceStatus" column="weekly_performance_status" />
+        <result property="weeklyPerformanceSkipReason" column="weekly_performance_skip_reason" />
+        <result property="weeklyPerformanceTime" column="weekly_performance_time" />
         <result property="createDay" column="create_day" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
@@ -38,8 +44,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <sql id="selectStakeHostingOrderVo">
         select id, order_no, user_id, account, package_id, package_name, package_days, stake_usdt_amount,
                source_type, pay_status, status, pay_hash, pay_amount, pay_time, effective_time, finish_time,
-               run_days, today_reward, total_static_reward, is_return_principal, last_reward_day, create_day,
-               create_by, create_time, update_by, update_time, remark, deleted
+               run_days, today_reward, total_static_reward, is_return_principal, afi_accelerated, last_reward_day, create_day,
+               performance_start_time, performance_end_time, weekly_performance_status, weekly_performance_skip_reason,
+               weekly_performance_time, create_by, create_time, update_by, update_time, remark, deleted
         from t_stake_hosting_order
     </sql>
 
@@ -56,6 +63,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="status != null"> and status = #{status}</if>
             <if test="payHash != null and payHash != ''"> and pay_hash = #{payHash}</if>
             <if test="isReturnPrincipal != null"> and is_return_principal = #{isReturnPrincipal}</if>
+            <if test="afiAccelerated != null"> and afi_accelerated = #{afiAccelerated}</if>
+            <if test="weeklyPerformanceStatus != null"> and weekly_performance_status = #{weeklyPerformanceStatus}</if>
+            <if test="performanceStartTime != null"> and performance_start_time = #{performanceStartTime}</if>
             <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
             and deleted = 0
         </where>

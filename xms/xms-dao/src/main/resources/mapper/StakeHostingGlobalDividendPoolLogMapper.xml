@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeHostingGlobalDividendPoolLogMapper">
+
+    <resultMap type="StakeHostingGlobalDividendPoolLog" id="StakeHostingGlobalDividendPoolLogResult">
+        <result property="id" column="id" />
+        <result property="logNo" column="log_no" />
+        <result property="poolId" column="pool_id" />
+        <result property="poolCode" column="pool_code" />
+        <result property="flowType" column="flow_type" />
+        <result property="bizType" column="biz_type" />
+        <result property="changeAmount" column="change_amount" />
+        <result property="beforeAmount" column="before_amount" />
+        <result property="afterAmount" column="after_amount" />
+        <result property="sourceOrderId" column="source_order_id" />
+        <result property="sourceOrderNo" column="source_order_no" />
+        <result property="sourceUserId" column="source_user_id" />
+        <result property="sourceSettlementDay" column="source_settlement_day" />
+        <result property="sourceBatchNo" column="source_batch_no" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <sql id="selectStakeHostingGlobalDividendPoolLogVo">
+        select id, log_no, pool_id, pool_code, flow_type, biz_type, change_amount,
+               before_amount, after_amount, source_order_id, source_order_no, source_user_id,
+               source_settlement_day, source_batch_no, create_by, create_time, update_by,
+               update_time, remark, deleted
+        from t_stake_hosting_global_dividend_pool_log
+    </sql>
+
+    <select id="selectStakeHostingGlobalDividendPoolLogList" parameterType="StakeHostingGlobalDividendPoolLog" resultMap="StakeHostingGlobalDividendPoolLogResult">
+        <include refid="selectStakeHostingGlobalDividendPoolLogVo"/>
+        <where>
+            <if test="logNo != null and logNo != ''"> and log_no = #{logNo}</if>
+            <if test="poolCode != null and poolCode != ''"> and pool_code = #{poolCode}</if>
+            <if test="flowType != null"> and flow_type = #{flowType}</if>
+            <if test="bizType != null"> and biz_type = #{bizType}</if>
+            <if test="sourceOrderNo != null and sourceOrderNo != ''"> and source_order_no = #{sourceOrderNo}</if>
+            <if test="sourceUserId != null"> and source_user_id = #{sourceUserId}</if>
+            <if test="sourceSettlementDay != null"> and source_settlement_day = #{sourceSettlementDay}</if>
+            <if test="sourceBatchNo != null and sourceBatchNo != ''"> and source_batch_no = #{sourceBatchNo}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            and deleted = 0
+        </where>
+        order by id desc
+    </select>
+</mapper>

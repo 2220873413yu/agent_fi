@@ -40,6 +40,16 @@
           />
         </el-select>
       </el-form-item>
+      <el-form-item label="AFI加速" prop="afiAccelerated">
+        <el-select v-model="queryParams.afiAccelerated" placeholder="请选择AFI状态" clearable>
+          <el-option
+            v-for="dict in dict.type.t_stake_hosting_order_afi_accelerated"
+            :key="dict.value"
+            :label="dict.label"
+            :value="parseInt(dict.value)"
+          />
+        </el-select>
+      </el-form-item>
       <el-form-item label="创建时间">
         <el-date-picker
           v-model="daterangeCreateTime"
@@ -114,6 +124,11 @@
           <dict-tag :options="dict.type.t_stake_hosting_order_return_principal" :value="scope.row.isReturnPrincipal" />
         </template>
       </el-table-column>
+      <el-table-column label="AFI加速" align="center" prop="afiAccelerated">
+        <template slot-scope="scope">
+          <dict-tag :options="dict.type.t_stake_hosting_order_afi_accelerated" :value="scope.row.afiAccelerated" />
+        </template>
+      </el-table-column>
       <el-table-column label="支付hash" align="center" prop="payHash" width="180" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template slot-scope="scope">
@@ -183,7 +198,8 @@ export default {
     't_stake_hosting_order_source_type',
     't_stake_hosting_order_pay_status',
     't_stake_hosting_order_status',
-    't_stake_hosting_order_return_principal'
+    't_stake_hosting_order_return_principal',
+    't_stake_hosting_order_afi_accelerated'
   ],
   data() {
     return {
@@ -206,7 +222,8 @@ export default {
         account: null,
         sourceType: null,
         payStatus: null,
-        status: null
+        status: null,
+        afiAccelerated: null
       },
       form: {},
       rules: {

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeHostingWeeklyCommunityPerformanceMapper">
+
+    <resultMap type="StakeHostingWeeklyCommunityPerformance" id="StakeHostingWeeklyCommunityPerformanceResult">
+        <result property="id" column="id" />
+        <result property="userId" column="user_id" />
+        <result property="account" column="account" />
+        <result property="weekStartTime" column="week_start_time" />
+        <result property="weekEndTime" column="week_end_time" />
+        <result property="selfNewPerformance" column="self_new_performance" />
+        <result property="teamNewPerformance" column="team_new_performance" />
+        <result property="totalLinePerformance" column="total_line_performance" />
+        <result property="maxLinePerformance" column="max_line_performance" />
+        <result property="communityNewPerformance" column="community_new_performance" />
+        <result property="settleStatus" column="settle_status" />
+        <result property="batchNo" column="batch_no" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <sql id="selectStakeHostingWeeklyCommunityPerformanceVo">
+        select id, user_id, account, week_start_time, week_end_time, self_new_performance,
+               team_new_performance, total_line_performance, max_line_performance,
+               community_new_performance, settle_status, batch_no, create_by, create_time,
+               update_by, update_time, remark, deleted
+        from t_stake_hosting_weekly_community_performance
+    </sql>
+
+    <select id="selectStakeHostingWeeklyCommunityPerformanceList" parameterType="StakeHostingWeeklyCommunityPerformance" resultMap="StakeHostingWeeklyCommunityPerformanceResult">
+        <include refid="selectStakeHostingWeeklyCommunityPerformanceVo"/>
+        <where>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="account != null and account != ''"> and account = #{account}</if>
+            <if test="weekStartTime != null"> and week_start_time = #{weekStartTime}</if>
+            <if test="weekEndTime != null"> and week_end_time = #{weekEndTime}</if>
+            <if test="settleStatus != null"> and settle_status = #{settleStatus}</if>
+            <if test="batchNo != null and batchNo != ''"> and batch_no = #{batchNo}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            and deleted = 0
+        </where>
+        order by week_start_time desc, id desc
+    </select>
+
+    <insert id="upsertWeeklyPerformance">
+        insert into t_stake_hosting_weekly_community_performance (
+            user_id, account, week_start_time, week_end_time, self_new_performance,
+            team_new_performance, total_line_performance, max_line_performance,
+            community_new_performance, settle_status, create_time, update_time, deleted
+        ) values (
+            #{userId}, #{account}, #{weekStartTime}, #{weekEndTime}, #{selfAmount},
+            #{teamAmount}, 0, 0, 0, 0, now(), now(), 0
+        )
+        on duplicate key update
+            account = values(account),
+            week_end_time = values(week_end_time),
+            self_new_performance = ifnull(self_new_performance, 0) + values(self_new_performance),
+            team_new_performance = ifnull(team_new_performance, 0) + values(team_new_performance),
+            update_time = now()
+    </insert>
+
+    <select id="selectByUserIdsAndWeek" resultMap="StakeHostingWeeklyCommunityPerformanceResult">
+        <include refid="selectStakeHostingWeeklyCommunityPerformanceVo"/>
+        where deleted = 0
+          and week_start_time = #{weekStartTime}
+          <if test="userIds != null and userIds.size() > 0">
+              and user_id in
+              <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                  #{userId}
+              </foreach>
+          </if>
+          <if test="userIds == null or userIds.size() == 0">
+              and 1 = 0
+          </if>
+    </select>
+</mapper>

@@ -38,6 +38,9 @@ public class OpenController {
 	@Autowired
 	private BizStakeHostingService bizStakeHostingService;
 
+	@Autowired
+	private BizRechargeService  bizRechargeService;
+
 //	/**
 //	 * df资产划转
 //	 * 从旧系统的df资产划转到本系统锁定usdt资产
@@ -50,15 +53,15 @@ public class OpenController {
 //		return bizRechargeService.dfTransfer(req);
 //	}
 
-//	/**
-//	 * 充值回调
-//	 */
-//	@PostMapping("/notify/recharge")
-//	@Anonymous
-//	public ResultPista<String> rechargeCallback(@Validated @RequestBody DestroyCallbackBo req) {
-//		return bizRechargeService.rechargeCallback(req);
-//	}
-//
+	/**
+	 * 充值回调
+	 */
+	@PostMapping("/notify/recharge")
+	@Anonymous
+	public ResultPista<String> rechargeCallback(@Validated @RequestBody DestroyCallbackBo req) {
+		return bizRechargeService.rechargeCallback(req);
+	}
+
 
 
 //

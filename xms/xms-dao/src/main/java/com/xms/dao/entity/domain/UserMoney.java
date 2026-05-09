@@ -45,9 +45,9 @@ public class UserMoney {
 	@Excel(name = "USDT", sort = 2)
     private BigDecimal validNum1;
 	/**
-	 * 可用余额数
+	 * AFI代币
 	 */
-	//@Excel(name = "可用余额数", sort = 3)
+	@Excel(name = "AFI", sort = 3)
     private BigDecimal validNum2;
 	/**
 	 * 可用余额数

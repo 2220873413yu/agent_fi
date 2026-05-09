@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeHostingGlobalDividendDetailMapper">
+
+    <resultMap type="StakeHostingGlobalDividendDetail" id="StakeHostingGlobalDividendDetailResult">
+        <result property="id" column="id" />
+        <result property="batchNo" column="batch_no" />
+        <result property="userId" column="user_id" />
+        <result property="account" column="account" />
+        <result property="rewardLevel" column="reward_level" />
+        <result property="levelDividendRatio" column="level_dividend_ratio" />
+        <result property="levelPoolAmount" column="level_pool_amount" />
+        <result property="userCommunityPerformance" column="user_community_performance" />
+        <result property="levelCommunityPerformance" column="level_community_performance" />
+        <result property="rewardAmount" column="reward_amount" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <sql id="selectStakeHostingGlobalDividendDetailVo">
+        select id, batch_no, user_id, account, reward_level, level_dividend_ratio,
+               level_pool_amount, user_community_performance, level_community_performance,
+               reward_amount, create_by, create_time, update_by, update_time, remark, deleted
+        from t_stake_hosting_global_dividend_detail
+    </sql>
+
+    <select id="selectStakeHostingGlobalDividendDetailList" parameterType="StakeHostingGlobalDividendDetail" resultMap="StakeHostingGlobalDividendDetailResult">
+        <include refid="selectStakeHostingGlobalDividendDetailVo"/>
+        <where>
+            <if test="batchNo != null and batchNo != ''"> and batch_no = #{batchNo}</if>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="account != null and account != ''"> and account like concat('%', #{account}, '%')</if>
+            <if test="rewardLevel != null"> and reward_level = #{rewardLevel}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            and deleted = 0
+        </where>
+        order by id desc
+    </select>
+</mapper>

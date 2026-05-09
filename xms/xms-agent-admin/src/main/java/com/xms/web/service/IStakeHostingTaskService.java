@@ -9,4 +9,9 @@ public interface IStakeHostingTaskService {
 	 * 第一批使用占位收益率，后续替换为G7收益率。
 	 */
 	void distributeDailyStaticReward();
+
+	/**
+	 * 每周发放托管全球分红。
+	 */
+	void distributeWeeklyGlobalDividend();
 }

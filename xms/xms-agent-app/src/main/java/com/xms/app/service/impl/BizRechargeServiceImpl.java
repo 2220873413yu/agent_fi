@@ -252,7 +252,7 @@ public class BizRechargeServiceImpl implements BizRechargeService {
 		}
 		rechargeOrder.setOrderNo(IDUtils.getSnowflakeStr());
 		rechargeOrder.setRechargeAmount(req.getAmount());
-		rechargeOrder.setCoinType(req.getCoinType());
+		rechargeOrder.setCoinType(ConstantType.user_money_coin_type.type_2);
 		rechargeOrder.setTxId(req.getHash());
 		rechargeOrder.setRemark(req.getAddress());
 		rechargeOrder.setCreateTime(new Date());
@@ -263,7 +263,7 @@ public class BizRechargeServiceImpl implements BizRechargeService {
 			int count = userWalletServiceImpl.handerUserMoney(rechargeOrder.getRechargeAmount(),
 				rechargeOrder.getOrderNo(), rechargeOrder.getUserId(),
 				rechargeOrder.getUserId(), ConstantType.user_money_log_source_type.type_1,
-				req.getCoinType());
+				ConstantType.user_money_coin_type.type_2);
 			if (count != 1) {
 				throw new ServiceException(ResponseCode.CODE_1002);
 			}
@@ -284,7 +284,6 @@ public class BizRechargeServiceImpl implements BizRechargeService {
 		List<RechargeRecordDto> list = rechargeRecordService.lambdaQuery()
 			.eq(RechargeRecord::getUserId, SecurityUtils.getFrontUserId())
 			.eq(RechargeRecord::getStatus, 1)
-			.eq(RechargeRecord::getCoinType, coinType)
 			.lt(Func.isNotEmpty(lastId), RechargeRecord::getId, lastId)
 			.orderByDesc(RechargeRecord::getId).last(SysConstant.PAGE_LIMIT)
 			.select(BaseEntity::getCreateTime, RechargeRecord::getId,

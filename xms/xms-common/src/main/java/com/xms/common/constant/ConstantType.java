@@ -130,7 +130,7 @@ public class ConstantType {
 	}
 
 	/**
-	 * 1:节点直推奖,2:节点间推奖,3:充值,4:提现,5:提现驳回,,28:平台拨扣
+	 * 1:节点直推奖,2:节点间推奖,3:充值,4:提现,5:提现驳回,6:聊天扣除,28:平台拨扣
 	 */
 	public class user_money_log_source_type{
 		public static final int type_1 = 1;

@@ -2,6 +2,7 @@ package com.xms.app.controller.chat;
 
 import cn.hutool.ai.core.Message;
 import cn.hutool.ai.model.openai.OpenaiService;
+import com.xms.app.entity.req.OpenAiActionReq;
 import com.xms.app.service.OpenAiService;
 import com.xms.common.annotation.RepeatSubmit;
 import com.xms.common.config.redis.XmsRedis;
@@ -39,7 +40,7 @@ public class OpenAiChatController {
 	 */
 	@PostMapping("/openGptAction")
 	@RepeatSubmit
-	public ResultPista openGptAction(@Validated @RequestBody Map<String, Object> params) throws Exception {
+	public ResultPista openGptAction(@Validated @RequestBody OpenAiActionReq params) throws Exception {
 		openAiServiceImpl.openAiAction(params);
 		return ResultPista.success();
 	}

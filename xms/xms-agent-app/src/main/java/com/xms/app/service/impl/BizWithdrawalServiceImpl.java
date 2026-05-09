@@ -67,14 +67,10 @@ public class BizWithdrawalServiceImpl implements BizWithdrawalService {
 	private IUserMoneyService userMoneyServiceImpl;
 
 	@Autowired
-	private ISysParaService sysParaServiceImpl;
-
-	@Autowired
 	private UserInfoService userInfoService;
 
 	@Autowired
 	private UserWalletService userWalletServiceImpl;
-
 
 	@Autowired
 	private XmsRedis xmsRedis;
@@ -83,18 +79,10 @@ public class BizWithdrawalServiceImpl implements BizWithdrawalService {
 	private IWithdrawalConfigService withdrawalConfigService;
 
 	@Autowired
-	private AsyncDynamicOrderSettlementService asyncDynamicOrderSettlementServiceImpl;
-
-
-	@Autowired(required = false)
-	private TelegramNotifyService telegramNotifyService;
-
-	@Autowired
 	private AsyncTelegramMessageService asyncTelegramMessageService;
 
 	@Value("${telegram.chat-id:}")
 	private String telegramChatId;
-
 
 
 	@Value("${lq.md5Key}")

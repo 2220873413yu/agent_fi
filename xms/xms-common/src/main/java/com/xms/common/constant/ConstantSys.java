@@ -137,4 +137,7 @@ public class ConstantSys {
 
 	//托管直推奖励比例 例如:10就是10%
 	public static final String biz_stake_hosting_direct_reward_ratio = "biz_stake_hosting_direct_reward_ratio";
+
+	// 调用open ai请求支付多少钱 例如:1就是支付1AFI
+	public static final String biz_pay_afi_amount = "biz_pay_afi_amount";
 }

@@ -85,7 +85,8 @@
         <el-table-column align="center" label="钱包地址" prop="account"/>
 <!--        <el-table-column align="center" label="用户编码" prop="userCode"/>-->
         <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="USDT" prop="validNum1" sortable="custom" />
-<!--        <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="DFC" prop="validNum2" sortable="custom" />
+        <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="AFI" prop="validNum2" sortable="custom" />
+<!--
         <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="OORT" prop="validNum3" sortable="custom"/>
         <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="锁定USDT" prop="validNum4" sortable="custom"/>
         <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="产出DFC" prop="validNum5" sortable="custom"/>-->

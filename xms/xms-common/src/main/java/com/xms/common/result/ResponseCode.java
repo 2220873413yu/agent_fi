@@ -138,7 +138,7 @@ public enum ResponseCode {
 	CODE_1265(1265, "请选择收货地址", ""),
 	CODE_1266(1266, "商品已下架", ""),
 	CODE_1267(1267, "最少一个起购", ""),
-
+	CODE_1075(1075, "请先支付费用"),
 
 	CODE_1268(1268, "该用户已拥有节点", ""),
 	CODE_1269(1269, "节点已下架", ""),
@@ -154,8 +154,8 @@ public enum ResponseCode {
 	CODE_114(114, "资源读取有误，请稍候再试", "Resource reading error, please try again later"),
 	CODE_115(115, "数据格式有误，请重新输入", "Incorrect data format, please re-enter"),
 	CODE_116(116, "账号已经存在", "Account already exists"),
-	VALIDATE_CODE_ERROR(117, "验证码错误", "Verification code error"),
-	;
+	VALIDATE_CODE_ERROR(117, "验证码错误", "Verification code error");
+
 	private static final ThreadLocal<String> LANG_CONTEXT = new ThreadLocal<>();
 	private static final String DEFAULT_LANG = "zh";
 	private static final String LANG_ZH = "zh";

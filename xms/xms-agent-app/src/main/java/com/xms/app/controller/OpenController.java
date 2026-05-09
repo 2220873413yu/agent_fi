@@ -56,7 +56,7 @@ public class OpenController {
 	/**
 	 * 充值回调
 	 */
-	@PostMapping("/notify/recharge")
+	@PostMapping("/afiOrder/callback")
 	@Anonymous
 	public ResultPista<String> rechargeCallback(@Validated @RequestBody DestroyCallbackBo req) {
 		return bizRechargeService.rechargeCallback(req);
@@ -104,7 +104,7 @@ public class OpenController {
 	/**
 	 * 托管订单回调
 	 */
-	@PostMapping("/stakeHostingOrder/callback")
+	@PostMapping("/pledgeOrder/callback")
 	@Anonymous
 	public ResultPista<String> stakeHostingOrderCallback(@Validated @RequestBody StakeOrderBo req) {
 		return bizStakeHostingService.orderCallback(req);

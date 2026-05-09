@@ -122,7 +122,8 @@ public class JwtAuthenticationAppTokenFilter extends OncePerRequestFilter {
 				|| requestURI.contains("/sysnotice/getBannerList")
 				//提现回调
 				|| requestURI.contains(URL_WITHDRAWAL_CALLBACK)
-				|| requestURI.contains("/api/notify/recharge")
+				|| requestURI.contains("/api/afiOrder/callback")
+				|| requestURI.contains("/api/pledgeOrder/callback")
 			) {
 				LoginAppUser loginAppUser = appTokenService.getLoginUser(request);
 				if (StringUtils.isNotNull(loginAppUser) && StringUtils.isNull(SecurityUtils.getAuthentication())) {

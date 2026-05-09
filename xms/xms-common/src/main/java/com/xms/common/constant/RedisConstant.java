@@ -180,5 +180,6 @@ public interface RedisConstant {
 		 * 商品详情缓存
 		 */
 		String DIY_PRODUCT_DETAIL = REDIS_DB + "diy:product:detail";
+		String USER_AI_AGENT = REDIS_DB + "user:ai:agent";
 	}
 }

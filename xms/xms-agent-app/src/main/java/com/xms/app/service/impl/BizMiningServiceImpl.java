@@ -70,14 +70,6 @@ public class BizMiningServiceImpl implements BizMiningService {
 	@Autowired
 	private RedissonDelayHandler redissonDelayHandler;
 
-	@Value("${lq.md5Key}")
-	private String md5Key;
-
-	@Value("${lq.baseUrl}")
-	private String baseUrl;
-
-	@Autowired
-	private ISwapOrderService iSwapOrderService;
 
 	@Autowired
 	private IMiningPackageService miningPackageService;
@@ -797,45 +789,6 @@ public class BizMiningServiceImpl implements BizMiningService {
 	}
 
 
-
-	private void doBurn(String account, BigDecimal reward, String orderNo) {
-		Map<String, Object> formParams = new HashMap<>();
-		formParams.put("orderNo", orderNo);
-		formParams.put("amount", reward.stripTrailingZeros().toPlainString());
-		formParams.put("accountAddress", account);
-		formParams.put("tokenAddress", "tokenName");
-		formParams.put("sign", SignUtil.getSign(formParams, false, false, md5Key));
-
-		// 使用HttpRequest创建请求对象
-		String url = baseUrl + "/api/burn";
-		//String url = baseUrl + "/api/mint";
-		HttpRequest request = HttpRequest.post(url)
-			.form(formParams) // 设置表单参数
-			.header("Custom-Header", "HeaderValue") // 设置自定义请求头
-			.timeout(5000); // 设置超时时间（毫秒）
-		// 发送请求并获取响应
-
-		HttpResponse response;
-		try {
-			response = request.execute();
-		} catch (IORuntimeException ex) {
-			log.error("withdrawal request timeout, params:{}, url:{}", formParams, url, ex);
-			throw new ServiceException("提现通道请求超时，请稍后重试");
-		}
-
-		// 获取响应状态码
-		int statusCode = response.getStatus();
-		log.info("Status Code:{}", statusCode);
-
-		// 获取响应体
-		String responseBody = response.body();
-		log.info("responseBody:{}", responseBody);
-		JSONObject jsonResponse = JSONUtil.parseObj(response.body());
-		Integer code = jsonResponse.getInt("code");
-		if (code.equals(200)) {
-			//200才是成功
-		}
-	}
 
 
 	/**

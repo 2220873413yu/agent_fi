@@ -37,11 +37,11 @@ public class StakeOrderController extends BaseController
     @Autowired
     private IStakeOrderService stakeOrderService;
 
-/**
- * 查询质押订单列表
- */
-@PreAuthorize("@ss.hasPermi('xms:stakeOrder:list')")
-@GetMapping("/list")
+	/**
+	 * 查询质押订单列表
+	 */
+	@PreAuthorize("@ss.hasPermi('xms:stakeOrder:list')")
+	@GetMapping("/list")
     public TableDataInfo list(StakeOrder stakeOrder)
     {
         startPage();

@@ -141,7 +141,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		stakeHostingGlobalDividendPoolService.incomeDailyServiceFee(rewardDay,
 			dailyServiceFee.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew), "task101");
 		// 所有订单处理完成后再写入任务记录，避免中途失败造成当天任务被误标记完成。
-		addDailyTask(strDate);
+		// 本地调试先注释
+		//addDailyTask(strDate);
 	}
 
 	/**
@@ -602,13 +603,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * 是否存在可作为团队奖励资格的未结束托管订单。
 	 *
 	 * <p>当前业务只会生成待支付、产出中、已完成三类状态，`STATUS_PAUSED` 是预留状态，
-	 * 暂无暂停托管订单流程；因此这里按“支付成功或后台拨付，且未完成”判断有效资格。</p>
+	 * 暂无暂停托管订单流程；因此这里按“支付成功，且未完成”判断有效资格。</p>
 	 */
 	private boolean hasUnfinishedHostingOrder(Long userId) {
 		return stakeHostingOrderService.lambdaQuery()
 			.eq(StakeHostingOrder::getUserId, userId)
-			.and(wrapper -> wrapper.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
-				.or().eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_ADMIN))
+			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
 			.ne(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_FINISHED)
 			.count() > 0;
 	}

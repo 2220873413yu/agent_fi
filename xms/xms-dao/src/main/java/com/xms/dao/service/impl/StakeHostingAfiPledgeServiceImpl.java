@@ -54,15 +54,15 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 
 	@Override
 	@Transactional(rollbackFor = Exception.class)
-	public StakeHostingAfiPledge pledgeAfi(Long userId, Long stakeHostingOrderId, BigDecimal afiAmount, BigDecimal afiPrice) {
+	public StakeHostingAfiPledge pledgeAfi(Long userId, Long stakeHostingOrderId, Long afiAccelerateConfigId, BigDecimal afiPrice) {
 		if (userId == null) {
 			throw new ServiceException("用户ID不能为空");
 		}
 		if (stakeHostingOrderId == null) {
 			throw new ServiceException("托管订单不能为空");
 		}
-		if (afiAmount == null || afiAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("AFI质押数量必须大于0");
+		if (afiAccelerateConfigId == null) {
+			throw new ServiceException("AFI质押加速套餐不能为空");
 		}
 		StakeHostingOrder order = stakeHostingOrderService.lambdaQuery()
 			.eq(StakeHostingOrder::getId, stakeHostingOrderId)
@@ -72,14 +72,9 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 		validateOrder(order);
 
 		BigDecimal afiPriceScaled = normalizeAfiPrice(afiPrice);
-		BigDecimal afiAmountScaled = afiAmount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
-		BigDecimal afiUsdtAmount = afiAmountScaled.multiply(afiPriceScaled).setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
-		BigDecimal pledgeRatio = afiUsdtAmount.multiply(new BigDecimal("100"))
-			.divide(order.getStakeUsdtAmount(), 6, ConstantStatic.roundingModeNew);
-		StakeHostingAfiAccelerateConfig hitConfig = afiAccelerateConfigService.hitConfig(pledgeRatio);
-		if (hitConfig == null) {
-			throw new ServiceException("未命中有效AFI加速配置");
-		}
+		StakeHostingAfiAccelerateConfig config = getEnabledAfiAccelerateConfig(afiAccelerateConfigId);
+		BigDecimal afiUsdtAmount = calculateAfiUsdtAmount(order.getStakeUsdtAmount(), config.getPledgeRatio());
+		BigDecimal afiAmountScaled = afiUsdtAmount.divide(afiPriceScaled, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 
 		String pledgeNo = IDUtils.getSnowflakeStr();
 		updateAfiWallet(userId, pledgeNo, order.getId(), afiAmountScaled.negate(), ConstantType.user_money_log_source_type.type_35, "AFI质押扣减");
@@ -95,8 +90,8 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 		pledge.setAfiAmount(afiAmountScaled);
 		pledge.setAfiPrice(afiPriceScaled);
 		pledge.setAfiUsdtAmount(afiUsdtAmount);
-		pledge.setPledgeRatio(hitConfig.getPledgeRatio());
-		pledge.setAccelerateRate(hitConfig.getAccelerateRate());
+		pledge.setPledgeRatio(config.getPledgeRatio());
+		pledge.setAccelerateRate(config.getAccelerateRate());
 		pledge.setPledgeTime(now);
 		Integer effectiveDay = Integer.parseInt(DateUtil.format(DateUtil.tomorrow(), "yyyyMMdd"));
 		pledge.setEffectiveDay(effectiveDay);
@@ -116,6 +111,47 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 			throw new ServiceException("托管订单已绑定AFI加速");
 		}
 		return pledge;
+	}
+
+	/**
+	 * 查询启用中的 AFI 加速配置。
+	 *
+	 * App 端提交的是用户选择的加速套餐ID，后端按该配置的质押比例和加速倍率生成快照。
+	 *
+	 * @param configId AFI加速配置ID
+	 * @return 已启用且未删除的AFI加速配置
+	 */
+	private StakeHostingAfiAccelerateConfig getEnabledAfiAccelerateConfig(Long configId) {
+		StakeHostingAfiAccelerateConfig config = afiAccelerateConfigService.lambdaQuery()
+			.eq(StakeHostingAfiAccelerateConfig::getId, configId)
+			.eq(StakeHostingAfiAccelerateConfig::getStatus, 1)
+			.eq(StakeHostingAfiAccelerateConfig::getDeleted, 0)
+			.one();
+		if (config == null) {
+			throw new ServiceException("AFI质押加速套餐不存在或未启用");
+		}
+		if (config.getPledgeRatio() == null || config.getPledgeRatio().compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException("AFI质押比例配置错误");
+		}
+		if (config.getAccelerateRate() == null || config.getAccelerateRate().compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException("AFI加速倍率配置错误");
+		}
+		return config;
+	}
+
+	/**
+	 * 根据托管金额和配置质押比例计算本次 AFI 等值 USDT。
+	 *
+	 * @param stakeUsdtAmount 托管订单金额，单位USDT
+	 * @param pledgeRatio 配置质押比例，单位%
+	 * @return 本次应质押 AFI 的等值USDT金额
+	 */
+	private BigDecimal calculateAfiUsdtAmount(BigDecimal stakeUsdtAmount, BigDecimal pledgeRatio) {
+		if (stakeUsdtAmount == null || stakeUsdtAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException("托管订单金额错误");
+		}
+		return stakeUsdtAmount.multiply(pledgeRatio)
+			.divide(new BigDecimal("100"), ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 	}
 
 	@Override

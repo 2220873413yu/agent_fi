@@ -569,7 +569,6 @@ public class BizUserServiceImpl implements BizUserService {
 		dto.setTeamUserCount(userInfo.getUmbrellaNum());
 		dto.setDirectUserCount(userInfo.getSubNum());
 		dto.setTeamRewardAmount(diffRewardAmount.add(sameLevelRewardAmount));
-		dto.setIndirectRewardAmount(BigDecimal.ZERO);
 		dto.setGlobalDividendAmount(globalDividendAmount);
 		dto.setTeamTotalHostingAmount(teamHostingAmount);
 		dto.setSelfTotalHostingAmount(selfHostingAmount);

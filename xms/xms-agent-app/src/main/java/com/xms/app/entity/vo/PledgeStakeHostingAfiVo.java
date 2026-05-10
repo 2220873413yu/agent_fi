@@ -4,8 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import java.math.BigDecimal;
-
 /**
  * 托管订单AFI质押参数
  */
@@ -15,9 +13,9 @@ public class PledgeStakeHostingAfiVo {
 	@NotNull(message = "托管订单不能为空")
 	private Long stakeHostingOrderId;
 
-	/** AFI质押数量 */
-	@NotNull(message = "AFI质押数量不能为空")
-	private BigDecimal afiAmount;
+	/** AFI质押加速配置ID */
+	@NotNull(message = "AFI质押加速套餐不能为空")
+	private Long afiAccelerateConfigId;
 
 	/** 钱包签名 */
 	@NotBlank(message = "签名不能为空")

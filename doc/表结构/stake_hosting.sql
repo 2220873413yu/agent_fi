@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS `t_stake_hosting_order` (
   `package_days` int NOT NULL COMMENT '套餐天数快照',
   `stake_usdt_amount` decimal(20,6) NOT NULL DEFAULT 0.000000 COMMENT '托管USDT金额',
   `source_type` int NOT NULL DEFAULT 0 COMMENT '订单来源 0:用户购买 1:后台拨付',
-  `pay_status` int NOT NULL DEFAULT 0 COMMENT '支付状态 0:待支付 1:支付成功 2:后台拨付无需支付',
+  `pay_status` int NOT NULL DEFAULT 0 COMMENT '支付状态 0:待支付 1:支付成功',
   `status` int NOT NULL DEFAULT 0 COMMENT '业务状态 0:未开始 1:产出中 2:已完成 3:已暂停',
   `pay_hash` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci NULL DEFAULT NULL COMMENT '支付hash',
   `pay_amount` decimal(20,6) NULL DEFAULT 0.000000 COMMENT '链上支付金额',
@@ -129,10 +129,6 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_stake_hosting
 INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
 SELECT 1, '支付成功', '1', 't_stake_hosting_order_pay_status', '', 'success', 'N', '0', 'admin', sysdate(), ''
 WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_stake_hosting_order_pay_status' AND dict_value = '1');
-INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
-SELECT 2, '后台拨付', '2', 't_stake_hosting_order_pay_status', '', 'warning', 'N', '0', 'admin', sysdate(), ''
-WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_stake_hosting_order_pay_status' AND dict_value = '2');
-
 INSERT INTO sys_dict_type (dict_name, dict_type, status, create_by, create_time, remark)
 SELECT '托管订单业务状态', 't_stake_hosting_order_status', '0', 'admin', sysdate(), '托管订单业务状态'
 WHERE NOT EXISTS (SELECT 1 FROM sys_dict_type WHERE dict_type = 't_stake_hosting_order_status');

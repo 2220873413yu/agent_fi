@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.system.SystemUtil;
 import com.xms.app.entity.bo.StakeOrderBo;
 import com.xms.app.entity.dto.StakeHostingAfiAccelerateConfigDto;
+import com.xms.app.entity.dto.StakeHostingAfiPledgeDto;
 import com.xms.app.entity.dto.StakeHostingOrderDto;
 import com.xms.app.entity.dto.StakeHostingPackageDto;
 import com.xms.app.entity.resp.CreateStakeHostingOrderResp;
@@ -16,6 +17,7 @@ import com.xms.common.config.redis.XmsRedis;
 import com.xms.common.constant.SysConstant;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.exception.ServiceException;
+import com.xms.common.result.ResponseCode;
 import com.xms.common.utils.SecurityUtils;
 import com.xms.common.utils.SignUtil;
 import com.xms.dao.domain.StakeHostingAfiAccelerateConfig;
@@ -117,7 +119,7 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 			.eq(UserInfo::getUserId, userId)
 			.one();
 		if (userInfo == null) {
-			throw new ServiceException("用户不存在");
+			throw userNotFoundException();
 		}
 		checkWallet(req.getRandomNum(), req.getSignature(), userInfo.getAccount(), xmsRedis);
 		StakeHostingOrder order = stakeHostingOrderService.createUserOrder(userId, req.getPackageId(), req.getAmount());
@@ -140,6 +142,7 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 	public List<StakeHostingOrderDto> orderList(Long lastId, Integer status) {
 		List<StakeHostingOrder> list = stakeHostingOrderService.lambdaQuery()
 			.eq(StakeHostingOrder::getUserId, SecurityUtils.getFrontUserId())
+			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
 			.eq(status != null, StakeHostingOrder::getStatus, status)
 			.lt(lastId != null, StakeHostingOrder::getId, lastId)
 			.orderByDesc(StakeHostingOrder::getId)
@@ -204,7 +207,7 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 	@Override
 	public StakeHostingOrderDto orderDetail(Long id) {
 		if (id == null) {
-			throw new ServiceException("托管订单不能为空");
+			throw operationFailedException();
 		}
 		StakeHostingOrder order = stakeHostingOrderService.lambdaQuery()
 			.eq(StakeHostingOrder::getId, id)
@@ -212,7 +215,7 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 			.eq(StakeHostingOrder::getDeleted, 0)
 			.one();
 		if (order == null) {
-			throw new ServiceException("托管订单不存在");
+			throw operationFailedException();
 		}
 		return toOrderDto(order);
 	}
@@ -265,17 +268,63 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 	}
 
 	@Override
-	public ResultPista<StakeHostingAfiPledge> pledgeAfi(PledgeStakeHostingAfiVo req) {
+	public ResultPista<StakeHostingAfiPledgeDto> pledgeAfi(PledgeStakeHostingAfiVo req) {
 		Long userId = SecurityUtils.getFrontUserId();
 		UserInfo userInfo = userInfoService.lambdaQuery()
 			.eq(UserInfo::getUserId, userId)
 			.one();
 		if (userInfo == null) {
-			throw new ServiceException("用户不存在");
+			throw userNotFoundException();
 		}
 		checkWallet(req.getRandomNum(), req.getSignature(), userInfo.getAccount(), xmsRedis);
 		BigDecimal afiPrice = bizCommonService.getAfiPrice();
-		return ResultPista.data(stakeHostingAfiPledgeService.pledgeAfi(userId, req.getStakeHostingOrderId(), req.getAfiAmount(), afiPrice));
+		StakeHostingAfiPledge pledge = stakeHostingAfiPledgeService.pledgeAfi(userId, req.getStakeHostingOrderId(),
+			req.getAfiAccelerateConfigId(), afiPrice);
+		return ResultPista.data(toAfiPledgeDto(pledge));
+	}
+
+	/**
+	 * 转换 AFI 质押加速记录展示 DTO。
+	 *
+	 * @param item 数据库 AFI 质押记录对象
+	 * @return App AFI 质押加速记录展示对象
+	 */
+	private StakeHostingAfiPledgeDto toAfiPledgeDto(StakeHostingAfiPledge item) {
+		StakeHostingAfiPledgeDto dto = new StakeHostingAfiPledgeDto();
+		dto.setId(item.getId());
+		dto.setPledgeNo(item.getPledgeNo());
+		dto.setStakeHostingOrderId(item.getStakeHostingOrderId());
+		dto.setStakeHostingOrderNo(item.getStakeHostingOrderNo());
+		dto.setStakeUsdtAmount(item.getStakeUsdtAmount());
+		dto.setAfiAmount(item.getAfiAmount());
+		dto.setAfiPrice(item.getAfiPrice());
+		dto.setAfiUsdtAmount(item.getAfiUsdtAmount());
+		dto.setPledgeRatio(item.getPledgeRatio());
+		dto.setAccelerateRate(item.getAccelerateRate());
+		dto.setPledgeTime(item.getPledgeTime());
+		dto.setEffectiveDay(item.getEffectiveDay());
+		dto.setStatus(item.getStatus());
+		return dto;
+	}
+
+	/**
+	 * 构建通用操作失败业务异常。
+	 *
+	 * App 托管接口对外不直接暴露内部业务原因，订单为空、订单不存在等通用失败统一走响应码。
+	 *
+	 * @return 通用操作失败异常
+	 */
+	private ServiceException operationFailedException() {
+		return new ServiceException(ResponseCode.CODE_1002);
+	}
+
+	/**
+	 * 构建用户不存在业务异常。
+	 *
+	 * @return 用户不存在异常
+	 */
+	private ServiceException userNotFoundException() {
+		return new ServiceException(ResponseCode.CODE_1007);
 	}
 
 	@Override
@@ -287,7 +336,7 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		if (!osName.toUpperCase().contains(SysConstant.OS_NAME_WINDOWS)) {
 			if (!sign.equals(req.getSign())) {
 				log.error("托管订单回调验签失败");
-				return ResultPista.fail("验签失败");
+				return ResultPista.fail(ResponseCode.SIGN_VALIDATE_ERROR);
 			}
 		}
 		stakeHostingOrderService.confirmChainPaid(req.getOrderNo(), req.getHash(), req.getAmount());

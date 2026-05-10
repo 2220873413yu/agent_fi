@@ -54,16 +54,16 @@ public class CommonController {
 
 	@Autowired
 	private IContractService contractService;
-//
-//	/**
-//	 * 查询dfc的价格
-//	 * @return
-//	 */
-//	@ApiOperation(value = "查询dfc的价格")
-//	@GetMapping(value = "/getDfcPrice")
-//	public ResultPista<BigDecimal> getDfcPrice() {
-//		return ResultPista.data(bizCommonService.getDFcPrice());
-//	}
+
+	/**
+	 * 查询AFI的价格
+	 * @return
+	 */
+	@ApiOperation(value = "查询AFI的价格")
+	@GetMapping(value = "/getAfiPrice")
+	public ResultPista<BigDecimal> getAfiPrice() {
+		return ResultPista.data(bizCommonService.getAfiPrice());
+	}
 //
 //	/**
 //	 * 查询dfc的价格

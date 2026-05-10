@@ -107,7 +107,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             and r.distance &gt; 0
             and r.active_flag = 1
         where o.deleted = 0
-          and o.pay_status in (1, 2)
+          and o.pay_status = 1
           and o.performance_start_time is not null
           and o.performance_end_time is not null
           and o.performance_start_time &lt;= #{snapshotTime}

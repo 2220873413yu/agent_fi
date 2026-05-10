@@ -42,7 +42,6 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	public static final int SOURCE_ADMIN = 1;
 	public static final int PAY_WAIT = 0;
 	public static final int PAY_SUCCESS = 1;
-	public static final int PAY_ADMIN = 2;
 	public static final int STATUS_WAIT = 0;
 	public static final int STATUS_RUNNING = 1;
 	public static final int STATUS_FINISHED = 2;
@@ -107,7 +106,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		if (order == null) {
 			throw new ServiceException("托管订单不存在");
 		}
-		if (PAY_SUCCESS == order.getPayStatus() || PAY_ADMIN == order.getPayStatus()) {
+		if (PAY_SUCCESS == order.getPayStatus()) {
 			return 1;
 		}
 		if (payAmount.compareTo(order.getStakeUsdtAmount()) < 0) {
@@ -160,7 +159,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		int createDay = Integer.parseInt(DateUtil.format(DateUtil.date(), "yyyyMMdd"));
 		StakeHostingOrder order = buildBaseOrder(userInfo, hostingPackage, req.getStakeUsdtAmount(), createDay);
 		order.setSourceType(SOURCE_ADMIN);
-		order.setPayStatus(PAY_ADMIN);
+		order.setPayStatus(PAY_SUCCESS);
 		order.setStatus(STATUS_RUNNING);
 		order.setPayAmount(req.getStakeUsdtAmount().setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
 		order.setPayTime(now);

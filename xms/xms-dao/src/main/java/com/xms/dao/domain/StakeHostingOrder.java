@@ -84,9 +84,9 @@ public class StakeHostingOrder extends BaseEntity {
 	@ApiModelProperty(value = "订单来源 0:用户购买 1:后台拨付")
 	private Integer sourceType;
 
-	/** 支付状态 0:待支付 1:支付成功 2:后台拨付无需支付 */
+	/** 支付状态 0:待支付 1:支付成功 */
 	@Excel(name = "支付状态", sort = 10, dictType = "t_stake_hosting_order_pay_status")
-	@ApiModelProperty(value = "支付状态 0:待支付 1:支付成功 2:后台拨付无需支付")
+	@ApiModelProperty(value = "支付状态 0:待支付 1:支付成功")
 	private Integer payStatus;
 
 	/** 业务状态 0:未开始 1:产出中 2:已完成 3:已暂停 */

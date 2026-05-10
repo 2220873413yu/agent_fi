@@ -21,6 +21,7 @@ import com.xms.dao.entity.domain.UserMoney;
 import com.xms.dao.entity.domain.Withdrawal;
 import com.xms.dao.entity.vo.ParentUserTaskVo;
 import com.xms.dao.service.*;
+import com.xms.dao.service.impl.StakeHostingOrderServiceImpl;
 import com.xms.dao.service.impl.StakeOrderServiceImpl;
 import com.xms.dao.service.impl.UserInfoServiceImpl;
 import com.xms.web.service.IRedisStreamBizJobService;
@@ -139,7 +140,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	private void handleBizType4(OrderMsgDO orderMsgDO) {
 		StakeHostingOrder order = stakeHostingOrderService.lambdaQuery()
 			.eq(StakeHostingOrder::getId, orderMsgDO.getId())
-			.and(wrapper -> wrapper.eq(StakeHostingOrder::getPayStatus, 1).or().eq(StakeHostingOrder::getPayStatus, 2))
+			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
 			.one();
 		if (order == null) {
 			log.info("托管等级重算跳过，订单不存在或未支付 orderId:{}", orderMsgDO.getId());

@@ -2,13 +2,13 @@ package com.xms.app.service;
 
 import com.xms.app.entity.bo.StakeOrderBo;
 import com.xms.app.entity.dto.StakeHostingAfiAccelerateConfigDto;
+import com.xms.app.entity.dto.StakeHostingAfiPledgeDto;
 import com.xms.app.entity.dto.StakeHostingOrderDto;
 import com.xms.app.entity.dto.StakeHostingPackageDto;
 import com.xms.app.entity.resp.CreateStakeHostingOrderResp;
 import com.xms.app.entity.vo.CreateStakeHostingOrderVo;
 import com.xms.app.entity.vo.PledgeStakeHostingAfiVo;
 import com.xms.common.core.domain.api.ResultPista;
-import com.xms.dao.domain.StakeHostingAfiPledge;
 
 import java.util.List;
 
@@ -65,7 +65,7 @@ public interface BizStakeHostingService {
 	/**
 	 * 提交AFI质押加速
 	 */
-	ResultPista<StakeHostingAfiPledge> pledgeAfi(PledgeStakeHostingAfiVo req);
+	ResultPista<StakeHostingAfiPledgeDto> pledgeAfi(PledgeStakeHostingAfiVo req);
 
 	/**
 	 * 托管订单链上支付回调

@@ -136,5 +136,5 @@ public interface BizUserService {
 	 * 获取我的直推列表
 	 * @return
 	 */
-	PageInfo<MyDirectMemberDto> listSubMembers(Integer pageIndex, Integer pageSize);
+	PageInfo<MyDirectMemberDto> listSubMembers(Integer pageIndex, Integer pageSize,Integer gameLevel);
 }

@@ -13,4 +13,9 @@ public class UserMoneyBo{
 	 * USDT
 	 */
 	private BigDecimal validNum1;
+
+	/**
+	 * AFI
+	 */
+	private BigDecimal validNum2;
 }

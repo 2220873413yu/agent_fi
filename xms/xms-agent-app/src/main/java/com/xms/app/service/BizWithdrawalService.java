@@ -48,7 +48,7 @@ public interface BizWithdrawalService {
 
 	/**
 	 * 提现记录
-	 * @param coinType 币种类型 1:USDT,2:DFC,3:OORT,5:产出DFC
+	 * @param coinType 币种类型 1:USDT,2:AFI
 	 * @param pageIndex 当前页 默认1
 	 * @param pageSize 每页长度 默认20(最大20)
 	 * @return
@@ -63,7 +63,7 @@ public interface BizWithdrawalService {
 
 	/**
 	 * 提现配置
-	 * @param coinType 提现币种 1:USDT,2:DFC,3:OORT,5:产出DFC
+	 * @param coinType 提现币种 1:USDT,2:AFI
 	 * @return
 	 */
 	ResultPista<WithdrawalConfigBo> getWithdrawalConfig(Integer coinType);

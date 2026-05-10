@@ -4,9 +4,13 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.system.SystemUtil;
 import com.xms.app.entity.bo.StakeOrderBo;
+import com.xms.app.entity.dto.StakeHostingAfiAccelerateConfigDto;
+import com.xms.app.entity.dto.StakeHostingOrderDto;
+import com.xms.app.entity.dto.StakeHostingPackageDto;
 import com.xms.app.entity.resp.CreateStakeHostingOrderResp;
 import com.xms.app.entity.vo.CreateStakeHostingOrderVo;
 import com.xms.app.entity.vo.PledgeStakeHostingAfiVo;
+import com.xms.app.service.BizCommonService;
 import com.xms.app.service.BizStakeHostingService;
 import com.xms.common.config.redis.XmsRedis;
 import com.xms.common.constant.SysConstant;
@@ -29,6 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -47,6 +52,7 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 	private final IStakeHostingAfiAccelerateConfigService stakeHostingAfiAccelerateConfigService;
 	private final UserInfoService userInfoService;
 	private final XmsRedis xmsRedis;
+	private final BizCommonService bizCommonService;
 
 	@Value("${lq.md5Key}")
 	private String md5Key;
@@ -56,22 +62,53 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 									  IStakeHostingAfiPledgeService stakeHostingAfiPledgeService,
 									  IStakeHostingAfiAccelerateConfigService stakeHostingAfiAccelerateConfigService,
 									  UserInfoService userInfoService,
-									  XmsRedis xmsRedis) {
+									  XmsRedis xmsRedis,
+									  BizCommonService bizCommonService) {
 		this.stakeHostingPackageService = stakeHostingPackageService;
 		this.stakeHostingOrderService = stakeHostingOrderService;
 		this.stakeHostingAfiPledgeService = stakeHostingAfiPledgeService;
 		this.stakeHostingAfiAccelerateConfigService = stakeHostingAfiAccelerateConfigService;
 		this.userInfoService = userInfoService;
 		this.xmsRedis = xmsRedis;
+		this.bizCommonService = bizCommonService;
 	}
 
+	/**
+	 * 查询 App 托管套餐列表。
+	 *
+	 * App 只需要展示和创建订单相关字段，因此将数据库套餐对象转换为 DTO，
+	 * 避免把状态、排序、删除标记、创建更新时间等后台字段直接返回给前端。
+	 *
+	 * @return 已上架托管套餐展示列表
+	 */
 	@Override
-	public List<StakeHostingPackage> packageList() {
-		return stakeHostingPackageService.lambdaQuery()
+	public List<StakeHostingPackageDto> packageList() {
+		List<StakeHostingPackage> list = stakeHostingPackageService.lambdaQuery()
 			.eq(StakeHostingPackage::getStatus, 1)
 			.orderByAsc(StakeHostingPackage::getSort)
 			.orderByAsc(StakeHostingPackage::getDays)
 			.list();
+		if (CollectionUtil.isEmpty(list)) {
+			return java.util.Collections.emptyList();
+		}
+		return list.stream().map(this::toPackageDto).collect(Collectors.toList());
+	}
+
+	/**
+	 * 转换托管套餐展示 DTO。
+	 *
+	 * @param item 数据库托管套餐对象
+	 * @return App 托管套餐展示对象
+	 */
+	private StakeHostingPackageDto toPackageDto(StakeHostingPackage item) {
+		StakeHostingPackageDto dto = new StakeHostingPackageDto();
+		dto.setId(item.getId());
+		dto.setName(item.getName());
+		dto.setDays(item.getDays());
+		dto.setMinAmount(item.getMinAmount());
+		dto.setServiceFeeRatio(item.getServiceFeeRatio());
+		dto.setPerformanceCoefficient(item.getPerformanceCoefficient());
+		return dto;
 	}
 
 	@Override
@@ -90,8 +127,17 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		return ResultPista.data(resp);
 	}
 
+	/**
+	 * 查询我的托管订单列表。
+	 *
+	 * 只返回 App 展示和操作需要的订单字段，隐藏用户ID、钱包地址、周业绩/G7处理状态等内部字段。
+	 *
+	 * @param lastId 上一页最后一条订单ID，空表示第一页
+	 * @param status 业务状态，空表示全部状态
+	 * @return 当前登录用户托管订单展示列表
+	 */
 	@Override
-	public List<StakeHostingOrder> orderList(Long lastId, Integer status) {
+	public List<StakeHostingOrderDto> orderList(Long lastId, Integer status) {
 		List<StakeHostingOrder> list = stakeHostingOrderService.lambdaQuery()
 			.eq(StakeHostingOrder::getUserId, SecurityUtils.getFrontUserId())
 			.eq(status != null, StakeHostingOrder::getStatus, status)
@@ -102,15 +148,19 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		if (CollectionUtil.isEmpty(list)) {
 			return java.util.Collections.emptyList();
 		}
-		return list.stream().map(item -> {
-			StakeHostingOrder order = new StakeHostingOrder();
-			BeanUtil.copyProperties(item, order);
-			return order;
-		}).collect(Collectors.toList());
+		return list.stream().map(this::toOrderDto).collect(Collectors.toList());
 	}
 
+	/**
+	 * 查询可提交 AFI 质押加速的托管订单列表。
+	 *
+	 * 仅返回当前登录用户产出中、30天及以上、未绑定 AFI 加速的订单，并转换为 App DTO。
+	 *
+	 * @param lastId 上一页最后一条订单ID，空表示第一页
+	 * @return 当前登录用户可加速订单展示列表
+	 */
 	@Override
-	public List<StakeHostingOrder> accelerateOrderList(Long lastId) {
+	public List<StakeHostingOrderDto> accelerateOrderList(Long lastId) {
 		List<StakeHostingOrder> list = stakeHostingOrderService.lambdaQuery()
 			.eq(StakeHostingOrder::getUserId, SecurityUtils.getFrontUserId())
 			.eq(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_RUNNING)
@@ -120,22 +170,39 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 			.orderByDesc(StakeHostingOrder::getId)
 			.last(SysConstant.PAGE_LIMIT)
 			.list();
-		return CollectionUtil.isEmpty(list) ? java.util.Collections.emptyList() : list;
+		return CollectionUtil.isEmpty(list) ? java.util.Collections.emptyList()
+			: list.stream().map(this::toOrderDto).collect(Collectors.toList());
 	}
 
+	/**
+	 * 查询 AFI 质押加速配置套餐。
+	 *
+	 * 只返回已启用配置的质押比例和加速倍率，隐藏排序、状态、删除标记等后台字段。
+	 *
+	 * @return 已启用 AFI 加速配置展示列表
+	 */
 	@Override
-	public List<StakeHostingAfiAccelerateConfig> afiAccelerateConfigList() {
+	public List<StakeHostingAfiAccelerateConfigDto> afiAccelerateConfigList() {
 		List<StakeHostingAfiAccelerateConfig> list = stakeHostingAfiAccelerateConfigService.lambdaQuery()
 			.eq(StakeHostingAfiAccelerateConfig::getStatus, 1)
 			.eq(StakeHostingAfiAccelerateConfig::getDeleted, 0)
 			.orderByAsc(StakeHostingAfiAccelerateConfig::getSort)
 			.orderByAsc(StakeHostingAfiAccelerateConfig::getPledgeRatio)
 			.list();
-		return CollectionUtil.isEmpty(list) ? java.util.Collections.emptyList() : list;
+		return CollectionUtil.isEmpty(list) ? java.util.Collections.emptyList()
+			: list.stream().map(this::toAfiAccelerateConfigDto).collect(Collectors.toList());
 	}
 
+	/**
+	 * 查询托管订单详情。
+	 *
+	 * 只允许查询当前登录用户自己的订单，并转换为 App DTO，避免暴露数据库内部字段。
+	 *
+	 * @param id 托管订单ID
+	 * @return 当前登录用户托管订单详情展示对象
+	 */
 	@Override
-	public StakeHostingOrder orderDetail(Long id) {
+	public StakeHostingOrderDto orderDetail(Long id) {
 		if (id == null) {
 			throw new ServiceException("托管订单不能为空");
 		}
@@ -147,7 +214,54 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		if (order == null) {
 			throw new ServiceException("托管订单不存在");
 		}
-		return order;
+		return toOrderDto(order);
+	}
+
+	/**
+	 * 转换托管订单展示 DTO。
+	 *
+	 * @param item 数据库托管订单对象
+	 * @return App 托管订单展示对象
+	 */
+	private StakeHostingOrderDto toOrderDto(StakeHostingOrder item) {
+		StakeHostingOrderDto dto = new StakeHostingOrderDto();
+		dto.setId(item.getId());
+		dto.setOrderNo(item.getOrderNo());
+		dto.setPackageId(item.getPackageId());
+		dto.setPackageName(item.getPackageName());
+		dto.setPackageDays(item.getPackageDays());
+		dto.setStakeUsdtAmount(item.getStakeUsdtAmount());
+		dto.setPerformanceCoefficient(item.getPerformanceCoefficient());
+		dto.setPerformancePoints(item.getPerformancePoints());
+		dto.setSourceType(item.getSourceType());
+		dto.setPayStatus(item.getPayStatus());
+		dto.setStatus(item.getStatus());
+		dto.setPayHash(item.getPayHash());
+		dto.setPayAmount(item.getPayAmount());
+		dto.setPayTime(item.getPayTime());
+		dto.setEffectiveTime(item.getEffectiveTime());
+		dto.setFinishTime(item.getFinishTime());
+		dto.setRunDays(item.getRunDays());
+		dto.setTodayReward(item.getTodayReward());
+		dto.setTotalStaticReward(item.getTotalStaticReward());
+		dto.setIsReturnPrincipal(item.getIsReturnPrincipal());
+		dto.setAfiAccelerated(item.getAfiAccelerated());
+		dto.setLastRewardDay(item.getLastRewardDay());
+		return dto;
+	}
+
+	/**
+	 * 转换 AFI 加速配置展示 DTO。
+	 *
+	 * @param item 数据库 AFI 加速配置对象
+	 * @return App AFI 加速配置展示对象
+	 */
+	private StakeHostingAfiAccelerateConfigDto toAfiAccelerateConfigDto(StakeHostingAfiAccelerateConfig item) {
+		StakeHostingAfiAccelerateConfigDto dto = new StakeHostingAfiAccelerateConfigDto();
+		dto.setId(item.getId());
+		dto.setPledgeRatio(item.getPledgeRatio());
+		dto.setAccelerateRate(item.getAccelerateRate());
+		return dto;
 	}
 
 	@Override
@@ -160,7 +274,8 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 			throw new ServiceException("用户不存在");
 		}
 		checkWallet(req.getRandomNum(), req.getSignature(), userInfo.getAccount(), xmsRedis);
-		return ResultPista.data(stakeHostingAfiPledgeService.pledgeAfi(userId, req.getStakeHostingOrderId(), req.getAfiAmount()));
+		BigDecimal afiPrice = bizCommonService.getAfiPrice();
+		return ResultPista.data(stakeHostingAfiPledgeService.pledgeAfi(userId, req.getStakeHostingOrderId(), req.getAfiAmount(), afiPrice));
 	}
 
 	@Override

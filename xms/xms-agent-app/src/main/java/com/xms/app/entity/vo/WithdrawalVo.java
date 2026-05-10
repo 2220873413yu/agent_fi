@@ -30,11 +30,11 @@ public class WithdrawalVo {
     private BigDecimal changeBalance;
 
 	/**
-	 * 币种 1:USDT
+	 * 币种 1:USDT,2:AFI
 	 */
     @ApiModelProperty(value = "币种",required=true)
     @NotNull
-	@ValidDiyStatus(values = {1}, message = "coinType error")
+	@ValidDiyStatus(values = {1,2}, message = "coinType error")
     private Integer coinType;
 
 

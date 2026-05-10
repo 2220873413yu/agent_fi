@@ -335,6 +335,9 @@ public class BizWithdrawalServiceImpl implements BizWithdrawalService {
 		if(withdrawal.getStatus().equals(ConstantType.withdrawal_status.type_3)){
 			//发送到合约(内扣)
 			String tokenName= "USDT";
+			if(req.getCoinType().equals(2)){
+				tokenName = "AFI";
+			}
 			Map<String, Object> formParams = new HashMap<>();
 			formParams.put("orderId", withdrawal.getCode());
 			formParams.put("userAddress", withdrawal.getAccountNo());

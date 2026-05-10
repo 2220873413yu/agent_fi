@@ -30,14 +30,25 @@ public class BizCommonServiceImpl implements BizCommonService {
 	 * 交易对符号
 	 */
 	private  final String DFC_USDT_PAIR = "DFCUSDT_SPBL";
+	private  final String AFI_USDT_PAIR = "AFIUSDT";
 	private  final Cache<String, BigDecimal> dfcPriceCache = Caffeine.newBuilder()
+		.expireAfterWrite(10, TimeUnit.SECONDS)
+		.maximumSize(100)
+		.build();
+	private  final Cache<String, BigDecimal> afiPriceCache = Caffeine.newBuilder()
 		.expireAfterWrite(10, TimeUnit.SECONDS)
 		.maximumSize(100)
 		.build();
 	@Value("${df.callDfcUrl}")
 	private String callDfcUrl;
+
+	@Value("${lq.baseUrl}")
+	private String baseUrl;
+
 	@Autowired
 	private XmsRedis xmsRedis;
+
+
 
 	/**
 	 * 获取Aleo币的价格
@@ -142,6 +153,52 @@ public class BizCommonServiceImpl implements BizCommonService {
 					throw (ServiceException)e;
 				}
 				throw new ServiceException("get dfc price error");
+			}
+		}
+	}
+
+	/**
+	 * 获取AFI价格
+	 */
+	@Override
+	public BigDecimal getAfiPrice() {
+		BigDecimal cachedPrice = afiPriceCache.getIfPresent(AFI_USDT_PAIR);
+		if (cachedPrice != null) {
+			return cachedPrice;
+		}
+		synchronized (lock) {
+			cachedPrice = afiPriceCache.getIfPresent(AFI_USDT_PAIR);
+			if (cachedPrice != null) {
+				return cachedPrice;
+			}
+			try {
+				String url = baseUrl + "/chain/price";
+				HttpRequest request = HttpUtil.createGet(url).timeout(5000);
+				String response = request.execute().body();
+				Log.info("请求获取afi价格 返回值 response:{}", response);
+				JSONObject jsonObject = JSONUtil.parseObj(response);
+				if (!"200".equals(jsonObject.getStr("code"))) {
+					log.warn("请求获取afi价格异常 code:{}", jsonObject.getStr("code"));
+					throw new ServiceException("get afi price error");
+				}
+				JSONObject data = jsonObject.getJSONObject("data");
+				if (data == null) {
+					log.warn("请求获取afi价格 data为空");
+					throw new ServiceException("get afi price error");
+				}
+				BigDecimal price = data.getBigDecimal("afi");
+				if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+					log.warn("请求获取afi价格为空或小于等于0, price:{}", price);
+					throw new ServiceException("get afi price error");
+				}
+				afiPriceCache.put(AFI_USDT_PAIR, price);
+				return price;
+			} catch (Exception e) {
+				log.error("请求获取afi价格错误: {}", e.getMessage());
+				if (e instanceof ServiceException) {
+					throw (ServiceException)e;
+				}
+				throw new ServiceException("get afi price error");
 			}
 		}
 	}

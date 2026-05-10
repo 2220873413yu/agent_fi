@@ -61,7 +61,7 @@ public class BizWithdrawalController {
 
 	/**
 	 * 提现配置
-	 * @param coinType 提现币种 1:USDT
+	 * @param coinType 提现币种 1:USDT,2AFI
 	 * @return
 	 */
 	@ApiOperation(value = "提现配置")

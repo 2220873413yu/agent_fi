@@ -23,4 +23,15 @@ public interface StakeHostingWeeklyCommunityPerformanceMapper extends XmsMapper<
 
 	List<StakeHostingWeeklyCommunityPerformance> selectByUserIdsAndWeek(@Param("userIds") List<Long> userIds,
 																		@Param("weekStartTime") Long weekStartTime);
+
+	BigDecimal selectSelfWeeklyNetPoints(@Param("userId") Long userId,
+										 @Param("weekStartTime") Long weekStartTime,
+										 @Param("weekEndTime") Long weekEndTime);
+
+	BigDecimal selectTeamWeeklyNetPoints(@Param("userId") Long userId,
+										 @Param("weekStartTime") Long weekStartTime,
+										 @Param("weekEndTime") Long weekEndTime);
+
+	BigDecimal selectLineValidPoints(@Param("directUserId") Long directUserId,
+									 @Param("snapshotTime") Long snapshotTime);
 }

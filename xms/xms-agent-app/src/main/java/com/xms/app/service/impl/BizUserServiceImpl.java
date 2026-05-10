@@ -71,6 +71,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.MessageFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -111,6 +112,15 @@ public class BizUserServiceImpl implements BizUserService {
 
 	@Autowired
 	private ISysParaService sysParaServiceImpl;
+
+	@Autowired
+	private IUserLevelConfigService userLevelConfigService;
+
+	@Autowired
+	private IRewardRecordService rewardRecordService;
+
+	@Autowired
+	private IStakeHostingUserRewardSummaryService stakeHostingUserRewardSummaryService;
 
 
 	@Autowired
@@ -319,7 +329,7 @@ public class BizUserServiceImpl implements BizUserService {
 	 * @return
 	 */
 	@Override
-	public PageInfo<MyDirectMemberDto> listSubMembers(Integer pageIndex, Integer pageSize) {
+	public PageInfo<MyDirectMemberDto> listSubMembers(Integer pageIndex, Integer pageSize,Integer gameLevel) {
 		if(pageIndex == null){
 			pageIndex =1;
 		}
@@ -329,10 +339,10 @@ public class BizUserServiceImpl implements BizUserService {
 		PageHelper.startPage(pageIndex, pageSize);
 		List<UserInfo> userInfoList = userInfoServiceImpl.lambdaQuery()
 			.eq(UserInfo::getInviteUserId, SecurityUtils.getLoginAppUser().getUserId())
+			.eq(gameLevel!=null, UserInfo::getGameLevel, gameLevel)
 			.select(UserInfo::getAccount, UserInfo::getCreateTime, UserInfo::getUserId,
-				UserInfo::getMinGameLevel, UserInfo::getGameLevel, UserInfo::getCommunityPerformance,
-				UserInfo::getSubNum, UserInfo::getUmbrellaNum, UserInfo::getUmbrellaPerformance,UserInfo::getPerformance,
-				UserInfo::getNodeLevel,UserInfo::getNodeTeamPerformance,UserInfo::getSubNodePerformance)
+				UserInfo::getMinGameLevel, UserInfo::getGameLevel,UserInfo::getAdminGameLevel,
+				UserInfo::getSubNum, UserInfo::getUmbrellaNum)
 			.list();
 
 		PageInfo<UserInfo> userInfoPageInfo = new PageInfo<>(userInfoList);
@@ -342,12 +352,12 @@ public class BizUserServiceImpl implements BizUserService {
 				MyDirectMemberDto entity = new MyDirectMemberDto();
 				entity.setUserId(record.getUserId());
 				entity.setAccount(record.getAccount());
-				entity.setGameLevel(record.getGameLevel()>record.getMinGameLevel()?record.getGameLevel():record.getMinGameLevel());
-				entity.setNodeLevel(record.getNodeLevel());
+				entity.setGameLevel(effectiveLevel(record));
+//				entity.setNodeLevel(record.getNodeLevel());
 				entity.setSubNum(record.getSubNum());
 				entity.setUmbrellaNum(record.getUmbrellaNum());
-				entity.setNodeTeamPerformance(record.getNodeTeamPerformance());
-				entity.setSubNodePerformance(record.getSubNodePerformance());
+//				entity.setNodeTeamPerformance(record.getNodeTeamPerformance());
+//				entity.setSubNodePerformance(record.getSubNodePerformance());
 //				entity.setPerformance(record.getPerformance());
 //				entity.setUmbrellaPerformance(record.getUmbrellaPerformance());
 				entity.setCreateTime(record.getCreateTime());
@@ -513,27 +523,121 @@ public class BizUserServiceImpl implements BizUserService {
 
 	/**
 	 * 我的团队数据
+	 *
+	 * 根据当前用户的真实等级、赠送等级、后台管理等级取最大等级，并查询下一档等级配置，
+	 * 返回个人托管和团队托管升级进度；收益字段当前只汇总全球分红，团队收益和间推收益按确认口径返回0。
+	 *
 	 * @param userId
-	 * @return
+	 * @return 我的团队页面展示数据，金额单位为USDT，进度单位为%
 	 */
 	@Override
 	public MyTeamInfoDto myTeamInfo(Long userId) {
 		UserInfo userInfo = userInfoServiceImpl.lambdaQuery()
 			.eq(UserInfo::getUserId, userId)
-			.select(UserInfo::getUserId,UserInfo::getSubNum,UserInfo::getUmbrellaNum,
-				UserInfo::getGameLevel,UserInfo::getUmbrellaPerformance)
 			.one();
-		MyTeamInfoDto result = new MyTeamInfoDto();
-		//团队总成员
-		result.setUmbrellaNum(userInfo.getUmbrellaNum());
-		//直推人数
-		result.setSubNum(userInfo.getSubNum());
-		//我的等级
-		result.setGameLevel(userInfo.getGameLevel());
-		//团队销毁USDt
-		result.setUmbrellaPerformance(userInfo.getUmbrellaPerformance());
-		result.setTeams(buildTeamLevelDistribution(userId));
-		return result;
+		if (userInfo == null) {
+			throw new ServiceException("用户不存在");
+		}
+
+		int currentLevel = effectiveLevel(userInfo);
+		int targetLevel = currentLevel >= 9 ? 9 : currentLevel + 1;
+		UserLevelConfig targetConfig = userLevelConfigService.lambdaQuery()
+			.eq(UserLevelConfig::getLevel, targetLevel)
+			.last("limit 1")
+			.one();
+
+		BigDecimal selfHostingAmount = defaultAmount(userInfo.getPerformance());
+		BigDecimal teamHostingAmount = defaultAmount(userInfo.getUmbrellaPerformance());
+		BigDecimal targetSelfHostingAmount = targetConfig == null ? BigDecimal.ZERO : defaultAmount(targetConfig.getPerformance());
+		BigDecimal targetTeamHostingAmount = targetConfig == null ? BigDecimal.ZERO : defaultAmount(targetConfig.getCommunityPerformance());
+		StakeHostingUserRewardSummary rewardSummary = stakeHostingUserRewardSummaryService.getByUserId(userId);
+		BigDecimal diffRewardAmount = rewardSummary == null ? BigDecimal.ZERO : defaultAmount(rewardSummary.getDiffRewardAmount());
+		BigDecimal sameLevelRewardAmount = rewardSummary == null ? BigDecimal.ZERO : defaultAmount(rewardSummary.getSameLevelRewardAmount());
+		BigDecimal globalDividendAmount = rewardSummary == null ? BigDecimal.ZERO : defaultAmount(rewardSummary.getGlobalDividendAmount());
+
+		MyTeamInfoDto dto = new MyTeamInfoDto();
+		dto.setCurrentLevel(currentLevel);
+		dto.setTargetLevel(targetLevel);
+		dto.setSelfHostingAmount(selfHostingAmount);
+		dto.setTargetSelfHostingAmount(targetSelfHostingAmount);
+		dto.setSelfHostingNeedAmount(needAmount(selfHostingAmount, targetSelfHostingAmount));
+		dto.setSelfHostingProgress(progressPercent(selfHostingAmount, targetSelfHostingAmount));
+		dto.setTeamHostingAmount(teamHostingAmount);
+		dto.setTargetTeamHostingAmount(targetTeamHostingAmount);
+		dto.setTeamHostingNeedAmount(needAmount(teamHostingAmount, targetTeamHostingAmount));
+		dto.setTeamHostingProgress(progressPercent(teamHostingAmount, targetTeamHostingAmount));
+		dto.setTeamUserCount(userInfo.getUmbrellaNum());
+		dto.setDirectUserCount(userInfo.getSubNum());
+		dto.setTeamRewardAmount(diffRewardAmount.add(sameLevelRewardAmount));
+		dto.setIndirectRewardAmount(BigDecimal.ZERO);
+		dto.setGlobalDividendAmount(globalDividendAmount);
+		dto.setTeamTotalHostingAmount(teamHostingAmount);
+		dto.setSelfTotalHostingAmount(selfHostingAmount);
+		return dto;
+	}
+
+	/**
+	 * 获取用户托管展示等级。
+	 *
+	 * 当前 App 团队页面按真实等级、赠送等级、后台管理等级三者的最大值展示用户等级，
+	 * 空等级按0处理。
+	 *
+	 * @param userInfo 用户信息
+	 * @return 最大有效等级编码
+	 */
+	private int effectiveLevel(UserInfo userInfo) {
+		return Math.max(userInfo.getGameLevel(), Math.max(userInfo.getMinGameLevel(), userInfo.getAdminGameLevel()));
+	}
+
+	/**
+	 * 计算升级还需金额。
+	 *
+	 * 当前值已达到或超过目标值时返回0，避免页面展示负数。
+	 *
+	 * @param current 当前金额
+	 * @param target 目标金额
+	 * @return 还需金额，单位USDT
+	 */
+	private BigDecimal needAmount(BigDecimal current, BigDecimal target) {
+		BigDecimal need = defaultAmount(target).subtract(defaultAmount(current));
+		return need.compareTo(BigDecimal.ZERO) > 0 ? need : BigDecimal.ZERO;
+	}
+
+	/**
+	 * 计算升级进度百分比。
+	 *
+	 * 目标值为空或小于等于0时返回0；当前值超过目标值时封顶100。
+	 *
+	 * @param current 当前金额
+	 * @param target 目标金额
+	 * @return 进度百分比，单位%
+	 */
+	private BigDecimal progressPercent(BigDecimal current, BigDecimal target) {
+		BigDecimal targetAmount = defaultAmount(target);
+		if (targetAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			return BigDecimal.ZERO;
+		}
+		BigDecimal progress = defaultAmount(current)
+			.multiply(new BigDecimal("100"))
+			.divide(targetAmount, 2, RoundingMode.HALF_UP);
+		return progress.compareTo(new BigDecimal("100")) > 0 ? new BigDecimal("100") : progress;
+	}
+
+	private BigDecimal defaultAmount(BigDecimal amount) {
+		return amount == null ? BigDecimal.ZERO : amount;
+	}
+
+
+	/**
+	 * 初始化用户托管奖励累计汇总。
+	 *
+	 * 新注册用户默认生成一条0金额汇总记录，方便 App 团队页直接读取团队收益和全球分红；
+	 * 方法内部使用 insert ignore，重复调用不会覆盖历史累计值。
+	 *
+	 * @param userId 用户ID
+	 */
+	private void initStakeHostingRewardSummary(Long userId) {
+		stakeHostingUserRewardSummaryService.initUser(userId);
 	}
 
 	/**
@@ -673,6 +777,7 @@ public class BizUserServiceImpl implements BizUserService {
 				TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
 				throw new ServiceException(ResponseCode.CODE_1002);
 			}
+			initStakeHostingRewardSummary(userInfo.getUserId());
 
 			//更新上级直推人数
 			userInfoServiceImpl.lambdaUpdate().setSql(" sub_num = sub_num + 1 ")
@@ -775,6 +880,7 @@ public class BizUserServiceImpl implements BizUserService {
 				TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
 				throw new ServiceException(ResponseCode.CODE_1002);
 			}
+			initStakeHostingRewardSummary(userInfo.getUserId());
 
 			//更新上级直推人数
 			userInfoServiceImpl.lambdaUpdate().setSql(" sub_num = sub_num + 1 ")
@@ -1019,6 +1125,7 @@ public class BizUserServiceImpl implements BizUserService {
 			e.printStackTrace();
 			throw new ServiceException(ResponseCode.CODE_1002);
 		}
+		initStakeHostingRewardSummary(userInfo.getUserId());
 		//更新上级直推人数
 		userInfoServiceImpl.lambdaUpdate().setSql(" sub_num = sub_num + 1 ")
 			.eq(UserInfo::getUserId, inviteUserInfo.getUserId()).update();

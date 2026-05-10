@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeHostingDailyTeamPerformanceMapper">
+
+    <resultMap type="StakeHostingDailyTeamPerformance" id="StakeHostingDailyTeamPerformanceResult">
+        <result property="id" column="id" />
+        <result property="userId" column="user_id" />
+        <result property="account" column="account" />
+        <result property="statDay" column="stat_day" />
+        <result property="teamNewAmount" column="team_new_amount" />
+        <result property="teamExpiredAmount" column="team_expired_amount" />
+        <result property="previousTeamTvl" column="previous_team_tvl" />
+        <result property="currentTeamTvl" column="current_team_tvl" />
+        <result property="gDay" column="g_day" />
+        <result property="gSmooth" column="g_smooth" />
+        <result property="baseStaticRate" column="base_static_rate" />
+        <result property="rateSource" column="rate_source" />
+        <result property="calcStatus" column="calc_status" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <sql id="selectStakeHostingDailyTeamPerformanceVo">
+        select id, user_id, account, stat_day, team_new_amount, team_expired_amount,
+               previous_team_tvl, current_team_tvl, g_day, g_smooth, base_static_rate,
+               rate_source, calc_status, create_by, create_time, update_by, update_time,
+               remark, deleted
+        from t_stake_hosting_daily_team_performance
+    </sql>
+
+    <insert id="upsertTeamNewAmount">
+        insert into t_stake_hosting_daily_team_performance (
+            user_id, account, stat_day, team_new_amount, create_time, update_time, deleted
+        ) values (
+            #{userId}, #{account}, #{statDay}, #{amount}, now(), now(), 0
+        )
+        on duplicate key update
+            account = values(account),
+            team_new_amount = team_new_amount + values(team_new_amount),
+            calc_status = 0,
+            update_time = now()
+    </insert>
+
+    <insert id="upsertTeamExpiredAmount">
+        insert into t_stake_hosting_daily_team_performance (
+            user_id, account, stat_day, team_expired_amount, create_time, update_time, deleted
+        ) values (
+            #{userId}, #{account}, #{statDay}, #{amount}, now(), now(), 0
+        )
+        on duplicate key update
+            account = values(account),
+            team_expired_amount = team_expired_amount + values(team_expired_amount),
+            calc_status = 0,
+            update_time = now()
+    </insert>
+
+    <insert id="upsertEmptyDay">
+        insert into t_stake_hosting_daily_team_performance (
+            user_id, account, stat_day, create_time, update_time, deleted
+        ) values (
+            #{userId}, #{account}, #{statDay}, now(), now(), 0
+        )
+        on duplicate key update
+            account = values(account),
+            update_time = now()
+    </insert>
+
+    <select id="selectLatestBefore" resultMap="StakeHostingDailyTeamPerformanceResult">
+        <include refid="selectStakeHostingDailyTeamPerformanceVo"/>
+        where user_id = #{userId}
+          and stat_day &lt; #{statDay}
+          and calc_status = 1
+          and deleted = 0
+        order by stat_day desc
+        limit 1
+    </select>
+
+    <select id="selectRecentGDayBefore" resultType="java.math.BigDecimal">
+        select g_day
+        from t_stake_hosting_daily_team_performance
+        where user_id = #{userId}
+          and stat_day &lt; #{statDay}
+          and calc_status = 1
+          and deleted = 0
+        order by stat_day desc
+        limit 6
+    </select>
+
+    <select id="selectUserIdsByStatDay" resultType="java.lang.Long">
+        select user_id
+        from t_stake_hosting_daily_team_performance
+        where stat_day = #{statDay}
+          and deleted = 0
+    </select>
+
+    <select id="selectTeamTvlAt" resultType="java.math.BigDecimal">
+        select ifnull(sum(ifnull(o.stake_usdt_amount, 0)), 0)
+        from t_stake_hosting_order o
+        inner join t_user_relation r on r.pos_user_id = o.user_id
+            and r.par_user_id = #{userId}
+            and r.distance &gt; 0
+            and r.active_flag = 1
+        where o.deleted = 0
+          and o.pay_status in (1, 2)
+          and o.performance_start_time is not null
+          and o.performance_end_time is not null
+          and o.performance_start_time &lt;= #{snapshotTime}
+          and o.performance_end_time &gt; #{snapshotTime}
+    </select>
+</mapper>

@@ -62,6 +62,14 @@ public class StakeHostingWeeklyCommunityPerformance extends BaseEntity {
 	@ApiModelProperty(value = "本周最大直推区新增业绩")
 	private BigDecimal maxLinePerformance;
 
+	@Excel(name = "上周末小区有效积分", sort = 9)
+	@ApiModelProperty(value = "上周末小区有效积分快照")
+	private BigDecimal previousCommunityPerformance;
+
+	@Excel(name = "本周末小区有效积分", sort = 10)
+	@ApiModelProperty(value = "本周末小区有效积分快照")
+	private BigDecimal currentCommunityPerformance;
+
 	@Excel(name = "新增小区业绩", sort = 9)
 	@ApiModelProperty(value = "本周新增小区业绩")
 	private BigDecimal communityNewPerformance;

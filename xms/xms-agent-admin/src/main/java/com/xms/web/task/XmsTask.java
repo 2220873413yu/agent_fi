@@ -77,8 +77,6 @@ public class XmsTask {
 	 *
 	 */
 	public void distributePtbInterest101() {
-//		log.info("任务类型100 每天发放质押奖励");
-//		asyncTaskServiceImpl.distributePtbInterest101();
 		log.info("任务类型101 每天发放托管静态收益");
 		stakeHostingTaskServiceImpl.distributeDailyStaticReward();
 	}

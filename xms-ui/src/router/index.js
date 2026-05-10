@@ -87,19 +87,6 @@ export const constantRoutes = [
         meta: { title: '个人中心', icon: 'user' }
       }
     ]
-  },
-  {
-    path: '/chat-debug',
-    component: Layout,
-    hidden: true,
-    children: [
-      {
-        path: '',
-        component: () => import('@/views/xms/chatDebug/index'),
-        name: 'ChatDebug',
-        meta: { title: '聊天调试', icon: 'message' }
-      }
-    ]
   }
 ]
 

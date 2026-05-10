@@ -15,6 +15,7 @@ import com.xms.dao.domain.StakeHostingOrder;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.mapper.StakeHostingOrderMapper;
 import com.xms.dao.service.IStakeHostingPackageService;
+import com.xms.dao.service.IStakeHostingDailyTeamPerformanceService;
 import com.xms.dao.service.IStakeHostingOrderService;
 import com.xms.dao.service.IStakeOrderService;
 import com.xms.dao.service.UserInfoService;
@@ -49,10 +50,13 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	public static final int WEEKLY_STATUS_WAIT = 0;
 	public static final int WEEKLY_STATUS_QUEUED = 1;
 	public static final int WEEKLY_STATUS_DONE = 3;
+	public static final int G7_STATUS_WAIT = 0;
+	private static final BigDecimal DEFAULT_PERFORMANCE_COEFFICIENT = BigDecimal.ONE;
 	private static final int DAILY_WAIT_PAY_LIMIT = 10;
 	private static final String WEEKLY_SKIP_EXPIRED_IN_WEEK = "本周内到期，不计入周新增业绩";
 
 	private final IStakeHostingPackageService stakeHostingPackageService;
+	private final IStakeHostingDailyTeamPerformanceService stakeHostingDailyTeamPerformanceService;
 	private final UserInfoService userInfoService;
 	private final IStakeOrderService stakeOrderService;
 	private final AsyncDynamicOrderSettlementService asyncDynamicOrderSettlementServiceImpl;
@@ -126,12 +130,15 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.set(StakeHostingOrder::getWeeklyPerformanceStatus, weeklyPrepare.status)
 			.set(StakeHostingOrder::getWeeklyPerformanceSkipReason, weeklyPrepare.skipReason)
 			.set(StakeHostingOrder::getWeeklyPerformanceTime, weeklyPrepare.done ? now : null)
+			.set(StakeHostingOrder::getG7NewPerformanceStatus, G7_STATUS_WAIT)
+			.set(StakeHostingOrder::getG7ExpirePerformanceStatus, G7_STATUS_WAIT)
 			.set(StakeHostingOrder::getUpdateTime, now)
 			.update();
 		if (!update) {
 			throw new ServiceException("托管订单状态已变更");
 		}
 		addHostingPerformance(order.getUserId(), order.getStakeUsdtAmount());
+		stakeHostingDailyTeamPerformanceService.recordOrderTeamNewAmount(order.getId());
 		if (weeklyPrepare.shouldSend) {
 			sendStakeHostingWeeklyPerformanceAfterCommit(order.getId());
 		}
@@ -164,11 +171,14 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setWeeklyPerformanceStatus(weeklyPrepare.status);
 		order.setWeeklyPerformanceSkipReason(weeklyPrepare.skipReason);
 		order.setWeeklyPerformanceTime(weeklyPrepare.done ? now : null);
+		order.setG7NewPerformanceStatus(G7_STATUS_WAIT);
+		order.setG7ExpirePerformanceStatus(G7_STATUS_WAIT);
 		order.setRemark(req.getRemark());
 		if (!save(order)) {
 			throw new ServiceException("后台拨付托管订单失败");
 		}
 		addHostingPerformance(order.getUserId(), order.getStakeUsdtAmount());
+		stakeHostingDailyTeamPerformanceService.recordOrderTeamNewAmount(order.getId());
 		if (weeklyPrepare.shouldSend) {
 			sendStakeHostingWeeklyPerformanceAfterCommit(order.getId());
 		}
@@ -248,6 +258,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			recalculateOrderId = order == null ? null : order.getId();
 		}
 		sendStakeHostingLevelRecalculateAfterCommit(recalculateOrderId);
+		sendStakeHostingWeeklyPerformanceAfterCommit(recalculateOrderId);
 	}
 
 	private void sendStakeHostingLevelRecalculateAfterCommit(Long orderId) {
@@ -319,12 +330,19 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setPackageName(hostingPackage.getName());
 		order.setPackageDays(hostingPackage.getDays());
 		order.setStakeUsdtAmount(amount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
+		BigDecimal performanceCoefficient = hostingPackage.getPerformanceCoefficient() == null
+			? DEFAULT_PERFORMANCE_COEFFICIENT : hostingPackage.getPerformanceCoefficient();
+		order.setPerformanceCoefficient(performanceCoefficient.setScale(4, ConstantStatic.roundingModeNew));
+		order.setPerformancePoints(order.getStakeUsdtAmount().multiply(performanceCoefficient)
+			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
 		order.setRunDays(0);
 		order.setTodayReward(BigDecimal.ZERO);
 		order.setTotalStaticReward(BigDecimal.ZERO);
 		order.setIsReturnPrincipal(0);
 		order.setAfiAccelerated(0);
 		order.setWeeklyPerformanceStatus(WEEKLY_STATUS_WAIT);
+		order.setG7NewPerformanceStatus(G7_STATUS_WAIT);
+		order.setG7ExpirePerformanceStatus(G7_STATUS_WAIT);
 		order.setCreateDay(createDay);
 		order.setCreateTime(new Date());
 		return order;

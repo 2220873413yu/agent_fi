@@ -268,7 +268,7 @@ public class UserMoneyController {
 	 *
 	 * @param pageIndex  当前页 默认10
 	 * @param pageSize   每页长度 默认20(最大20)
-	 * @param coinType   币种 1:USDT,2:DFC,3:OORT,4:锁定USDT,5:产出DFC
+	 * @param coinType   币种 1:USDT,2:AFI
 	 * @param sourceType 来源类型 xxx
 	 * @return
 	 */

@@ -52,6 +52,11 @@ public class StakeHostingPackage extends BaseEntity {
 	@ApiModelProperty(value = "服务费比例，单位%")
 	private BigDecimal serviceFeeRatio;
 
+	/** 业绩积分系数，用于计算新增小区业绩积分 */
+	@Excel(name = "业绩积分系数", sort = 6)
+	@ApiModelProperty(value = "业绩积分系数，用于计算新增小区业绩积分")
+	private BigDecimal performanceCoefficient;
+
 	/** 排序 */
 	@Excel(name = "排序", sort = 6)
 	@ApiModelProperty(value = "排序")

@@ -24,6 +24,7 @@
         <result column="sub_performance" property="subPerformance" />
         <result column="community_performance" property="communityPerformance" />
         <result column="umbrella_performance" property="umbrellaPerformance" />
+        <result column="stake_hosting_static_rate" property="stakeHostingStaticRate" />
 
         <result column="parent_chain" property="parentChain" />
         <result column="create_time" property="createTime" />

@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -111,6 +112,10 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 
 		updateUser.setAdminGameLevel(req.getAdminGameLevel());
 		updateUser.setUserId(req.getUserId());
+		if (req.getStakeHostingStaticRate() != null && req.getStakeHostingStaticRate().compareTo(BigDecimal.ZERO) < 0) {
+			throw new ServiceException("托管指定静态收益率不能小于0");
+		}
+		updateUser.setStakeHostingStaticRate(req.getStakeHostingStaticRate() == null ? BigDecimal.ZERO : req.getStakeHostingStaticRate());
 
 		if(StrUtil.isNotBlank(req.getAccount())){
 			updateUser.setAccount(req.getAccount());

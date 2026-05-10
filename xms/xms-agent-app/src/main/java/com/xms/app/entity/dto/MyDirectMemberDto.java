@@ -28,20 +28,20 @@ public class MyDirectMemberDto {
 	 */
 	private Integer gameLevel;
 
-	/**
-	 * 节点等级 0:A0,1:A1,2:A2,3:A3
-	 */
-	private Integer nodeLevel;
+//	/**
+//	 * 节点等级 0:A0,1:A1,2:A2,3:A3
+//	 */
+//	private Integer nodeLevel;
 
-	/**
-	 * 团队业绩(节点数量)
-	 */
-	private BigDecimal nodeTeamPerformance;
-
-	/**
-	 * 直推业绩(节点数量)
-	 */
-	private BigDecimal subNodePerformance;
+//	/**
+//	 * 团队业绩(节点数量)
+//	 */
+//	private BigDecimal nodeTeamPerformance;
+//
+//	/**
+//	 * 直推业绩(节点数量)
+//	 */
+//	private BigDecimal subNodePerformance;
 
 	/**
 	 * 直推人数

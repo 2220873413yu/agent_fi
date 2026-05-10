@@ -212,7 +212,7 @@ public class IndexDataServiceImpl implements IndexDataService {
 			indexDataPanelVo.setV30(v30);
 			indexDataPanelVo.setV31(BigDecimal.ZERO);
 
-			//提现币种 1:USDT,2:DFC,3:OORT,5:产出DFC
+			//提现币种 1:USDT,2:AFI
 			Withdrawal usdtWdwSum = withdrawalService.getOne(
 				new QueryWrapper<Withdrawal>()
 					.select("IFNULL(SUM(change_balance),0) AS change_balance")

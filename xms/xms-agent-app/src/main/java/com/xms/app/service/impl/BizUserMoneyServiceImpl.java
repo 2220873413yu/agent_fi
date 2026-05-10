@@ -212,11 +212,11 @@ public class BizUserMoneyServiceImpl implements BizUserMoneyService {
 	public UserMoneyBo getUserMoney(Long userId) {
 		//查询钱包
 		UserMoney userMoney = userMoneyService.lambdaQuery().eq(UserMoney::getId, userId)
-			.select(UserMoney::getValidNum1, UserMoney::getValidNum2,
-				UserMoney::getValidNum3,UserMoney::getValidNum4,UserMoney::getValidNum5)
+			.select(UserMoney::getValidNum1, UserMoney::getValidNum2)
 			.one();
 		UserMoneyBo userMoneyBo = new UserMoneyBo();
 		userMoneyBo.setValidNum1(userMoney.getValidNum1());
+		userMoneyBo.setValidNum2(userMoney.getValidNum2());
 		return userMoneyBo;
 	}
 

@@ -49,6 +49,8 @@
       <el-table-column label="团队新增" align="center" prop="teamNewPerformance" />
       <el-table-column label="直推区合计" align="center" prop="totalLinePerformance" />
       <el-table-column label="最大区" align="center" prop="maxLinePerformance" />
+      <el-table-column label="上周末小区" align="center" prop="previousCommunityPerformance" />
+      <el-table-column label="本周末小区" align="center" prop="currentCommunityPerformance" />
       <el-table-column label="新增小区" align="center" prop="communityNewPerformance" />
       <el-table-column label="状态" align="center" prop="settleStatus" width="100">
         <template slot-scope="scope">

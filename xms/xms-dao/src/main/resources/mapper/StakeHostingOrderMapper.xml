@@ -13,6 +13,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="packageName" column="package_name" />
         <result property="packageDays" column="package_days" />
         <result property="stakeUsdtAmount" column="stake_usdt_amount" />
+        <result property="performanceCoefficient" column="performance_coefficient" />
+        <result property="performancePoints" column="performance_points" />
         <result property="sourceType" column="source_type" />
         <result property="payStatus" column="pay_status" />
         <result property="status" column="status" />
@@ -43,6 +45,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectStakeHostingOrderVo">
         select id, order_no, user_id, account, package_id, package_name, package_days, stake_usdt_amount,
+               performance_coefficient, performance_points,
                source_type, pay_status, status, pay_hash, pay_amount, pay_time, effective_time, finish_time,
                run_days, today_reward, total_static_reward, is_return_principal, afi_accelerated, last_reward_day, create_day,
                performance_start_time, performance_end_time, weekly_performance_status, weekly_performance_skip_reason,

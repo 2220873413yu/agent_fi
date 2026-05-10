@@ -13,7 +13,7 @@ import java.util.List;
 public interface IStakeHostingAfiPledgeService extends XmsDataService<StakeHostingAfiPledge> {
 	List<StakeHostingAfiPledge> selectStakeHostingAfiPledgeList(StakeHostingAfiPledge pledge);
 
-	StakeHostingAfiPledge pledgeAfi(Long userId, Long stakeHostingOrderId, BigDecimal afiAmount);
+	StakeHostingAfiPledge pledgeAfi(Long userId, Long stakeHostingOrderId, BigDecimal afiAmount, BigDecimal afiPrice);
 
 	int returnPledgeByOrderId(Long stakeHostingOrderId);
 }

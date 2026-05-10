@@ -33,7 +33,7 @@ public class WithdrawalConfig extends BaseEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
     /** 币种 1:USDT,2:DFC,3:OORT */
-    @Excel(name = "币种 1:USDT,2:DFC,3:OORT,5:产出DFC")
+    @Excel(name = "币种 1:USDT,2:AFI")
     @ApiModelProperty(value = "币种 1:USDT,2:DFC,3:OORT")
     private Integer coinType;
 

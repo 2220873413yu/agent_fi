@@ -10,6 +10,7 @@ import com.xms.common.constant.SysConstant;
 import com.xms.common.exception.ServiceException;
 import com.xms.common.utils.uuid.IDUtils;
 import com.xms.dao.domain.RewardRecord;
+import com.xms.dao.domain.StakeHostingDailyTeamPerformance;
 import com.xms.dao.domain.StakeHostingAfiPledge;
 import com.xms.dao.domain.StakeHostingGlobalDividendBatch;
 import com.xms.dao.domain.StakeHostingGlobalDividendDetail;
@@ -23,11 +24,13 @@ import com.xms.dao.entity.vo.ParentUserTaskVo;
 import com.xms.dao.service.IRewardRecordService;
 import com.xms.dao.service.IStakeHostingAfiPledgeService;
 import com.xms.dao.service.IStakeHostingPackageService;
+import com.xms.dao.service.IStakeHostingDailyTeamPerformanceService;
 import com.xms.dao.service.IStakeHostingOrderService;
 import com.xms.dao.service.IStakeHostingRewardSettlementService;
 import com.xms.dao.service.IStakeHostingGlobalDividendPoolService;
 import com.xms.dao.service.IStakeHostingGlobalDividendBatchService;
 import com.xms.dao.service.IStakeHostingGlobalDividendDetailService;
+import com.xms.dao.service.IStakeHostingUserRewardSummaryService;
 import com.xms.dao.service.IStakeHostingWeeklyCommunityPerformanceService;
 import com.xms.dao.service.ISysParaService;
 import com.xms.dao.service.IUserLevelConfigService;
@@ -59,12 +62,15 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	/**
-	 * 第一批占位静态收益率：0.5%。
-	 * 第二批接入G7时替换 calculatePlaceholderStaticRate 的内部实现。
+	 * G7快照缺失时的兜底静态收益率：0.5%。
 	 */
 	private static final BigDecimal PLACEHOLDER_STATIC_RATE = new BigDecimal("0.005");
+	private static final BigDecimal PURE_STATIC_RATE_BEFORE_RETURN_PERCENT = new BigDecimal("0.5");
+	private static final BigDecimal PURE_STATIC_RATE_AFTER_RETURN_PERCENT = new BigDecimal("0.2");
+	private static final BigDecimal PERCENT_DIVISOR = new BigDecimal("100");
 
 	private final IStakeHostingOrderService stakeHostingOrderService;
+	private final IStakeHostingDailyTeamPerformanceService stakeHostingDailyTeamPerformanceService;
 	private final UserWalletService userWalletService;
 	private final IRewardRecordService rewardRecordService;
 	private final IAsyncTaskService asyncTaskServiceImpl;
@@ -74,6 +80,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	private final IStakeHostingGlobalDividendPoolService stakeHostingGlobalDividendPoolService;
 	private final IStakeHostingGlobalDividendBatchService stakeHostingGlobalDividendBatchService;
 	private final IStakeHostingGlobalDividendDetailService stakeHostingGlobalDividendDetailService;
+	private final IStakeHostingUserRewardSummaryService stakeHostingUserRewardSummaryService;
 	private final IStakeHostingWeeklyCommunityPerformanceService stakeHostingWeeklyCommunityPerformanceService;
 	private final UserInfoService userInfoService;
 	private final IUserLevelConfigService userLevelConfigService;
@@ -121,6 +128,11 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			addDailyTask(strDate);
 			return;
 		}
+		List<Long> rewardUserIds = orderList.stream()
+			.map(StakeHostingOrder::getUserId)
+			.distinct()
+			.collect(Collectors.toList());
+		stakeHostingDailyTeamPerformanceService.prepareDailySnapshots(rewardDay, rewardUserIds);
 		Date now = new Date();
 		BigDecimal dailyServiceFee = BigDecimal.ZERO;
 		for (StakeHostingOrder order : orderList) {
@@ -324,6 +336,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		rewardRecord.setGtId(IDUtils.getSnowflakeStr());
 		rewardRecord.setCreateTime(now);
 		rewardRecordService.save(rewardRecord);
+		stakeHostingUserRewardSummaryService.addGlobalDividend(detail.getUserId(), detail.getRewardAmount());
 	}
 
 	private void finishGlobalDividendBatch(Long batchId, BigDecimal actualAmount, int userCount, Date now) {
@@ -347,7 +360,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * <p>5. 订单发满后改为已完成，扣减对应托管业绩，并自动退还绑定的 AFI。</p>
 	 */
 	private BigDecimal distributeOne(StakeHostingOrder order, int rewardDay, Date now) {
-		BigDecimal todayRate = calculatePlaceholderStaticRate(order);
+		BigDecimal todayRate = calculateStaticRate(order, rewardDay);
 		BigDecimal baseGrossReward = order.getStakeUsdtAmount().multiply(todayRate)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 		StakeHostingAfiPledge effectiveAfiPledge = getEffectiveAfiPledge(order.getId(), rewardDay);
@@ -406,6 +419,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		if (finished) {
 			stakeHostingOrderService.subtractHostingPerformance(order.getUserId(), order.getStakeUsdtAmount(), order.getId());
 			stakeHostingAfiPledgeService.returnPledgeByOrderId(order.getId());
+			stakeHostingDailyTeamPerformanceService.recordOrderTeamExpiredAmountNextDay(order.getId(), rewardDay);
 		}
 		return serviceFee;
 	}
@@ -438,8 +452,43 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 	}
 
-	private BigDecimal calculatePlaceholderStaticRate(StakeHostingOrder order) {
-		return PLACEHOLDER_STATIC_RATE;
+	/**
+	 * 计算单笔托管订单当天使用的基础静态收益率。
+	 *
+	 * <p>收益率优先级：用户指定收益率 > 未推广特殊规则 > G7团队TVL快照。
+	 * 配置和快照里的收益率单位是%，本方法返回实际乘数，例如 0.5% 返回 0.005。</p>
+	 *
+	 * @param order 托管订单
+	 * @param rewardDay 收益日期，格式yyyyMMdd
+	 * @return 基础静态收益率乘数
+	 */
+	private BigDecimal calculateStaticRate(StakeHostingOrder order, int rewardDay) {
+		UserInfo user = userInfoService.lambdaQuery()
+			.eq(UserInfo::getUserId, order.getUserId())
+			.one();
+		if (user != null && user.getStakeHostingStaticRate() != null && user.getStakeHostingStaticRate().compareTo(BigDecimal.ZERO) > 0) {
+			return percentToRate(user.getStakeHostingStaticRate());
+		}
+		if (!stakeHostingDailyTeamPerformanceService.hasTeamTvl(order.getUserId(), rewardDay)) {
+			BigDecimal pureStaticRate = order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1
+				? PURE_STATIC_RATE_AFTER_RETURN_PERCENT : PURE_STATIC_RATE_BEFORE_RETURN_PERCENT;
+			return percentToRate(pureStaticRate);
+		}
+		StakeHostingDailyTeamPerformance snapshot = stakeHostingDailyTeamPerformanceService.getCalculatedSnapshot(order.getUserId(), rewardDay);
+		if (snapshot == null || snapshot.getBaseStaticRate() == null) {
+			return PLACEHOLDER_STATIC_RATE;
+		}
+		return percentToRate(snapshot.getBaseStaticRate());
+	}
+
+	/**
+	 * 将百分比收益率换算成实际乘数。
+	 *
+	 * @param percentRate 百分比收益率，例如0.5表示0.5%
+	 * @return 实际乘数，例如0.005
+	 */
+	private BigDecimal percentToRate(BigDecimal percentRate) {
+		return percentRate.divide(PERCENT_DIVISOR, 8, ConstantStatic.roundingModeNew);
 	}
 
 	private BigDecimal getServiceFeeRatio(StakeHostingOrder order) {
@@ -635,8 +684,27 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		rewardRecord.setGtId(IDUtils.getSnowflakeStr());
 		rewardRecord.setCreateTime(now);
 		rewardRecordService.save(rewardRecord);
+		addTeamRewardSummary(receiveUserId, rewardType, rewardAmount);
 		saveSettlement(order, receiveUserId, rewardType, rewardLevel, rewardBase, ratioPercent, rewardAmount,
 			grossReward, serviceFeeRatio, serviceFee, netReward, ARRIVAL_YES, null, rewardDay, now);
+	}
+
+	/**
+	 * 累加托管团队收益汇总。
+	 *
+	 * App 团队页团队收益只统计极差奖和平级奖，直推奖不计入；
+	 * 汇总表使用 user_id 主键兜底初始化，金额单位为USDT。
+	 *
+	 * @param receiveUserId 奖励接收用户ID
+	 * @param rewardType 托管奖励类型
+	 * @param rewardAmount 本次到账奖励金额
+	 */
+	private void addTeamRewardSummary(Long receiveUserId, int rewardType, BigDecimal rewardAmount) {
+		if (rewardType == REWARD_TYPE_DIFF) {
+			stakeHostingUserRewardSummaryService.addDiffReward(receiveUserId, rewardAmount);
+		} else if (rewardType == REWARD_TYPE_SAME_LEVEL) {
+			stakeHostingUserRewardSummaryService.addSameLevelReward(receiveUserId, rewardAmount);
+		}
 	}
 
 	private void saveSettlement(StakeHostingOrder order, Long receiveUserId, int rewardType, Integer rewardLevel,

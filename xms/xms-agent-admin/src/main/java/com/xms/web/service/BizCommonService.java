@@ -15,4 +15,10 @@ public interface BizCommonService {
 	 * @return
 	 */
 	public BigDecimal getOortPrice();
+
+	/**
+	 * 获取AFI价格
+	 * @return
+	 */
+	public BigDecimal getAfiPrice();
 }

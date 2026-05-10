@@ -14,6 +14,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="teamNewPerformance" column="team_new_performance" />
         <result property="totalLinePerformance" column="total_line_performance" />
         <result property="maxLinePerformance" column="max_line_performance" />
+        <result property="previousCommunityPerformance" column="previous_community_performance" />
+        <result property="currentCommunityPerformance" column="current_community_performance" />
         <result property="communityNewPerformance" column="community_new_performance" />
         <result property="settleStatus" column="settle_status" />
         <result property="batchNo" column="batch_no" />
@@ -28,6 +30,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <sql id="selectStakeHostingWeeklyCommunityPerformanceVo">
         select id, user_id, account, week_start_time, week_end_time, self_new_performance,
                team_new_performance, total_line_performance, max_line_performance,
+               previous_community_performance, current_community_performance,
                community_new_performance, settle_status, batch_no, create_by, create_time,
                update_by, update_time, remark, deleted
         from t_stake_hosting_weekly_community_performance
@@ -52,18 +55,82 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         insert into t_stake_hosting_weekly_community_performance (
             user_id, account, week_start_time, week_end_time, self_new_performance,
             team_new_performance, total_line_performance, max_line_performance,
+            previous_community_performance, current_community_performance,
             community_new_performance, settle_status, create_time, update_time, deleted
         ) values (
             #{userId}, #{account}, #{weekStartTime}, #{weekEndTime}, #{selfAmount},
-            #{teamAmount}, 0, 0, 0, 0, now(), now(), 0
+            #{teamAmount}, 0, 0, 0, 0, 0, 0, now(), now(), 0
         )
         on duplicate key update
             account = values(account),
             week_end_time = values(week_end_time),
-            self_new_performance = ifnull(self_new_performance, 0) + values(self_new_performance),
-            team_new_performance = ifnull(team_new_performance, 0) + values(team_new_performance),
+            self_new_performance = values(self_new_performance),
+            team_new_performance = values(team_new_performance),
             update_time = now()
     </insert>
+
+    <select id="selectSelfWeeklyNetPoints" resultType="java.math.BigDecimal">
+        select ifnull(sum(case
+            when o.performance_start_time between #{weekStartTime} and #{weekEndTime}
+                then ifnull(o.performance_points, ifnull(o.stake_usdt_amount, 0) * ifnull(o.performance_coefficient, 1))
+            else 0 end), 0)
+        - ifnull(sum(case
+            when o.performance_end_time between #{weekStartTime} and #{weekEndTime}
+                then ifnull(o.performance_points, ifnull(o.stake_usdt_amount, 0) * ifnull(o.performance_coefficient, 1))
+            else 0 end), 0)
+        from t_stake_hosting_order o
+        where o.deleted = 0
+          and o.pay_status in (1, 2)
+          and o.user_id = #{userId}
+          and (
+              o.performance_start_time between #{weekStartTime} and #{weekEndTime}
+              or o.performance_end_time between #{weekStartTime} and #{weekEndTime}
+          )
+    </select>
+
+    <select id="selectTeamWeeklyNetPoints" resultType="java.math.BigDecimal">
+        select ifnull(sum(case
+            when o.performance_start_time between #{weekStartTime} and #{weekEndTime}
+                then ifnull(o.performance_points, ifnull(o.stake_usdt_amount, 0) * ifnull(o.performance_coefficient, 1))
+            else 0 end), 0)
+        - ifnull(sum(case
+            when o.performance_end_time between #{weekStartTime} and #{weekEndTime}
+                then ifnull(o.performance_points, ifnull(o.stake_usdt_amount, 0) * ifnull(o.performance_coefficient, 1))
+            else 0 end), 0)
+        from t_stake_hosting_order o
+        inner join t_user_relation r on r.pos_user_id = o.user_id
+            and r.par_user_id = #{userId}
+            and r.distance > 0
+            and r.active_flag = 1
+        where o.deleted = 0
+          and o.pay_status in (1, 2)
+          and (
+              o.performance_start_time between #{weekStartTime} and #{weekEndTime}
+              or o.performance_end_time between #{weekStartTime} and #{weekEndTime}
+          )
+    </select>
+
+    <select id="selectLineValidPoints" resultType="java.math.BigDecimal">
+        select ifnull(sum(ifnull(o.performance_points, ifnull(o.stake_usdt_amount, 0) * ifnull(o.performance_coefficient, 1))), 0)
+        from t_stake_hosting_order o
+        where o.deleted = 0
+          and o.pay_status in (1, 2)
+          and o.performance_start_time is not null
+          and o.performance_end_time is not null
+          and o.performance_start_time &lt;= #{snapshotTime}
+          and o.performance_end_time &gt; #{snapshotTime}
+          and (
+              o.user_id = #{directUserId}
+              or exists (
+                  select 1
+                  from t_user_relation r
+                  where r.par_user_id = #{directUserId}
+                    and r.pos_user_id = o.user_id
+                    and r.distance > 0
+                    and r.active_flag = 1
+              )
+          )
+    </select>
 
     <select id="selectByUserIdsAndWeek" resultMap="StakeHostingWeeklyCommunityPerformanceResult">
         <include refid="selectStakeHostingWeeklyCommunityPerformanceVo"/>

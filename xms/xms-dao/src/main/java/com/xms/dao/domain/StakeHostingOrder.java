@@ -69,6 +69,16 @@ public class StakeHostingOrder extends BaseEntity {
 	@ApiModelProperty(value = "托管USDT金额")
 	private BigDecimal stakeUsdtAmount;
 
+	/** 业绩积分系数快照 */
+	@Excel(name = "业绩积分系数", sort = 9)
+	@ApiModelProperty(value = "业绩积分系数快照")
+	private BigDecimal performanceCoefficient;
+
+	/** 业绩积分快照 */
+	@Excel(name = "业绩积分", sort = 10)
+	@ApiModelProperty(value = "业绩积分快照")
+	private BigDecimal performancePoints;
+
 	/** 订单来源 0:用户购买 1:后台拨付 */
 	@Excel(name = "订单来源", sort = 9, dictType = "t_stake_hosting_order_source_type")
 	@ApiModelProperty(value = "订单来源 0:用户购买 1:后台拨付")
@@ -152,6 +162,24 @@ public class StakeHostingOrder extends BaseEntity {
 
 	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
 	private Date weeklyPerformanceTime;
+
+	/** G7团队新增统计状态 0未处理 1已处理 */
+	@ApiModelProperty(value = "G7团队新增统计状态 0未处理 1已处理")
+	private Integer g7NewPerformanceStatus;
+
+	/** G7团队新增统计处理时间 */
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@ApiModelProperty(value = "G7团队新增统计处理时间")
+	private Date g7NewPerformanceTime;
+
+	/** G7团队到期统计状态 0未处理 1已处理 */
+	@ApiModelProperty(value = "G7团队到期统计状态 0未处理 1已处理")
+	private Integer g7ExpirePerformanceStatus;
+
+	/** G7团队到期统计处理时间 */
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@ApiModelProperty(value = "G7团队到期统计处理时间")
+	private Date g7ExpirePerformanceTime;
 
 	private Integer createDay;
 }

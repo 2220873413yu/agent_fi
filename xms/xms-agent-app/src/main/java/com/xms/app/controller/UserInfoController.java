@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import com.github.pagehelper.PageInfo;
 import com.xms.app.config.RobotConfig;
 import com.xms.app.entity.dto.MyDirectMemberDto;
+import com.xms.app.entity.dto.MyTeamInfoDto;
 import com.xms.app.entity.vo.*;
 import com.xms.app.service.BizUserService;
 import com.xms.common.annotation.Anonymous;
@@ -197,15 +198,29 @@ public class UserInfoController {
 	}
 
 
-
 	/**
-	 * 我的直推用户信息
+	 * 查询我的直推用户信息
+	 * @param pageIndex pageindex
+	 * @param pageSize pageSize
+	 * @param gameLevel 用户等级
 	 * @return
 	 */
 	@ApiOperation(value = "我的直推用户信息")
 	@GetMapping("/listSubMembers")
-	public ResultPista<PageInfo<MyDirectMemberDto>> listSubMembers(Integer pageIndex, Integer pageSize) {
-		return ResultPista.data(bizUserService.listSubMembers(pageIndex, pageSize));
+	public ResultPista<PageInfo<MyDirectMemberDto>> listSubMembers(Integer pageIndex, Integer pageSize,Integer gameLevel) {
+		return ResultPista.data(bizUserService.listSubMembers(pageIndex, pageSize,gameLevel));
+	}
+
+
+	/**
+	 * 我的团队数据
+	 *
+	 * @return
+	 */
+	@ApiOperation(value = "我的团队数据")
+	@GetMapping(value = "/myTeamInfo")
+	public ResultPista<MyTeamInfoDto> myTeamInfo() {
+		return ResultPista.data(bizUserService.myTeamInfo(SecurityUtils.getLoginAppUser().getUserId()));
 	}
 
 	/**
@@ -219,18 +234,10 @@ public class UserInfoController {
 //	}
 
 
-//
-//	/**
-//	 * 我的团队数据 总成员、直推人数、团队销毁usdt、等级
-//	 *
-//	 * @return
-//	 */
-//	@ApiOperation(value = "我的团队数据")
-//	@GetMapping(value = "/myTeamInfo")
-//	public ResultPista<MyTeamInfoDto> myTeamInfo() {
-//		return ResultPista.data(bizUserService.myTeamInfo(SecurityUtils.getLoginAppUser().getUserId()));
-//	}
-//
+
+
+
+
 //	/**
 //	 * 我的团队数据 总成员、直推人数、团队销毁usdt、等级
 //	 * @param lastId lastId

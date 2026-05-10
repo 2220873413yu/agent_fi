@@ -145,6 +145,11 @@ public class UserInfo extends BaseXmsEntity {
 	 */
 	private BigDecimal performanceMining;
 
+	/**
+	 * 托管指定静态收益率，单位%，0表示按G7规则
+	 */
+	private BigDecimal stakeHostingStaticRate;
+
 
 
 

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeHostingUserRewardSummaryMapper">
+
+    <resultMap type="StakeHostingUserRewardSummary" id="StakeHostingUserRewardSummaryResult">
+        <id property="userId" column="user_id" />
+        <result property="diffRewardAmount" column="diff_reward_amount" />
+        <result property="sameLevelRewardAmount" column="same_level_reward_amount" />
+        <result property="globalDividendAmount" column="global_dividend_amount" />
+    </resultMap>
+
+    <select id="selectByUserId" resultMap="StakeHostingUserRewardSummaryResult">
+        select user_id, diff_reward_amount, same_level_reward_amount, global_dividend_amount
+        from t_stake_hosting_user_reward_summary
+        where user_id = #{userId}
+    </select>
+
+    <insert id="initUser">
+        insert ignore into t_stake_hosting_user_reward_summary
+            (user_id, diff_reward_amount, same_level_reward_amount, global_dividend_amount)
+        values
+            (#{userId}, 0.000000, 0.000000, 0.000000)
+    </insert>
+
+    <insert id="addDiffReward">
+        insert into t_stake_hosting_user_reward_summary
+            (user_id, diff_reward_amount, same_level_reward_amount, global_dividend_amount)
+        values
+            (#{userId}, #{amount}, 0.000000, 0.000000)
+        on duplicate key update
+            diff_reward_amount = diff_reward_amount + values(diff_reward_amount)
+    </insert>
+
+    <insert id="addSameLevelReward">
+        insert into t_stake_hosting_user_reward_summary
+            (user_id, diff_reward_amount, same_level_reward_amount, global_dividend_amount)
+        values
+            (#{userId}, 0.000000, #{amount}, 0.000000)
+        on duplicate key update
+            same_level_reward_amount = same_level_reward_amount + values(same_level_reward_amount)
+    </insert>
+
+    <insert id="addGlobalDividend">
+        insert into t_stake_hosting_user_reward_summary
+            (user_id, diff_reward_amount, same_level_reward_amount, global_dividend_amount)
+        values
+            (#{userId}, 0.000000, 0.000000, #{amount})
+        on duplicate key update
+            global_dividend_amount = global_dividend_amount + values(global_dividend_amount)
+    </insert>
+</mapper>

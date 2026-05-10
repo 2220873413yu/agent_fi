@@ -1,16 +1,16 @@
 package com.xms.app.controller;
 
+import com.xms.app.entity.dto.StakeHostingAfiAccelerateConfigDto;
+import com.xms.app.entity.dto.StakeHostingOrderDto;
 import com.xms.app.entity.resp.CreateStakeHostingOrderResp;
+import com.xms.app.entity.dto.StakeHostingPackageDto;
 import com.xms.app.entity.vo.CreateStakeHostingOrderVo;
 import com.xms.app.entity.vo.PledgeStakeHostingAfiVo;
 import com.xms.app.service.BizStakeHostingService;
 import com.xms.common.annotation.RepeatSubmit;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.utils.SecurityUtils;
-import com.xms.dao.domain.StakeHostingAfiAccelerateConfig;
 import com.xms.dao.domain.StakeHostingAfiPledge;
-import com.xms.dao.domain.StakeHostingOrder;
-import com.xms.dao.domain.StakeHostingPackage;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import jakarta.validation.Valid;
@@ -33,7 +33,7 @@ public class BizStakeHostingController {
 
 	@ApiOperation(value = "托管套餐列表")
 	@GetMapping("/packageList")
-	public ResultPista<List<StakeHostingPackage>> packageList() {
+	public ResultPista<List<StakeHostingPackageDto>> packageList() {
 		return ResultPista.data(bizStakeHostingService.packageList());
 	}
 
@@ -46,25 +46,25 @@ public class BizStakeHostingController {
 
 	@ApiOperation(value = "我的托管订单")
 	@GetMapping("/orderList")
-	public ResultPista<List<StakeHostingOrder>> orderList(Long lastId, Integer status) {
+	public ResultPista<List<StakeHostingOrderDto>> orderList(Long lastId, Integer status) {
 		return ResultPista.data(bizStakeHostingService.orderList(lastId, status));
 	}
-
-	@ApiOperation(value = "可加速托管订单")
-	@GetMapping("/accelerateOrderList")
-	public ResultPista<List<StakeHostingOrder>> accelerateOrderList(Long lastId) {
-		return ResultPista.data(bizStakeHostingService.accelerateOrderList(lastId));
-	}
+//
+//	@ApiOperation(value = "可加速托管订单")
+//	@GetMapping("/accelerateOrderList")
+//	public ResultPista<List<StakeHostingOrderDto>> accelerateOrderList(Long lastId) {
+//		return ResultPista.data(bizStakeHostingService.accelerateOrderList(lastId));
+//	}
 
 	@ApiOperation(value = "AFI质押加速配置套餐")
 	@GetMapping("/afiAccelerateConfigList")
-	public ResultPista<List<StakeHostingAfiAccelerateConfig>> afiAccelerateConfigList() {
+	public ResultPista<List<StakeHostingAfiAccelerateConfigDto>> afiAccelerateConfigList() {
 		return ResultPista.data(bizStakeHostingService.afiAccelerateConfigList());
 	}
 
 	@ApiOperation(value = "托管订单详情")
 	@GetMapping("/orderDetail/{id}")
-	public ResultPista<StakeHostingOrder> orderDetail(@PathVariable("id") Long id) {
+	public ResultPista<StakeHostingOrderDto> orderDetail(@PathVariable("id") Long id) {
 		return ResultPista.data(bizStakeHostingService.orderDetail(id));
 	}
 

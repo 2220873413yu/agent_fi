@@ -79,6 +79,7 @@
       </el-table-column>
       <el-table-column label="最低起购USDT" align="center" prop="minAmount" />
       <el-table-column label="服务费比例(%)" align="center" prop="serviceFeeRatio" />
+      <el-table-column label="业绩积分系数" align="center" prop="performanceCoefficient" />
       <el-table-column label="排序" align="center" prop="sort" />
       <el-table-column label="状态" align="center" prop="status">
         <template slot-scope="scope">
@@ -131,6 +132,9 @@
         </el-form-item>
         <el-form-item label="服务费比例" prop="serviceFeeRatio">
           <el-input v-model="form.serviceFeeRatio" placeholder="请输入服务费比例，例如10表示10%" @input="onAmountInput('serviceFeeRatio')" />
+        </el-form-item>
+        <el-form-item label="业绩积分系数" prop="performanceCoefficient">
+          <el-input v-model="form.performanceCoefficient" placeholder="例如30天填1，90天填3" @input="onAmountInput('performanceCoefficient')" />
         </el-form-item>
         <el-form-item label="排序" prop="sort">
           <el-input-number v-model="form.sort" :min="0" controls-position="right" />
@@ -186,6 +190,7 @@ export default {
         days: [{ required: true, message: '托管天数不能为空', trigger: 'change' }],
         minAmount: [{ required: true, message: '起购金额不能为空', trigger: 'blur' }],
         serviceFeeRatio: [{ required: true, message: '服务费比例不能为空', trigger: 'blur' }],
+        performanceCoefficient: [{ required: true, message: '业绩积分系数不能为空', trigger: 'blur' }],
         status: [{ required: true, message: '状态不能为空', trigger: 'change' }]
       }
     }
@@ -213,6 +218,7 @@ export default {
         days: null,
         minAmount: null,
         serviceFeeRatio: 0,
+        performanceCoefficient: 1,
         sort: 0,
         status: 1,
         remark: null

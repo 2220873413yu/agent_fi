@@ -1,7 +1,6 @@
 package com.xms.dao.service.impl;
 
 import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.util.StrUtil;
 import com.xms.common.constant.ConstantStatic;
 import com.xms.common.constant.ConstantType;
 import com.xms.common.exception.ServiceException;
@@ -15,7 +14,6 @@ import com.xms.dao.mapper.StakeHostingAfiPledgeMapper;
 import com.xms.dao.service.IStakeHostingAfiAccelerateConfigService;
 import com.xms.dao.service.IStakeHostingAfiPledgeService;
 import com.xms.dao.service.IStakeHostingOrderService;
-import com.xms.dao.service.ISysParaService;
 import com.xms.dao.service.IUserMoneyService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,20 +35,15 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 	public static final int STATUS_RETURNED = 2;
 	public static final int AFI_ACCELERATED_NO = 0;
 	public static final int AFI_ACCELERATED_YES = 1;
-	public static final String SYS_PARA_AFI_PRICE = "stake_hosting_afi_price";
-
 	private final IStakeHostingOrderService stakeHostingOrderService;
 	private final IStakeHostingAfiAccelerateConfigService afiAccelerateConfigService;
-	private final ISysParaService sysParaService;
 	private final IUserMoneyService userMoneyService;
 
 	public StakeHostingAfiPledgeServiceImpl(IStakeHostingOrderService stakeHostingOrderService,
 											IStakeHostingAfiAccelerateConfigService afiAccelerateConfigService,
-											ISysParaService sysParaService,
 											IUserMoneyService userMoneyService) {
 		this.stakeHostingOrderService = stakeHostingOrderService;
 		this.afiAccelerateConfigService = afiAccelerateConfigService;
-		this.sysParaService = sysParaService;
 		this.userMoneyService = userMoneyService;
 	}
 
@@ -61,7 +54,7 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 
 	@Override
 	@Transactional(rollbackFor = Exception.class)
-	public StakeHostingAfiPledge pledgeAfi(Long userId, Long stakeHostingOrderId, BigDecimal afiAmount) {
+	public StakeHostingAfiPledge pledgeAfi(Long userId, Long stakeHostingOrderId, BigDecimal afiAmount, BigDecimal afiPrice) {
 		if (userId == null) {
 			throw new ServiceException("用户ID不能为空");
 		}
@@ -78,9 +71,9 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 			.one();
 		validateOrder(order);
 
-		BigDecimal afiPrice = getAfiPrice();
+		BigDecimal afiPriceScaled = normalizeAfiPrice(afiPrice);
 		BigDecimal afiAmountScaled = afiAmount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
-		BigDecimal afiUsdtAmount = afiAmountScaled.multiply(afiPrice).setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		BigDecimal afiUsdtAmount = afiAmountScaled.multiply(afiPriceScaled).setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 		BigDecimal pledgeRatio = afiUsdtAmount.multiply(new BigDecimal("100"))
 			.divide(order.getStakeUsdtAmount(), 6, ConstantStatic.roundingModeNew);
 		StakeHostingAfiAccelerateConfig hitConfig = afiAccelerateConfigService.hitConfig(pledgeRatio);
@@ -100,7 +93,7 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 		pledge.setAccount(order.getAccount());
 		pledge.setStakeUsdtAmount(order.getStakeUsdtAmount());
 		pledge.setAfiAmount(afiAmountScaled);
-		pledge.setAfiPrice(afiPrice);
+		pledge.setAfiPrice(afiPriceScaled);
 		pledge.setAfiUsdtAmount(afiUsdtAmount);
 		pledge.setPledgeRatio(hitConfig.getPledgeRatio());
 		pledge.setAccelerateRate(hitConfig.getAccelerateRate());
@@ -168,16 +161,9 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 		}
 	}
 
-	private BigDecimal getAfiPrice() {
-		String priceValue = sysParaService.getValue(SYS_PARA_AFI_PRICE);
-		if (StrUtil.isBlank(priceValue)) {
+	private BigDecimal normalizeAfiPrice(BigDecimal price) {
+		if (price == null) {
 			throw new ServiceException("AFI价格未配置");
-		}
-		BigDecimal price;
-		try {
-			price = new BigDecimal(priceValue);
-		} catch (NumberFormatException e) {
-			throw new ServiceException("AFI价格配置错误");
 		}
 		if (price.compareTo(BigDecimal.ZERO) <= 0) {
 			throw new ServiceException("AFI价格必须大于0");

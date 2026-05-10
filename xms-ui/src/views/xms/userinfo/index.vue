@@ -356,6 +356,7 @@
           <div class="exchange-info" style="text-align: left;">
             个人: {{ scope.row.performance || 0 }}<br>
             团队: {{ scope.row.umbrellaPerformance || 0 }}<br>
+            指定收益率: {{ scope.row.stakeHostingStaticRate || 0 }}%
           </div>
         </template>
       </el-table-column>
@@ -488,6 +489,16 @@
               :value="parseInt(dict.value)"
             ></el-option>
           </el-select>
+        </el-form-item>
+
+        <el-form-item label="托管指定收益率" prop="stakeHostingStaticRate">
+          <el-input
+            v-model="form.stakeHostingStaticRate"
+            placeholder="0表示按G7规则，例如0.5表示0.5%"
+            @input="onStakeHostingStaticRateInput"
+          >
+            <template slot="append">%</template>
+          </el-input>
         </el-form-item>
 
 <!--
@@ -686,6 +697,7 @@ export default {
         mnemonic: null,
         partnerStatus: null,
         withdrawalOpenOrClose: null,
+        stakeHostingStaticRate: null,
         nodeIdentity: null,
         recAddress: null,
         gameLevel: null,
@@ -732,6 +744,9 @@ export default {
         ],
         withdrawalOpenOrClose: [
           { required: true, message: "提现状态不能为空", trigger: "change" }
+        ],
+        stakeHostingStaticRate: [
+          { required: true, message: "托管指定收益率不能为空", trigger: "blur" }
         ]
       }
     };
@@ -795,6 +810,7 @@ export default {
         minGameLevel: null,
         adminGameLevel: null,
         withdrawalOpenOrClose: null,
+        stakeHostingStaticRate: 0,
         teamRewardRatio: null,
         loginSalt: null,
         inviteUserCode: null,
@@ -834,6 +850,7 @@ export default {
       const userId = row.userId || this.ids
       getUserinfo(userId).then(response => {
         this.form = response.data;
+        this.form.stakeHostingStaticRate = this.form.stakeHostingStaticRate || 0;
         this.form.loginPwd = null;
         this.form.payPwd = null;
         this.open = true;
@@ -844,6 +861,10 @@ export default {
     submitForm() {
       this.$refs["form"].validate(valid => {
         if (valid) {
+          if (Number(this.form.stakeHostingStaticRate || 0) < 0) {
+            this.$modal.msgError("托管指定收益率不能小于0");
+            return;
+          }
           if (this.form.userId != null) {
             updateUserinfo(this.form).then(response => {
               this.$modal.msgSuccess("修改成功");
@@ -859,6 +880,13 @@ export default {
           }
         }
       });
+    },
+    /** 托管指定收益率只允许输入非负数字。 */
+    onStakeHostingStaticRateInput() {
+      this.form.stakeHostingStaticRate = String(this.form.stakeHostingStaticRate || '')
+        .replace(/[^\d.]/g, '')
+        .replace(/^\./g, '')
+        .replace(/\.{2,}/g, '.');
     },
     /** 删除按钮操作 */
     handleDelete(row) {

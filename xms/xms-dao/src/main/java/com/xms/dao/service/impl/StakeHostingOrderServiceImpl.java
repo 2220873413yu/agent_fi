@@ -118,7 +118,8 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.eq(StakeHostingOrder::getOrderNo, orderNo)
 			.one();
 		if (order == null) {
-			throw new ServiceException("托管订单不存在");
+			return 1;
+			//throw new ServiceException("托管订单不存在");
 		}
 		if (PAY_SUCCESS == order.getPayStatus()) {
 			return 1;

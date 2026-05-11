@@ -129,6 +129,16 @@
           <dict-tag :options="dict.type.t_stake_hosting_order_afi_accelerated" :value="scope.row.afiAccelerated" />
         </template>
       </el-table-column>
+      <el-table-column label="AFI质押比例" align="center" prop="afiPledgeRatio">
+        <template slot-scope="scope">
+          <span>{{ formatPercent(scope.row.afiPledgeRatio) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="AFI加速倍率" align="center" prop="afiAccelerateRate">
+        <template slot-scope="scope">
+          <span>{{ scope.row.afiAccelerateRate || '-' }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="支付hash" align="center" prop="payHash" width="180" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template slot-scope="scope">
@@ -250,6 +260,12 @@ export default {
         this.total = response.total
         this.loading = false
       })
+    },
+    formatPercent(value) {
+      if (value === undefined || value === null || value === '') {
+        return '-'
+      }
+      return value + '%'
     },
     getPackageOptions() {
       listStakeHostingPackage({ pageNum: 1, pageSize: 100, status: 1 }).then(response => {

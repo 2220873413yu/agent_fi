@@ -16,6 +16,7 @@ import com.xms.common.utils.CollectionUtil;
 import com.xms.common.utils.spring.SpringUtils;
 import com.xms.dao.domain.DiyStoreProduct;
 import com.xms.dao.domain.UserLevelConfig;
+import com.xms.dao.entity.dto.StakeOrderListDto;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.entity.vo.StakeOrderProductSnapshotVo;
 import com.xms.dao.service.IDiyStoreProductService;
@@ -66,6 +67,19 @@ public class StakeOrderServiceImpl extends XmsDataServiceImpl<StakeOrderMapper, 
     {
         return baseMapper.selectStakeOrderList(stakeOrder);
     }
+
+	/**
+	 * 查询后台质押订单列表展示数据。
+	 *
+	 * <p>列表和导出返回DTO，附带 AFI 加速倍率快照，避免后台接口直接使用数据库实体作为展示对象。</p>
+	 *
+	 * @param query 查询条件
+	 * @return 后台质押订单列表
+	 */
+	@Override
+	public List<StakeOrderListDto> selectStakeOrderDtoList(StakeOrderListDto query) {
+		return baseMapper.selectStakeOrderDtoList(query);
+	}
 
 	@Override
 	public int orderShipped(StakeOrder stakeOrder) {

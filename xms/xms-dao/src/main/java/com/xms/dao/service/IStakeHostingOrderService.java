@@ -1,6 +1,7 @@
 package com.xms.dao.service;
 
 import com.xms.dao.domain.StakeHostingOrder;
+import com.xms.dao.entity.dto.StakeHostingOrderListDto;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -18,6 +19,14 @@ public interface IStakeHostingOrderService extends XmsDataService<StakeHostingOr
 	 * @return 托管订单集合
 	 */
 	List<StakeHostingOrder> selectStakeHostingOrderList(StakeHostingOrder stakeHostingOrder);
+
+	/**
+	 * 查询后台托管订单列表展示数据。
+	 *
+	 * @param query 查询条件
+	 * @return 托管订单列表，包含AFI质押比例和加速倍率展示字段
+	 */
+	List<StakeHostingOrderListDto> selectStakeHostingOrderDtoList(StakeHostingOrderListDto query);
 
 	/**
 	 * 用户创建链上待支付托管订单

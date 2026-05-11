@@ -83,10 +83,29 @@
         </template>
       </el-table-column>
       <el-table-column label="奖励基数" align="center" prop="rewardBaseAmount" />
-      <el-table-column label="奖励比例(%)" align="center" prop="rewardRatio" />
+      <el-table-column label="奖励比例" align="center" prop="rewardRatio">
+        <template slot-scope="scope">
+          <span>{{ formatPercent(scope.row.rewardRatio) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="奖励金额" align="center" prop="rewardAmount" />
       <el-table-column label="静态毛收益" align="center" prop="grossStaticReward" />
-      <el-table-column label="服务费比例(%)" align="center" prop="serviceFeeRatio" />
+      <el-table-column label="基础静态收益率" align="center" prop="baseStaticRate" width="140">
+        <template slot-scope="scope">
+          <span>{{ formatPercent(scope.row.baseStaticRate) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="AFI加速倍率" align="center" prop="afiAccelerateRate" width="120" />
+      <el-table-column label="实际静态收益率" align="center" prop="actualStaticRate" width="140">
+        <template slot-scope="scope">
+          <span>{{ formatPercent(scope.row.actualStaticRate) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="服务费比例" align="center" prop="serviceFeeRatio">
+        <template slot-scope="scope">
+          <span>{{ formatPercent(scope.row.serviceFeeRatio) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="服务费金额" align="center" prop="serviceFeeAmount" />
       <el-table-column label="静态净收益" align="center" prop="netStaticReward" />
       <el-table-column label="到账状态" align="center" prop="arrivalStatus">
@@ -178,6 +197,12 @@ export default {
       this.download('xms/stakeHostingRewardSettlement/export', {
         ...this.queryParams
       }, `stakeHostingRewardSettlement_${new Date().getTime()}.xlsx`)
+    },
+    formatPercent(value) {
+      if (value === undefined || value === null || value === '') {
+        return '-'
+      }
+      return value + ' %'
     }
   }
 }

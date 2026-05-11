@@ -49,6 +49,6 @@ public class StakeHostingAfiPledgeDto {
 	@ApiModelProperty(value = "生效日期，格式yyyyMMdd")
 	private Integer effectiveDay;
 
-	@ApiModelProperty(value = "状态 0:未生效 1:生效中 2:已退还")
+	@ApiModelProperty(value = "状态 1:生效中 2:已退还")
 	private Integer status;
 }

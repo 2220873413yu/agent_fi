@@ -12,6 +12,7 @@ import com.xms.common.mq.dynamic.OrderMsgDO;
 import com.xms.common.utils.uuid.IDUtils;
 import com.xms.dao.domain.StakeHostingPackage;
 import com.xms.dao.domain.StakeHostingOrder;
+import com.xms.dao.entity.dto.StakeHostingOrderListDto;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.mapper.StakeHostingOrderMapper;
 import com.xms.dao.service.IStakeHostingPackageService;
@@ -63,6 +64,19 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	@Override
 	public List<StakeHostingOrder> selectStakeHostingOrderList(StakeHostingOrder stakeHostingOrder) {
 		return baseMapper.selectStakeHostingOrderList(stakeHostingOrder);
+	}
+
+	/**
+	 * 查询后台托管订单列表展示数据。
+	 *
+	 * <p>列表和导出返回DTO，附带 AFI 质押比例和加速倍率快照，避免后台接口直接使用数据库实体作为展示对象。</p>
+	 *
+	 * @param query 查询条件
+	 * @return 后台托管订单列表
+	 */
+	@Override
+	public List<StakeHostingOrderListDto> selectStakeHostingOrderDtoList(StakeHostingOrderListDto query) {
+		return baseMapper.selectStakeHostingOrderDtoList(query);
 	}
 
 	@Override
@@ -329,6 +343,8 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setPackageName(hostingPackage.getName());
 		order.setPackageDays(hostingPackage.getDays());
 		order.setStakeUsdtAmount(amount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
+		// Snapshot the package service fee ratio at order creation. Future settlement must not be affected by package config changes.
+		order.setServiceFeeRatio(hostingPackage.getServiceFeeRatio() == null ? BigDecimal.ZERO : hostingPackage.getServiceFeeRatio());
 		BigDecimal performanceCoefficient = hostingPackage.getPerformanceCoefficient() == null
 			? DEFAULT_PERFORMANCE_COEFFICIENT : hostingPackage.getPerformanceCoefficient();
 		order.setPerformanceCoefficient(performanceCoefficient.setScale(4, ConstantStatic.roundingModeNew));

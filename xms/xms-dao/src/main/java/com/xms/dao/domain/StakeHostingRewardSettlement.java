@@ -73,27 +73,39 @@ public class StakeHostingRewardSettlement extends BaseEntity {
 	@ApiModelProperty(value = "静态毛收益")
 	private BigDecimal grossStaticReward;
 
-	@Excel(name = "服务费比例", sort = 11)
+	@Excel(name = "基础静态收益率", sort = 11)
+	@ApiModelProperty(value = "基础静态收益率，单位%")
+	private BigDecimal baseStaticRate;
+
+	@Excel(name = "AFI加速倍率", sort = 12)
+	@ApiModelProperty(value = "AFI加速倍率")
+	private BigDecimal afiAccelerateRate;
+
+	@Excel(name = "实际静态收益率", sort = 13)
+	@ApiModelProperty(value = "实际静态收益率，单位%")
+	private BigDecimal actualStaticRate;
+
+	@Excel(name = "服务费比例", sort = 14)
 	@ApiModelProperty(value = "服务费比例，单位%")
 	private BigDecimal serviceFeeRatio;
 
-	@Excel(name = "服务费金额", sort = 12)
+	@Excel(name = "服务费金额", sort = 15)
 	@ApiModelProperty(value = "服务费金额")
 	private BigDecimal serviceFeeAmount;
 
-	@Excel(name = "静态净收益", sort = 13)
+	@Excel(name = "静态净收益", sort = 16)
 	@ApiModelProperty(value = "静态净收益")
 	private BigDecimal netStaticReward;
 
-	@Excel(name = "到账状态", sort = 14, dictType = "t_stake_hosting_reward_settlement_arrival_status")
+	@Excel(name = "到账状态", sort = 17, dictType = "t_stake_hosting_reward_settlement_arrival_status")
 	@ApiModelProperty(value = "到账状态 0:未到账 1:已到账")
 	private Integer arrivalStatus;
 
-	@Excel(name = "未到账原因", sort = 15, dictType = "t_stake_hosting_reward_settlement_skip_reason")
+	@Excel(name = "未到账原因", sort = 18, dictType = "t_stake_hosting_reward_settlement_skip_reason")
 	@ApiModelProperty(value = "未到账原因")
 	private Integer skipReason;
 
-	@Excel(name = "结算日期", sort = 16)
+	@Excel(name = "结算日期", sort = 19)
 	@ApiModelProperty(value = "结算日期，格式yyyyMMdd")
 	private Integer settlementDay;
 }

@@ -198,6 +198,16 @@
       <el-table-column label="用户ID" align="center" prop="userId" />
       <el-table-column label="质押订单号" align="center" prop="orderNo" />
       <el-table-column label="质押金额" align="center" prop="stakeUsdtAmount" />
+      <el-table-column label="AFI质押比例" align="center" prop="afiPledgeRatio">
+        <template slot-scope="scope">
+          <span>{{ formatPercent(scope.row.afiPledgeRatio) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="AFI加速倍率" align="center" prop="afiAccelerateRate">
+        <template slot-scope="scope">
+          <span>{{ scope.row.afiAccelerateRate || "-" }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="订单状态" align="center" prop="status" width="180">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.t_stake_order_status" :value="scope.row.status"/>
@@ -544,6 +554,12 @@ export default {
       }
       const text = count.toFixed(6).replace(/\.?0+$/, "");
       return text || "0";
+    },
+    formatPercent(value) {
+      if (value === undefined || value === null || value === "") {
+        return "-";
+      }
+      return value + "%";
     },
     parseReceiverInfo(receiverInfo) {
       if (!receiverInfo) {

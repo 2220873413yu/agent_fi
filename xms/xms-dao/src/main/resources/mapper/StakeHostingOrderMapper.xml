@@ -13,6 +13,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="packageName" column="package_name" />
         <result property="packageDays" column="package_days" />
         <result property="stakeUsdtAmount" column="stake_usdt_amount" />
+        <result property="serviceFeeRatio" column="service_fee_ratio" />
         <result property="performanceCoefficient" column="performance_coefficient" />
         <result property="performancePoints" column="performance_points" />
         <result property="sourceType" column="source_type" />
@@ -43,14 +44,68 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="deleted" column="deleted" />
     </resultMap>
 
+    <resultMap type="com.xms.dao.entity.dto.StakeHostingOrderListDto" id="StakeHostingOrderListDtoResult">
+        <result property="id" column="id" />
+        <result property="orderNo" column="order_no" />
+        <result property="userId" column="user_id" />
+        <result property="account" column="account" />
+        <result property="packageId" column="package_id" />
+        <result property="packageName" column="package_name" />
+        <result property="packageDays" column="package_days" />
+        <result property="stakeUsdtAmount" column="stake_usdt_amount" />
+        <result property="serviceFeeRatio" column="service_fee_ratio" />
+        <result property="performanceCoefficient" column="performance_coefficient" />
+        <result property="performancePoints" column="performance_points" />
+        <result property="afiPledgeRatio" column="afi_pledge_ratio" />
+        <result property="afiAccelerateRate" column="afi_accelerate_rate" />
+        <result property="sourceType" column="source_type" />
+        <result property="payStatus" column="pay_status" />
+        <result property="status" column="status" />
+        <result property="payHash" column="pay_hash" />
+        <result property="payAmount" column="pay_amount" />
+        <result property="payTime" column="pay_time" />
+        <result property="effectiveTime" column="effective_time" />
+        <result property="finishTime" column="finish_time" />
+        <result property="runDays" column="run_days" />
+        <result property="todayReward" column="today_reward" />
+        <result property="totalStaticReward" column="total_static_reward" />
+        <result property="isReturnPrincipal" column="is_return_principal" />
+        <result property="afiAccelerated" column="afi_accelerated" />
+        <result property="lastRewardDay" column="last_reward_day" />
+        <result property="performanceStartTime" column="performance_start_time" />
+        <result property="performanceEndTime" column="performance_end_time" />
+        <result property="weeklyPerformanceStatus" column="weekly_performance_status" />
+        <result property="weeklyPerformanceSkipReason" column="weekly_performance_skip_reason" />
+        <result property="weeklyPerformanceTime" column="weekly_performance_time" />
+        <result property="createDay" column="create_day" />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
     <sql id="selectStakeHostingOrderVo">
-        select id, order_no, user_id, account, package_id, package_name, package_days, stake_usdt_amount,
+        select id, order_no, user_id, account, package_id, package_name, package_days, stake_usdt_amount, service_fee_ratio,
                performance_coefficient, performance_points,
                source_type, pay_status, status, pay_hash, pay_amount, pay_time, effective_time, finish_time,
                run_days, today_reward, total_static_reward, is_return_principal, afi_accelerated, last_reward_day, create_day,
                performance_start_time, performance_end_time, weekly_performance_status, weekly_performance_skip_reason,
                weekly_performance_time, create_by, create_time, update_by, update_time, remark, deleted
         from t_stake_hosting_order
+    </sql>
+
+    <sql id="selectStakeHostingOrderDtoVo">
+        select o.id, o.order_no, o.user_id, o.account, o.package_id, o.package_name, o.package_days, o.stake_usdt_amount, o.service_fee_ratio,
+               o.performance_coefficient, o.performance_points,
+               afi.pledge_ratio as afi_pledge_ratio,
+               afi.accelerate_rate as afi_accelerate_rate,
+               o.source_type, o.pay_status, o.status, o.pay_hash, o.pay_amount, o.pay_time, o.effective_time, o.finish_time,
+               o.run_days, o.today_reward, o.total_static_reward, o.is_return_principal, o.afi_accelerated, o.last_reward_day, o.create_day,
+               o.performance_start_time, o.performance_end_time, o.weekly_performance_status, o.weekly_performance_skip_reason,
+               o.weekly_performance_time, o.create_by, o.create_time, o.update_by, o.update_time, o.remark, o.deleted
+        from t_stake_hosting_order o
+        left join t_stake_hosting_afi_pledge afi
+               on afi.deleted = 0
+              and afi.stake_hosting_order_id = o.id
     </sql>
 
     <select id="selectStakeHostingOrderList" parameterType="StakeHostingOrder" resultMap="StakeHostingOrderResult">
@@ -73,5 +128,27 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             and deleted = 0
         </where>
         order by id desc
+    </select>
+
+    <select id="selectStakeHostingOrderDtoList" parameterType="com.xms.dao.entity.dto.StakeHostingOrderListDto" resultMap="StakeHostingOrderListDtoResult">
+        <include refid="selectStakeHostingOrderDtoVo"/>
+        <where>
+            <if test="orderNo != null and orderNo != ''"> and o.order_no = #{orderNo}</if>
+            <if test="userId != null"> and o.user_id = #{userId}</if>
+            <if test="account != null and account != ''"> and o.account = #{account}</if>
+            <if test="packageId != null"> and o.package_id = #{packageId}</if>
+            <if test="packageDays != null"> and o.package_days = #{packageDays}</if>
+            <if test="sourceType != null"> and o.source_type = #{sourceType}</if>
+            <if test="payStatus != null"> and o.pay_status = #{payStatus}</if>
+            <if test="status != null"> and o.status = #{status}</if>
+            <if test="payHash != null and payHash != ''"> and o.pay_hash = #{payHash}</if>
+            <if test="isReturnPrincipal != null"> and o.is_return_principal = #{isReturnPrincipal}</if>
+            <if test="afiAccelerated != null"> and o.afi_accelerated = #{afiAccelerated}</if>
+            <if test="weeklyPerformanceStatus != null"> and o.weekly_performance_status = #{weeklyPerformanceStatus}</if>
+            <if test="performanceStartTime != null"> and o.performance_start_time = #{performanceStartTime}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and o.create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            and o.deleted = 0
+        </where>
+        order by o.id desc
     </select>
 </mapper>

@@ -30,8 +30,49 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="num"    column="num"    />
     </resultMap>
 
+    <resultMap type="com.xms.dao.entity.dto.StakeOrderListDto" id="StakeOrderListDtoResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="orderNo"    column="order_no"    />
+        <result property="stakeUsdtAmount"    column="stake_usdt_amount"    />
+        <result property="afiPledgeRatio"    column="afi_pledge_ratio"    />
+        <result property="afiAccelerateRate"    column="afi_accelerate_rate"    />
+        <result property="status"    column="status"    />
+        <result property="remainingOutAmount"    column="remaining_out_amount"    />
+        <result property="allOutAmount"    column="all_out_amount"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+        <result property="payTime"    column="pay_time"    />
+        <result property="payHash"    column="pay_hash"    />
+        <result property="todayReward"    column="today_reward"    />
+        <result property="bizStatus1"    column="biz_status1"    />
+        <result property="hashFirstShipOrder"    column="hash_first_ship_order"    />
+        <result property="shipStatus"    column="ship_status"    />
+        <result property="shipTime"    column="ship_time"    />
+        <result property="receiverInfo"    column="receiver_info"    />
+        <result property="shipCompany"    column="ship_company"    />
+        <result property="shipNo"    column="ship_no"    />
+        <result property="productSnapshot"    column="product_snapshot"    />
+        <result property="num"    column="num"    />
+    </resultMap>
+
     <sql id="selectStakeOrderVo">
         select num, product_snapshot, hash_first_ship_order, ship_status, ship_time, receiver_info, ship_company, ship_no, biz_status1, today_reward, id, user_id, order_no, stake_usdt_amount, status, remaining_out_amount, all_out_amount, create_time, update_time, remark, pay_time, pay_hash from t_stake_order
+    </sql>
+
+    <sql id="selectStakeOrderDtoVo">
+        select o.num, o.product_snapshot, o.hash_first_ship_order, o.ship_status, o.ship_time,
+               o.receiver_info, o.ship_company, o.ship_no, o.biz_status1, o.today_reward,
+               o.id, o.user_id, o.order_no, o.stake_usdt_amount, o.status,
+               o.remaining_out_amount, o.all_out_amount, o.create_time, o.update_time,
+               o.remark, o.pay_time, o.pay_hash,
+               afi.pledge_ratio as afi_pledge_ratio,
+               afi.accelerate_rate as afi_accelerate_rate
+        from t_stake_order o
+        left join t_stake_hosting_afi_pledge afi
+               on afi.deleted = 0
+              and (afi.stake_hosting_order_id = o.id or afi.stake_hosting_order_no = o.order_no)
     </sql>
 
     <select id="selectStakeOrderList" parameterType="StakeOrder"
@@ -55,6 +96,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="payHash != null  and payHash != ''"> and pay_hash = #{payHash}</if>
         </where>
         order by id desc
+    </select>
+
+    <select id="selectStakeOrderDtoList" parameterType="com.xms.dao.entity.dto.StakeOrderListDto"
+            resultMap="StakeOrderListDtoResult">
+        <include refid="selectStakeOrderDtoVo"/>
+        <where>
+            <if test="userId != null "> and o.user_id = #{userId}</if>
+            <if test="shipNo != null "> and o.ship_no = #{shipNo}</if>
+            <if test="shipCompany != null "> and o.ship_company = #{shipCompany}</if>
+            <if test="shipStatus != null "> and o.hash_first_ship_order = 1 and o.ship_status = #{shipStatus}</if>
+            <if test="hashFirstShipOrder != null "> and o.hash_first_ship_order = #{hashFirstShipOrder}</if>
+            <if test="bizStatus1 != null "> and o.biz_status1 = #{bizStatus1}</if>
+            <if test="orderNo != null  and orderNo != ''"> and o.order_no = #{orderNo}</if>
+            <if test="stakeUsdtAmount != null "> and o.stake_usdt_amount = #{stakeUsdtAmount}</if>
+            <if test="status != null "> and o.status = #{status}</if>
+            <if test="remainingOutAmount != null "> and o.remaining_out_amount = #{remainingOutAmount}</if>
+            <if test="allOutAmount != null "> and o.all_out_amount = #{allOutAmount}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and o.create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            <if test="payTime != null "> and o.pay_time = #{payTime}</if>
+            <if test="payHash != null  and payHash != ''"> and o.pay_hash = #{payHash}</if>
+        </where>
+        order by o.id desc
     </select>
 
 </mapper>

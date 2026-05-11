@@ -30,6 +30,9 @@ public class StakeHostingOrderDto {
 	@ApiModelProperty(value = "托管USDT金额")
 	private BigDecimal stakeUsdtAmount;
 
+	@ApiModelProperty(value = "服务费比例快照，单位%")
+	private BigDecimal serviceFeeRatio;
+
 	@ApiModelProperty(value = "业绩积分系数快照")
 	private BigDecimal performanceCoefficient;
 

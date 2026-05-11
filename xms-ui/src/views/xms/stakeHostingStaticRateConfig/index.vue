@@ -39,16 +39,24 @@
       <right-toolbar :show-search.sync="showSearch" @queryTable="getList" />
     </el-row>
 
-    <el-table v-loading="loading" :data="configList" @selection-change="handleSelectionChange">
+      <el-table v-loading="loading" :data="configList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="ID" align="center" prop="id" width="80" />
-      <el-table-column label="Gsmooth下限(%)" align="center" prop="minG" />
-      <el-table-column label="Gsmooth上限(%)" align="center" prop="maxG">
+      <el-table-column label="Gsmooth下限" align="center" prop="minG">
         <template slot-scope="scope">
-          <span>{{ scope.row.maxG == null ? '无上限' : scope.row.maxG }}</span>
+          <span>{{ formatPercent(scope.row.minG) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="日化收益率(%)" align="center" prop="staticRate" />
+      <el-table-column label="Gsmooth上限" align="center" prop="maxG">
+        <template slot-scope="scope">
+          <span>{{ scope.row.maxG == null ? '无上限' : formatPercent(scope.row.maxG) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="日化收益率" align="center" prop="staticRate">
+        <template slot-scope="scope">
+          <span>{{ formatPercent(scope.row.staticRate) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="排序" align="center" prop="sort" width="80" />
       <el-table-column label="状态" align="center" prop="status">
         <template slot-scope="scope">
@@ -252,6 +260,12 @@ export default {
         value = value.replace(/-/g, '')
       }
       this.form[prop] = value
+    },
+    formatPercent(value) {
+      if (value === undefined || value === null || value === '') {
+        return '-'
+      }
+      return value + ' %'
     }
   }
 }

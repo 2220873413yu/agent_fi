@@ -24,5 +24,13 @@ public interface IStakeHostingAfiPledgeService extends XmsDataService<StakeHosti
 	 */
 	StakeHostingAfiPledge pledgeAfi(Long userId, Long stakeHostingOrderId, Long afiAccelerateConfigId, BigDecimal afiPrice);
 
+	/**
+	 * 按托管订单退还未退还的AFI质押。
+	 *
+	 * <p>只处理状态为1=生效中的质押记录；退还后状态更新为2=已退还，并写AFI退还钱包流水。</p>
+	 *
+	 * @param stakeHostingOrderId 托管订单ID
+	 * @return 1表示成功退还，0表示无可退还记录
+	 */
 	int returnPledgeByOrderId(Long stakeHostingOrderId);
 }

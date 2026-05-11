@@ -36,10 +36,14 @@
       <right-toolbar :show-search.sync="showSearch" @queryTable="getList" />
     </el-row>
 
-    <el-table v-loading="loading" :data="configList" @selection-change="handleSelectionChange">
+      <el-table v-loading="loading" :data="configList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="ID" align="center" prop="id" width="80" />
-      <el-table-column label="质押比例(%)" align="center" prop="pledgeRatio" />
+      <el-table-column label="质押比例" align="center" prop="pledgeRatio">
+        <template slot-scope="scope">
+          <span>{{ formatPercent(scope.row.pledgeRatio) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="加速倍率" align="center" prop="accelerateRate" />
       <el-table-column label="排序" align="center" prop="sort" />
       <el-table-column label="状态" align="center" prop="status">
@@ -204,6 +208,12 @@ export default {
     },
     onAmountInput(prop) {
       this.form[prop] = String(this.form[prop] || '').replace(/[^\d.]/g, '').replace(/^\./g, '').replace(/\.{2,}/g, '.')
+    },
+    formatPercent(value) {
+      if (value === undefined || value === null || value === '') {
+        return '-'
+      }
+      return value + ' %'
     }
   }
 }

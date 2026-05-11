@@ -3,6 +3,7 @@ package com.xms.dao.service;
 import java.util.List;
 
 import com.xms.dao.domain.UserLevelConfig;
+import com.xms.dao.entity.dto.StakeOrderListDto;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.service.XmsDataService;
 import com.xms.dao.domain.StakeOrder;
@@ -36,6 +37,14 @@ public interface IStakeOrderService extends XmsDataService<StakeOrder>
      * @return 质押订单集合
      */
     public List<StakeOrder> selectStakeOrderList(StakeOrder stakeOrder);
+
+	/**
+	 * 查询后台质押订单列表展示数据。
+	 *
+	 * @param query 查询条件
+	 * @return 后台质押订单列表，包含AFI加速倍率展示字段
+	 */
+	public List<StakeOrderListDto> selectStakeOrderDtoList(StakeOrderListDto query);
 
 	/**
 	 * 手动修改质押订单

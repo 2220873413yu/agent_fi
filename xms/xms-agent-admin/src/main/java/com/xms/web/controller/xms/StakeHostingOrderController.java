@@ -8,6 +8,7 @@ import com.xms.common.core.page.TableDataInfo;
 import com.xms.common.enums.BusinessType;
 import com.xms.common.utils.poi.ExcelUtil;
 import com.xms.dao.domain.StakeHostingOrder;
+import com.xms.dao.entity.dto.StakeHostingOrderListDto;
 import com.xms.dao.service.IStakeHostingOrderService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,25 +32,31 @@ public class StakeHostingOrderController extends BaseController {
 	}
 
 	/**
-	 * 查询托管订单列表
+	 * 查询托管订单列表。
+	 *
+	 * @param query 托管订单查询条件
+	 * @return 后台分页列表，包含AFI质押比例和加速倍率展示字段
 	 */
 	@PreAuthorize("@ss.hasPermi('xms:stakeHostingOrder:list')")
 	@GetMapping("/list")
-	public TableDataInfo list(StakeHostingOrder stakeHostingOrder) {
+	public TableDataInfo list(StakeHostingOrderListDto query) {
 		startPage();
-		List<StakeHostingOrder> list = stakeHostingOrderService.selectStakeHostingOrderList(stakeHostingOrder);
+		List<StakeHostingOrderListDto> list = stakeHostingOrderService.selectStakeHostingOrderDtoList(query);
 		return getDataTable(list);
 	}
 
 	/**
-	 * 导出托管订单列表
+	 * 导出托管订单列表。
+	 *
+	 * @param response HTTP响应
+	 * @param query 托管订单查询条件
 	 */
 	@PreAuthorize("@ss.hasPermi('xms:stakeHostingOrder:export')")
 	@Log(title = "托管订单", businessType = BusinessType.EXPORT)
 	@PostMapping("/export")
-	public void export(HttpServletResponse response, StakeHostingOrder stakeHostingOrder) {
-		List<StakeHostingOrder> list = stakeHostingOrderService.selectStakeHostingOrderList(stakeHostingOrder);
-		ExcelUtil<StakeHostingOrder> util = new ExcelUtil<>(StakeHostingOrder.class);
+	public void export(HttpServletResponse response, StakeHostingOrderListDto query) {
+		List<StakeHostingOrderListDto> list = stakeHostingOrderService.selectStakeHostingOrderDtoList(query);
+		ExcelUtil<StakeHostingOrderListDto> util = new ExcelUtil<>(StakeHostingOrderListDto.class);
 		util.exportExcel(response, list, "托管订单数据");
 	}
 

@@ -50,4 +50,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         on duplicate key update
             global_dividend_amount = global_dividend_amount + values(global_dividend_amount)
     </insert>
+
+    <insert id="batchAddTeamRewardSummary">
+        insert into t_stake_hosting_user_reward_summary
+            (user_id, diff_reward_amount, same_level_reward_amount, global_dividend_amount)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.userId},
+             #{item.diffRewardAmount},
+             #{item.sameLevelRewardAmount},
+             0.000000)
+        </foreach>
+        on duplicate key update
+            diff_reward_amount = diff_reward_amount + values(diff_reward_amount),
+            same_level_reward_amount = same_level_reward_amount + values(same_level_reward_amount)
+    </insert>
 </mapper>

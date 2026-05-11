@@ -17,6 +17,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="rewardRatio" column="reward_ratio" />
         <result property="rewardAmount" column="reward_amount" />
         <result property="grossStaticReward" column="gross_static_reward" />
+        <result property="baseStaticRate" column="base_static_rate" />
+        <result property="afiAccelerateRate" column="afi_accelerate_rate" />
+        <result property="actualStaticRate" column="actual_static_rate" />
         <result property="serviceFeeRatio" column="service_fee_ratio" />
         <result property="serviceFeeAmount" column="service_fee_amount" />
         <result property="netStaticReward" column="net_static_reward" />
@@ -34,7 +37,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <sql id="selectStakeHostingRewardSettlementVo">
         select id, settlement_no, source_order_id, source_order_no, source_user_id, receive_user_id,
                reward_type, reward_level, reward_base_amount, reward_ratio, reward_amount,
-               gross_static_reward, service_fee_ratio, service_fee_amount, net_static_reward,
+               gross_static_reward, base_static_rate, afi_accelerate_rate, actual_static_rate,
+               service_fee_ratio, service_fee_amount, net_static_reward,
                arrival_status, skip_reason, settlement_day, create_by, create_time, update_by,
                update_time, remark, deleted
         from t_stake_hosting_reward_settlement

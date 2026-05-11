@@ -69,6 +69,11 @@ public class StakeHostingOrder extends BaseEntity {
 	@ApiModelProperty(value = "托管USDT金额")
 	private BigDecimal stakeUsdtAmount;
 
+	/** Service fee ratio snapshot, unit %. Settlement jobs must read this order snapshot instead of current package config. */
+	@Excel(name = "服务费比例", sort = 9)
+	@ApiModelProperty(value = "服务费比例快照，单位%")
+	private BigDecimal serviceFeeRatio;
+
 	/** 业绩积分系数快照 */
 	@Excel(name = "业绩积分系数", sort = 9)
 	@ApiModelProperty(value = "业绩积分系数快照")

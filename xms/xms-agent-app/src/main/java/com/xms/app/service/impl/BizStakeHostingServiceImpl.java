@@ -234,6 +234,7 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		dto.setPackageName(item.getPackageName());
 		dto.setPackageDays(item.getPackageDays());
 		dto.setStakeUsdtAmount(item.getStakeUsdtAmount());
+		dto.setServiceFeeRatio(item.getServiceFeeRatio());
 		dto.setPerformanceCoefficient(item.getPerformanceCoefficient());
 		dto.setPerformancePoints(item.getPerformancePoints());
 		dto.setSourceType(item.getSourceType());

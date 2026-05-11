@@ -6,6 +6,7 @@ import com.xms.dao.service.IStakeHostingUserRewardSummaryService;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 托管用户奖励累计汇总Service业务层处理
@@ -88,5 +89,21 @@ public class StakeHostingUserRewardSummaryServiceImpl
 			return;
 		}
 		baseMapper.addGlobalDividend(userId, amount);
+	}
+
+	/**
+	 * 批量累加用户托管团队收益汇总。
+	 *
+	 * <p>用于定时任务批量结算直推/极差/平级奖励后的汇总落库；这里只累计极差奖和平级奖，
+	 * 直推奖不计入App团队收益汇总。</p>
+	 *
+	 * @param list 用户团队收益增量列表，金额单位USDT
+	 */
+	@Override
+	public void batchAddTeamRewardSummary(List<StakeHostingUserRewardSummary> list) {
+		if (list == null || list.isEmpty()) {
+			return;
+		}
+		baseMapper.batchAddTeamRewardSummary(list);
 	}
 }

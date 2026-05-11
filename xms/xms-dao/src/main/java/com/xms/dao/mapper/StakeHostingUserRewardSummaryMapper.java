@@ -4,6 +4,7 @@ import com.xms.dao.domain.StakeHostingUserRewardSummary;
 import org.apache.ibatis.annotations.Param;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 托管用户奖励累计汇总Mapper接口
@@ -53,4 +54,12 @@ public interface StakeHostingUserRewardSummaryMapper extends XmsMapper<StakeHost
 	 * @return 影响行数
 	 */
 	int addGlobalDividend(@Param("userId") Long userId, @Param("amount") BigDecimal amount);
+
+	/**
+	 * 批量累加托管团队收益汇总。
+	 *
+	 * @param list 用户团队收益增量列表，包含极差奖和平级奖累计增量
+	 * @return 影响行数
+	 */
+	int batchAddTeamRewardSummary(@Param("list") List<StakeHostingUserRewardSummary> list);
 }

@@ -91,6 +91,6 @@ public class StakeHostingAfiPledge extends BaseEntity {
 	private Date returnTime;
 
 	@Excel(name = "状态", sort = 15, dictType = "t_stake_hosting_afi_pledge_status")
-	@ApiModelProperty(value = "状态 0:未生效 1:生效中 2:已退还")
+	@ApiModelProperty(value = "状态 1:生效中 2:已退还")
 	private Integer status;
 }

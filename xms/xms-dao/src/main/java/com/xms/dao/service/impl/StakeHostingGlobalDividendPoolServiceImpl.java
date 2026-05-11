@@ -111,6 +111,22 @@ public class StakeHostingGlobalDividendPoolServiceImpl extends XmsDataServiceImp
 		return pool;
 	}
 
+	/**
+	 * 将101每日托管静态收益任务累计扣出的服务费计入全球分红奖池。
+	 *
+	 * <p>本方法只写一笔“每日服务费入池”流水，不按订单逐条入池。调用方需要先把当天所有托管订单
+	 * 扣出的服务费汇总成 {@code amount} 后再传入；当金额为空或小于等于0时，仅返回当前奖池记录，
+	 * 不更新余额也不写流水。</p>
+	 *
+	 * <p>方法内部会先确保奖池存在，再使用 {@code selectOneForUpdate()} 锁定唯一奖池记录，
+	 * 在同一个事务内更新奖池余额、累计收入、最近收入时间，并写入
+	 * {@code t_stake_hosting_global_dividend_pool_log} 追溯来源。</p>
+	 *
+	 * @param settlementDay 服务费归属结算日，格式yyyyMMdd
+	 * @param amount 当天101任务累计扣出的托管服务费，单位USDT
+	 * @param operator 操作人或任务标识，例如task101
+	 * @return 更新后的全球分红奖池记录；无有效金额时返回当前奖池记录
+	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public StakeHostingGlobalDividendPool incomeDailyServiceFee(Integer settlementDay, BigDecimal amount, String operator) {

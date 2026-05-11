@@ -3,6 +3,7 @@ package com.xms.dao.service;
 import com.xms.dao.domain.StakeHostingUserRewardSummary;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 托管用户奖励累计汇总Service接口
@@ -48,4 +49,11 @@ public interface IStakeHostingUserRewardSummaryService extends XmsDataService<St
 	 * @param amount 本次全球分红金额，单位USDT
 	 */
 	void addGlobalDividend(Long userId, BigDecimal amount);
+
+	/**
+	 * 批量累加用户托管团队收益汇总。
+	 *
+	 * @param list 用户团队收益增量列表，金额单位USDT
+	 */
+	void batchAddTeamRewardSummary(List<StakeHostingUserRewardSummary> list);
 }

@@ -30,7 +30,6 @@ import java.util.List;
  */
 @Service
 public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHostingAfiPledgeMapper, StakeHostingAfiPledge> implements IStakeHostingAfiPledgeService {
-	public static final int STATUS_WAIT_EFFECTIVE = 0;
 	public static final int STATUS_EFFECTIVE = 1;
 	public static final int STATUS_RETURNED = 2;
 	public static final int AFI_ACCELERATED_NO = 0;
@@ -73,10 +72,12 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 
 		BigDecimal afiPriceScaled = normalizeAfiPrice(afiPrice);
 		StakeHostingAfiAccelerateConfig config = getEnabledAfiAccelerateConfig(afiAccelerateConfigId);
+		// 按用户选择的加速档位计算本次AFI等值USDT，再用当前AFI价格换算应扣AFI数量。
 		BigDecimal afiUsdtAmount = calculateAfiUsdtAmount(order.getStakeUsdtAmount(), config.getPledgeRatio());
 		BigDecimal afiAmountScaled = afiUsdtAmount.divide(afiPriceScaled, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 
 		String pledgeNo = IDUtils.getSnowflakeStr();
+		// 质押成功时立即扣减用户AFI可用余额，钱包流水source_type=35。
 		updateAfiWallet(userId, pledgeNo, order.getId(), afiAmountScaled.negate(), ConstantType.user_money_log_source_type.type_35, "AFI质押扣减");
 
 		Date now = new Date();
@@ -93,9 +94,11 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 		pledge.setPledgeRatio(config.getPledgeRatio());
 		pledge.setAccelerateRate(config.getAccelerateRate());
 		pledge.setPledgeTime(now);
+		// 今天质押，明天开始加速；状态不再表达“未到生效日”，只由effectiveDay控制收益日是否能加速。
 		Integer effectiveDay = Integer.parseInt(DateUtil.format(DateUtil.tomorrow(), "yyyyMMdd"));
 		pledge.setEffectiveDay(effectiveDay);
-		pledge.setStatus(STATUS_WAIT_EFFECTIVE);
+		// 状态只表示AFI是否还在质押中：1=生效中，2=已退还；是否参与收益加速由effectiveDay控制。
+		pledge.setStatus(STATUS_EFFECTIVE);
 		pledge.setCreateTime(now);
 		if (!save(pledge)) {
 			throw new ServiceException("生成AFI质押记录失败");
@@ -162,16 +165,18 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 		}
 		StakeHostingAfiPledge pledge = lambdaQuery()
 			.eq(StakeHostingAfiPledge::getStakeHostingOrderId, stakeHostingOrderId)
-			.ne(StakeHostingAfiPledge::getStatus, STATUS_RETURNED)
+			.eq(StakeHostingAfiPledge::getStatus, STATUS_EFFECTIVE)
 			.one();
 		if (pledge == null) {
 			return 0;
 		}
 		String sourceCode = IDUtils.getSnowflakeStr();
+		// 订单到期时退还原质押AFI数量到用户AFI钱包，钱包流水source_type=36。
 		updateAfiWallet(pledge.getUserId(), sourceCode, pledge.getStakeHostingOrderId(), pledge.getAfiAmount(), ConstantType.user_money_log_source_type.type_36, "AFI质押退还");
+		// 退还后将质押记录置为2=已退还，后续101补跑或重跑时不能再参与静态收益加速。
 		boolean update = lambdaUpdate()
 			.eq(StakeHostingAfiPledge::getId, pledge.getId())
-			.ne(StakeHostingAfiPledge::getStatus, STATUS_RETURNED)
+			.eq(StakeHostingAfiPledge::getStatus, STATUS_EFFECTIVE)
 			.set(StakeHostingAfiPledge::getStatus, STATUS_RETURNED)
 			.set(StakeHostingAfiPledge::getReturnTime, new Date())
 			.set(StakeHostingAfiPledge::getUpdateTime, new Date())

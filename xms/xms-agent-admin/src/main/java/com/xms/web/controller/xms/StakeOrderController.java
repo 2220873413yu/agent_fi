@@ -20,6 +20,7 @@ import com.xms.common.core.controller.BaseController;
 import com.xms.common.core.domain.AjaxResult;
 import com.xms.common.enums.BusinessType;
 import com.xms.dao.domain.StakeOrder;
+import com.xms.dao.entity.dto.StakeOrderListDto;
 import com.xms.dao.service.IStakeOrderService;
 import com.xms.common.utils.poi.ExcelUtil;
 import com.xms.common.core.page.TableDataInfo;
@@ -38,27 +39,33 @@ public class StakeOrderController extends BaseController
     private IStakeOrderService stakeOrderService;
 
 	/**
-	 * 查询质押订单列表
+	 * 查询质押订单列表。
+	 *
+	 * @param query 质押订单查询条件
+	 * @return 后台分页列表，包含AFI加速倍率展示字段
 	 */
 	@PreAuthorize("@ss.hasPermi('xms:stakeOrder:list')")
 	@GetMapping("/list")
-    public TableDataInfo list(StakeOrder stakeOrder)
+    public TableDataInfo list(StakeOrderListDto query)
     {
         startPage();
-        List<StakeOrder> list = stakeOrderService.selectStakeOrderList(stakeOrder);
+        List<StakeOrderListDto> list = stakeOrderService.selectStakeOrderDtoList(query);
         return getDataTable(list);
     }
 
     /**
-     * 导出质押订单列表
+     * 导出质押订单列表。
+	 *
+	 * @param response HTTP响应
+	 * @param query 质押订单查询条件
      */
     @PreAuthorize("@ss.hasPermi('xms:stakeOrder:export')")
     @Log(title = "质押订单", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
-    public void export(HttpServletResponse response, StakeOrder stakeOrder)
+    public void export(HttpServletResponse response, StakeOrderListDto query)
     {
-        List<StakeOrder> list = stakeOrderService.selectStakeOrderList(stakeOrder);
-        ExcelUtil<StakeOrder> util = new ExcelUtil<StakeOrder>(StakeOrder.class);
+        List<StakeOrderListDto> list = stakeOrderService.selectStakeOrderDtoList(query);
+        ExcelUtil<StakeOrderListDto> util = new ExcelUtil<StakeOrderListDto>(StakeOrderListDto.class);
         util.exportExcel(response, list, "质押订单数据");
     }
 

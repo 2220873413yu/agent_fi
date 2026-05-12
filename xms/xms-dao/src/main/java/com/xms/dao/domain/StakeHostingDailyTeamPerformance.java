@@ -3,6 +3,7 @@ package com.xms.dao.domain;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.xms.common.annotation.Excel;
 import com.xms.common.core.domain.BaseEntity;
 import io.swagger.annotations.ApiModelProperty;
@@ -14,7 +15,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 /**
- * 托管G7每日团队TVL与收益率快照对象 t_stake_hosting_daily_team_performance
+ * 托管G7每日团队新增业绩与收益率快照对象 t_stake_hosting_daily_team_performance
  *
  * @author xms
  */
@@ -51,29 +52,31 @@ public class StakeHostingDailyTeamPerformance extends BaseEntity {
 	@ApiModelProperty(value = "当天伞下团队新增托管USDT金额")
 	private BigDecimal teamNewAmount;
 
-	/** 当天伞下团队到期托管USDT金额 */
+	/** 当天伞下团队到期托管USDT金额，当前不参与G7静态日利率 */
 	@Excel(name = "团队到期USDT", sort = 5)
-	@ApiModelProperty(value = "当天伞下团队到期托管USDT金额")
+	@ApiModelProperty(value = "当天伞下团队到期托管USDT金额，当前不参与G7静态日利率")
 	private BigDecimal teamExpiredAmount;
 
-	/** 昨日伞下团队有效托管USDT TVL */
-	@Excel(name = "昨日团队TVL", sort = 6)
-	@ApiModelProperty(value = "昨日伞下团队有效托管USDT TVL")
+	/** 昨日伞下团队新增托管USDT金额，字段名沿用 previous_team_tvl */
+	@Excel(name = "昨日团队新增USDT", sort = 6)
+	@ApiModelProperty(value = "昨日伞下团队新增托管USDT金额，字段名沿用 previous_team_tvl")
 	private BigDecimal previousTeamTvl;
 
-	/** 当日伞下团队有效托管USDT TVL */
-	@Excel(name = "当日团队TVL", sort = 7)
-	@ApiModelProperty(value = "当日伞下团队有效托管USDT TVL")
+	/** 当日伞下团队新增托管USDT金额，字段名沿用 current_team_tvl */
+	@Excel(name = "当日团队新增USDT", sort = 7)
+	@ApiModelProperty(value = "当日伞下团队新增托管USDT金额，字段名沿用 current_team_tvl")
 	private BigDecimal currentTeamTvl;
 
 	/** 单日增长率，单位% */
 	@Excel(name = "单日增长率", sort = 8)
 	@ApiModelProperty(value = "单日增长率，单位%")
+	@JsonProperty("gDay")
 	private BigDecimal gDay;
 
 	/** 最近最多7天滚动平均增长率，单位% */
 	@Excel(name = "G7滚动增长率", sort = 9)
 	@ApiModelProperty(value = "最近最多7天滚动平均增长率，单位%")
+	@JsonProperty("gSmooth")
 	private BigDecimal gSmooth;
 
 	/** 命中基础静态收益率，单位% */

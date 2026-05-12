@@ -91,6 +91,18 @@ public class XmsTask {
 	}
 
 	/**
+	 * 测试托管静态日利率。
+	 *
+	 * <p>该任务只调用测试方法准备/读取G7快照并打印每笔产出中订单命中的基础静态日利率，
+	 * 不发放奖励、不写钱包、不改订单收益字段。</p>
+	 */
+	public void testStakeHostingStaticRate() {
+		log.info("测试托管静态日利率");
+		stakeHostingTaskServiceImpl.testCalculateStaticRate(null);
+	}
+
+
+	/**
 	 * 查询没有处理的节点订单
 	 */
 	public void processOverdueMiningOrders() {

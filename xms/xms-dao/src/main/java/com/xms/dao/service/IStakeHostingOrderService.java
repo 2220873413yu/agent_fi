@@ -72,4 +72,31 @@ public interface IStakeHostingOrderService extends XmsDataService<StakeHostingOr
 	 * @param orderId 托管订单ID
 	 */
 	void subtractHostingPerformance(Long userId, BigDecimal amount, Long orderId);
+
+	/**
+	 * 按用户当前未完成托管订单刷新有效用户状态。
+	 *
+	 * <p>101 任务会在本轮所有静态收益和团队奖励都处理完后统一调用，避免同一用户多笔订单同批次完成时提前判断。</p>
+	 *
+	 * @param userId 用户ID
+	 */
+	void refreshUserValidByUnfinishedHostingOrder(Long userId);
+
+	/**
+	 * 同步重算托管订单相关用户的小区业绩和真实等级。
+	 *
+	 * <p>Redis消费者会调用该方法执行实际重算；HTTP回调和后台拨付只负责发送队列消息。</p>
+	 *
+	 * @param orderId 用于定位下单用户及其上级链路的托管订单ID
+	 */
+	void recalculateStakeHostingLevel(Long orderId);
+
+	/**
+	 * 事务提交后发送托管等级重算消息。
+	 *
+	 * <p>等级重算会重算小区业绩并遍历上级链路，业务入口只发Redis队列消息，不同步执行耗时逻辑。</p>
+	 *
+	 * @param orderId 托管订单ID
+	 */
+	void sendStakeHostingLevelRecalculateAfterCommit(Long orderId);
 }

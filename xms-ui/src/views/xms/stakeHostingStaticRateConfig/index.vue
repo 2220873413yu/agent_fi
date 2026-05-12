@@ -58,11 +58,11 @@
         </template>
       </el-table-column>
       <el-table-column label="排序" align="center" prop="sort" width="80" />
-      <el-table-column label="状态" align="center" prop="status">
+<!--      <el-table-column label="状态" align="center" prop="status">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.t_stake_hosting_static_rate_config_status" :value="scope.row.status" />
         </template>
-      </el-table-column>
+      </el-table-column>-->
       <el-table-column label="备注" align="center" prop="remark" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template slot-scope="scope">
@@ -93,11 +93,11 @@
         <el-form-item label="排序" prop="sort">
           <el-input-number v-model="form.sort" :min="0" controls-position="right" />
         </el-form-item>
-        <el-form-item label="状态" prop="status">
+<!--        <el-form-item label="状态" prop="status">
           <el-radio-group v-model="form.status">
             <el-radio v-for="dict in dict.type.t_stake_hosting_static_rate_config_status" :key="dict.value" :label="parseInt(dict.value)">{{ dict.label }}</el-radio>
           </el-radio-group>
-        </el-form-item>
+        </el-form-item>-->
         <el-form-item label="备注" prop="remark">
           <el-input v-model="form.remark" type="textarea" placeholder="请输入备注" />
         </el-form-item>

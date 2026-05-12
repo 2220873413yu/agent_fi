@@ -22,6 +22,7 @@ import com.xms.dao.domain.StakeHostingWeeklyCommunityPerformance;
 import com.xms.dao.domain.UserLevelConfig;
 import com.xms.dao.entity.domain.UserMoney;
 import com.xms.dao.entity.domain.UserInfo;
+import com.xms.dao.entity.dto.StakeHostingStaticRateTestDto;
 import com.xms.dao.entity.vo.ParentUserTaskVo;
 import com.xms.dao.service.IRewardRecordService;
 import com.xms.dao.service.IStakeHostingAfiPledgeService;
@@ -175,6 +176,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		}
 		// 直推、极差、平级奖励统一批量落库：钱包、奖励记录、结算明细和团队收益汇总。
 		flushTeamRewardContext(teamRewardContext);
+		// 本轮所有静态和团队奖励都计算落库后，再统一刷新到期用户状态并触发等级重算，避免中间态影响奖励口径。
+		refreshFinishedUserStateAfterRewards(staticRewardResults);
 		// 101 每日静态收益任务扣出的服务费不逐单入池，这里按当天累计服务费写一笔全球分红奖池收入流水。
 		stakeHostingGlobalDividendPoolService.incomeDailyServiceFee(rewardDay,
 			dailyServiceFee.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew), "task101");
@@ -256,6 +259,44 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		markWeeklyPerformanceSettled(batchNo, weekStartTime, details, now);
 		finishGlobalDividendBatch(batch.getId(), actualAmount, details.size(), now);
 		addWeeklyTask(strDate);
+	}
+
+	/**
+	 * 测试计算托管静态日利率。
+	 *
+	 * <p>本方法复用101任务的G7快照准备和上下文预加载，但只输出每笔产出中订单命中的基础静态日利率。
+	 * 它不会发放奖励、不会写钱包、不会修改订单收益字段；并且会绕开 `FORCE_TEST_STATIC_RATE`，
+	 * 用于单独核对真实G7/指定收益率/未推广规则是否正确。</p>
+	 *
+	 * @param rewardDay 收益日期，格式yyyyMMdd；为空时默认当天
+	 * @return 每笔产出中托管订单的基础静态日利率测试结果
+	 */
+	@Override
+	public List<StakeHostingStaticRateTestDto> testCalculateStaticRate(Integer rewardDay) {
+		int statDay = rewardDay == null ? Integer.parseInt(DateUtil.format(DateUtil.date(), "yyyyMMdd")) : rewardDay;
+		List<StakeHostingOrder> orderList = stakeHostingOrderService.lambdaQuery()
+			.eq(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_RUNNING)
+			.list();
+		if (CollectionUtil.isEmpty(orderList)) {
+			log.info("托管静态日利率测试：无产出中托管订单，rewardDay={}", statDay);
+			return new ArrayList<>();
+		}
+		List<Long> rewardUserIds = orderList.stream()
+			.map(StakeHostingOrder::getUserId)
+			.distinct()
+			.collect(Collectors.toList());
+		// 与101任务保持一致：先生成/补齐当天G7快照，再基于快照判断订单基础日利率。
+		stakeHostingDailyTeamPerformanceService.prepareDailySnapshots(statDay, rewardUserIds);
+		StaticRewardCalculateContext context = buildStaticRewardCalculateContext(orderList, statDay);
+		List<StakeHostingStaticRateTestDto> results = new ArrayList<>(orderList.size());
+		for (StakeHostingOrder order : orderList) {
+			StakeHostingStaticRateTestDto result = calculateStaticRateForTest(order, statDay, context);
+			results.add(result);
+			log.info("托管静态日利率测试：rewardDay={}, orderNo={}, userId={}, source={}, finalRate={}%, gDay={}, gSmooth={}, remark={}",
+				statDay, result.getOrderNo(), result.getUserId(), result.getRateSource(), result.getFinalStaticRate(),
+				result.getGDay(), result.getGSmooth(), result.getRemark());
+		}
+		return results;
 	}
 
 	private void addWeeklyTask(String strDate) {
@@ -456,12 +497,35 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			stakeHostingOrderService.subtractHostingPerformance(order.getUserId(), order.getStakeUsdtAmount(), order.getId());
 			// 若订单绑定AFI质押且未退还，则到期自动退回用户AFI余额并写AFI退还钱包流水。
 			stakeHostingAfiPledgeService.returnPledgeByOrderId(order.getId());
-			// G7团队TVL到期扣减记到次日，避免影响本次已按当天快照计算完成的静态收益率。
-			stakeHostingDailyTeamPerformanceService.recordOrderTeamExpiredAmountNextDay(order.getId(), rewardDay);
+			// G7静态日利率按每日新增对比计算，订单到期不再写入G7扣减。
 		}
 		// 返回本订单完整静态收益计算结果，调用方统一批量入账静态收益并继续发放团队奖励。
 		return new StaticRewardResult(order, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
-			serviceFeeRatio, serviceFee, reward, staticSettlement);
+			serviceFeeRatio, serviceFee, reward, staticSettlement, finished);
+	}
+
+	/**
+	 * 批量刷新本轮101完成订单用户的有效状态并触发等级重算。
+	 *
+	 * <p>刷新和等级重算消息放在静态收益、直推、极差、平级奖励都处理完之后。
+	 * 这样同一用户多笔订单同批次完成时，先按原有等级完成本轮奖励，再基于最终扣减后的业绩统一判断是否降级。</p>
+	 *
+	 * @param results 本轮101任务已计算完成的静态收益结果
+	 */
+	private void refreshFinishedUserStateAfterRewards(List<StaticRewardResult> results) {
+		if (CollectionUtil.isEmpty(results)) {
+			return;
+		}
+		Map<Long, Long> finishedUserOrderMap = new HashMap<>();
+		for (StaticRewardResult result : results) {
+			if (result.finished) {
+				finishedUserOrderMap.putIfAbsent(result.order.getUserId(), result.order.getId());
+			}
+		}
+		for (Map.Entry<Long, Long> entry : finishedUserOrderMap.entrySet()) {
+			stakeHostingOrderService.refreshUserValidByUnfinishedHostingOrder(entry.getKey());
+			stakeHostingOrderService.sendStakeHostingLevelRecalculateAfterCommit(entry.getValue());
+		}
 	}
 
 	/**
@@ -634,11 +698,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		private final BigDecimal serviceFee;
 		private final BigDecimal netReward;
 		private final StakeHostingRewardSettlement staticSettlement;
+		private final boolean finished;
 
 		private StaticRewardResult(StakeHostingOrder order, BigDecimal grossReward, BigDecimal baseStaticRate,
 								   BigDecimal afiAccelerateRate, BigDecimal actualStaticRate,
 								   BigDecimal serviceFeeRatio, BigDecimal serviceFee, BigDecimal netReward,
-								   StakeHostingRewardSettlement staticSettlement) {
+								   StakeHostingRewardSettlement staticSettlement, boolean finished) {
 			this.order = order;
 			this.grossReward = grossReward;
 			this.baseStaticRate = baseStaticRate;
@@ -648,6 +713,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			this.serviceFee = serviceFee;
 			this.netReward = netReward;
 			this.staticSettlement = staticSettlement;
+			this.finished = finished;
 		}
 
 		/**
@@ -711,7 +777,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * 计算单笔托管订单当天使用的基础静态收益率。
 	 *
 	 * <p>当前临时硬编码测试为所有订单返回 1% 日利率；恢复正式逻辑时删除方法开头的测试返回值。
-	 * 正式收益率优先级：用户指定收益率 > 未推广特殊规则 > G7团队TVL快照。
+	 * 正式收益率优先级：用户指定收益率 > 未推广特殊规则 > G7团队新增业绩快照。
 	 * 配置和快照里的收益率单位是%，本方法返回实际乘数，例如 0.5% 返回 0.005。</p>
 	 *
 	 * @param order 托管订单
@@ -729,7 +795,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			return percentToRate(user.getStakeHostingStaticRate());
 		}
 		StakeHostingDailyTeamPerformance snapshot = context.snapshotMap.get(order.getUserId());
-		if (snapshot == null || snapshot.getCurrentTeamTvl() == null || snapshot.getCurrentTeamTvl().compareTo(BigDecimal.ZERO) <= 0) {
+		if (!hasG7NewPerformanceSnapshot(snapshot)) {
 			BigDecimal pureStaticRate = order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1
 				? PURE_STATIC_RATE_AFTER_RETURN_PERCENT : PURE_STATIC_RATE_BEFORE_RETURN_PERCENT;
 			return percentToRate(pureStaticRate);
@@ -738,6 +804,82 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			return PLACEHOLDER_STATIC_RATE;
 		}
 		return percentToRate(snapshot.getBaseStaticRate());
+	}
+
+	/**
+	 * 按正式优先级计算单笔订单基础静态日利率测试结果。
+	 *
+	 * <p>该方法刻意不读取 `FORCE_TEST_STATIC_RATE`，用于排查真实日利率公式。返回值中的收益率单位均为百分比，
+	 * 例如 0.7500 表示 0.75%。</p>
+	 *
+	 * @param order 托管订单
+	 * @param rewardDay 收益日期，格式yyyyMMdd
+	 * @param context 本轮测试预加载上下文
+	 * @return 静态日利率测试结果
+	 */
+	private StakeHostingStaticRateTestDto calculateStaticRateForTest(StakeHostingOrder order, int rewardDay,
+																	 StaticRewardCalculateContext context) {
+		UserInfo user = context.userMap.get(order.getUserId());
+		StakeHostingDailyTeamPerformance snapshot = context.snapshotMap.get(order.getUserId());
+		BigDecimal finalStaticRate;
+		String rateSource;
+		String remark;
+		if (user != null && user.getStakeHostingStaticRate() != null
+			&& user.getStakeHostingStaticRate().compareTo(BigDecimal.ZERO) > 0) {
+			finalStaticRate = user.getStakeHostingStaticRate();
+			rateSource = "指定收益率";
+			remark = "用户 stake_hosting_static_rate > 0，优先使用后台指定收益率";
+		} else if (!hasG7NewPerformanceSnapshot(snapshot)) {
+			finalStaticRate = order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1
+				? PURE_STATIC_RATE_AFTER_RETURN_PERCENT : PURE_STATIC_RATE_BEFORE_RETURN_PERCENT;
+			rateSource = "未推广规则";
+			remark = order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1
+				? "昨日和今日团队新增均为0，订单已回本，使用回本后纯静态收益率"
+				: "昨日和今日团队新增均为0，订单未回本，使用回本前纯静态收益率";
+		} else if (snapshot.getBaseStaticRate() == null) {
+			finalStaticRate = rateToPercent(PLACEHOLDER_STATIC_RATE);
+			rateSource = "快照缺失兜底";
+			remark = "G7快照存在但 base_static_rate 为空，使用0.5%兜底收益率";
+		} else {
+			finalStaticRate = snapshot.getBaseStaticRate();
+			rateSource = "G7快照";
+			remark = "使用当天G7快照 base_static_rate";
+		}
+		return StakeHostingStaticRateTestDto.builder()
+			.orderId(order.getId())
+			.orderNo(order.getOrderNo())
+			.userId(order.getUserId())
+			.stakeUsdtAmount(order.getStakeUsdtAmount())
+			.stakeHostingStaticRate(user == null ? null : user.getStakeHostingStaticRate())
+			.previousTeamTvl(snapshot == null ? null : snapshot.getPreviousTeamTvl())
+			.currentTeamTvl(snapshot == null ? null : snapshot.getCurrentTeamTvl())
+			.teamNewAmount(snapshot == null ? null : snapshot.getTeamNewAmount())
+			.teamExpiredAmount(snapshot == null ? null : snapshot.getTeamExpiredAmount())
+			.gDay(snapshot == null ? null : snapshot.getGDay())
+			.gSmooth(snapshot == null ? null : snapshot.getGSmooth())
+			.baseStaticRate(snapshot == null ? null : snapshot.getBaseStaticRate())
+			.finalStaticRate(finalStaticRate == null ? null : finalStaticRate.setScale(4, ConstantStatic.roundingModeNew))
+			.rateSource(rateSource)
+			.remark(remark)
+			.build();
+	}
+
+	/**
+	 * 判断快照是否存在可用于G7计算的团队新增业绩。
+	 *
+	 * <p>G7静态日利率按“今日团队新增 vs 昨日团队新增”计算；
+	 * 今日新增为0但昨日新增大于0时会产生负增长，仍必须走G7档位，不能落入未推广纯静态规则。</p>
+	 *
+	 * @param snapshot G7每日团队新增快照
+	 * @return true表示应按G7快照收益率计算
+	 */
+	private boolean hasG7NewPerformanceSnapshot(StakeHostingDailyTeamPerformance snapshot) {
+		if (snapshot == null) {
+			return false;
+		}
+		BigDecimal previousTeamNewAmount = snapshot.getPreviousTeamTvl() == null ? BigDecimal.ZERO : snapshot.getPreviousTeamTvl();
+		BigDecimal currentTeamNewAmount = snapshot.getCurrentTeamTvl() == null ? BigDecimal.ZERO : snapshot.getCurrentTeamTvl();
+		return previousTeamNewAmount.compareTo(BigDecimal.ZERO) > 0 || currentTeamNewAmount.compareTo(BigDecimal.ZERO) > 0;
 	}
 
 	/**

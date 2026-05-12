@@ -7,6 +7,7 @@ import com.xms.app.entity.bo.CoinInfoBo;
 import com.xms.app.entity.bo.ComputingPowerBo;
 import com.xms.app.entity.bo.TeamViewBO;
 import com.xms.app.entity.bo.UserAssetInfoBo;
+import com.xms.app.entity.dto.CurrentStakeHostingStaticRateDto;
 import com.xms.app.entity.dto.MyDirectMemberDto;
 import com.xms.app.entity.dto.MyTeamInfoDto;
 import com.xms.app.entity.dto.MyTeamMemberDto;
@@ -92,6 +93,14 @@ public interface BizUserService {
 	 * @return
 	 */
 	MyTeamInfoDto myTeamInfo(Long userId);
+
+	/**
+	 * 查询当前登录用户今日G值和托管基础静态日利率。
+	 *
+	 * @param userId 用户ID
+	 * @return 今日G值和当前托管基础静态日利率
+	 */
+	CurrentStakeHostingStaticRateDto currentStakeHostingStaticRate(Long userId);
 
 	/**
 	 * 我的团队数据 总成员、直推人数、团队销毁usdt、等级

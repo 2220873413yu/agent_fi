@@ -233,11 +233,11 @@
       <el-table-column label="openId" align="center" prop="juOpenId" show-overflow-tooltip width="150"/>-->
       <el-table-column align="center" label="钱包地址" prop="account" width="150"/>
 
-<!--      <el-table-column align="center" label="是否有效用户" prop="isValid" width="80">
+      <el-table-column align="center" label="是否持有未出局的矿机" prop="isValid" width="80">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.t_user_info_is_valid" :value="scope.row.isValid"/>
         </template>
-      </el-table-column> -->
+      </el-table-column>
 
 
 

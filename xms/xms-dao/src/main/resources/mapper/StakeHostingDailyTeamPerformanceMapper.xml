@@ -34,6 +34,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from t_stake_hosting_daily_team_performance
     </sql>
 
+    <select id="selectStakeHostingDailyTeamPerformanceList" parameterType="StakeHostingDailyTeamPerformance" resultMap="StakeHostingDailyTeamPerformanceResult">
+        <include refid="selectStakeHostingDailyTeamPerformanceVo"/>
+        <where>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="account != null and account != ''"> and account = #{account}</if>
+            <if test="statDay != null"> and stat_day = #{statDay}</if>
+            <if test="rateSource != null"> and rate_source = #{rateSource}</if>
+            <if test="calcStatus != null"> and calc_status = #{calcStatus}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            and deleted = 0
+        </where>
+        order by stat_day desc, id desc
+    </select>
+
     <insert id="upsertTeamNewAmount">
         insert into t_stake_hosting_daily_team_performance (
             user_id, account, stat_day, team_new_amount, create_time, update_time, deleted
@@ -90,6 +104,37 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and deleted = 0
         order by stat_day desc
         limit 6
+    </select>
+
+    <select id="selectRecentGDayBeforeBatch" resultMap="StakeHostingDailyTeamPerformanceResult">
+        select id, user_id, account, stat_day, team_new_amount, team_expired_amount,
+               previous_team_tvl, current_team_tvl, g_day, g_smooth, base_static_rate,
+               rate_source, calc_status, create_by, create_time, update_by, update_time,
+               remark, deleted
+        from (
+            select p.*,
+                   row_number() over (partition by p.user_id order by p.stat_day desc) as rn
+            from t_stake_hosting_daily_team_performance p
+            where p.user_id in
+            <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                #{userId}
+            </foreach>
+              and p.stat_day &lt; #{statDay}
+              and p.calc_status = 1
+              and p.deleted = 0
+        ) t
+        where t.rn &lt;= 6
+        order by t.user_id, t.stat_day desc
+    </select>
+
+    <select id="selectByUserIdsAndStatDay" resultMap="StakeHostingDailyTeamPerformanceResult">
+        <include refid="selectStakeHostingDailyTeamPerformanceVo"/>
+        where user_id in
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+          and stat_day = #{statDay}
+          and deleted = 0
     </select>
 
     <select id="selectUserIdsByStatDay" resultType="java.lang.Long">

@@ -79,9 +79,9 @@ public class UserInfo extends BaseXmsEntity {
 	private BigDecimal subNodePerformance;
 
 	/**
-	 * 是否购买过矿机(0.否 1.是)
+	 * 是否有效用户：0=无未完成托管订单，1=持有未完成托管订单
 	 */
-	//@Excel(name = "是否购买过矿机", sort = 4,dictType = "t_user_info_is_valid")
+	//@Excel(name = "是否有效用户", sort = 4,dictType = "t_user_info_is_valid")
 	private Integer isValid;
 
 	/**

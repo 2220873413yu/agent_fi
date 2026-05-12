@@ -4,6 +4,7 @@ package com.xms.app.controller;
 import cn.hutool.core.util.StrUtil;
 import com.github.pagehelper.PageInfo;
 import com.xms.app.config.RobotConfig;
+import com.xms.app.entity.dto.CurrentStakeHostingStaticRateDto;
 import com.xms.app.entity.dto.MyDirectMemberDto;
 import com.xms.app.entity.dto.MyTeamInfoDto;
 import com.xms.app.entity.vo.*;
@@ -221,6 +222,19 @@ public class UserInfoController {
 	@GetMapping(value = "/myTeamInfo")
 	public ResultPista<MyTeamInfoDto> myTeamInfo() {
 		return ResultPista.data(bizUserService.myTeamInfo(SecurityUtils.getLoginAppUser().getUserId()));
+	}
+
+	/**
+	 * 查询当前托管静态日利率。
+	 *
+	 * 查询当前登录用户今日G值和当前托管基础静态日利率。
+	 *
+	 * @return 今日G值和当前托管基础静态日利率
+	 */
+	@ApiOperation(value = "查询当前托管静态日利率")
+	@GetMapping(value = "/currentStakeHostingStaticRate")
+	public ResultPista<CurrentStakeHostingStaticRateDto> currentStakeHostingStaticRate() {
+		return ResultPista.data(bizUserService.currentStakeHostingStaticRate(SecurityUtils.getLoginAppUser().getUserId()));
 	}
 
 	/**

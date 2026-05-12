@@ -87,6 +87,9 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	private IStakeHostingWeeklyCommunityPerformanceService stakeHostingWeeklyCommunityPerformanceService;
 
 	@Autowired
+	private IStakeHostingDailyTeamPerformanceService stakeHostingDailyTeamPerformanceService;
+
+	@Autowired
 	private ISysParaService sysParaService;
 
 	@Autowired
@@ -129,9 +132,40 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			}else if(orderMsgDO.getBizType().equals(5)){
 				//托管订单周新增业绩统计
 				stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(orderMsgDO.getId());
+			}else if(orderMsgDO.getBizType().equals(6)){
+				//托管订单生效后置处理：G7新增 -> 周新增 -> 小区业绩和等级重算
+				handleStakeHostingEffectiveAfter(orderMsgDO);
 			}
 		}
 		return 1;
+	}
+
+	/**
+	 * 托管订单生效后的统一后置处理。
+	 *
+	 * <p>购买回调和后台拨付只发送一条 bizType=6 消息，本方法在消费者中按固定顺序完成同一业务链路里的耗时动作：
+	 * 先统计G7当天团队新增，再按订单周业绩状态决定是否处理周新增，最后重算小区业绩和真实等级。</p>
+	 *
+	 * @param orderMsgDO 托管订单生效后置处理消息
+	 */
+	private void handleStakeHostingEffectiveAfter(OrderMsgDO orderMsgDO) {
+		StakeHostingOrder order = stakeHostingOrderService.lambdaQuery()
+			.eq(StakeHostingOrder::getId, orderMsgDO.getId())
+			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
+			.one();
+		if (order == null) {
+			log.info("托管订单生效后置处理跳过，订单不存在或未支付 orderId:{}", orderMsgDO.getId());
+			return;
+		}
+		// 1. G7使用当天团队新增业绩，先按订单用户上级链路累加当天新增USDT。
+		stakeHostingDailyTeamPerformanceService.recordOrderTeamNewAmount(order.getId());
+		// 2. 只有周新增状态为队列中时才处理；本周内到期或已处理的订单不重复初始化周业绩。
+		if (order.getWeeklyPerformanceStatus() != null
+			&& order.getWeeklyPerformanceStatus().equals(StakeHostingOrderServiceImpl.WEEKLY_STATUS_QUEUED)) {
+			stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(order.getId());
+		}
+		// 3. 最后重算小区业绩和真实等级，确保等级判断读取到最新G7/周业绩相关基础数据。
+		stakeHostingOrderService.recalculateStakeHostingLevel(order.getId());
 	}
 
 	/**

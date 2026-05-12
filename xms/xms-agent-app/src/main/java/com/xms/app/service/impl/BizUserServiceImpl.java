@@ -24,6 +24,7 @@ import com.xms.app.handler.CustomException;
 import com.xms.common.constant.ExternalApiConstant;
 import com.xms.app.entity.bo.CoinInfoBo;
 import com.xms.app.entity.bo.UserAssetInfoBo;
+import com.xms.app.entity.dto.CurrentStakeHostingStaticRateDto;
 import com.xms.app.entity.dto.MyDirectMemberDto;
 import com.xms.app.entity.dto.MyTeamInfoDto;
 import com.xms.app.entity.dto.MyTeamMemberDto;
@@ -57,6 +58,7 @@ import com.xms.common.utils.spring.SpringUtils;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.entity.domain.UserMoney;
 import com.xms.dao.entity.domain.UserRelation;
+import com.xms.dao.service.impl.StakeHostingOrderServiceImpl;
 import com.xms.dao.service.impl.UserInfoServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -85,6 +87,9 @@ public class BizUserServiceImpl implements BizUserService {
 	private static final String SDK_APP_ID = "1721002266";
 	private static final String SECRET_KEY = "01acd6bad44c551dd72e3fad285275586c060dd32ef483d8f9958d3eae5ede46"; // 需要替换为真实密钥
 	private static final String ADMIN_IDENTIFIER = "administrator"; // App管理员账号
+	private static final BigDecimal PLACEHOLDER_STATIC_RATE_PERCENT = new BigDecimal("0.5000");
+	private static final BigDecimal PURE_STATIC_RATE_BEFORE_RETURN_PERCENT = new BigDecimal("0.5000");
+	private static final BigDecimal PURE_STATIC_RATE_AFTER_RETURN_PERCENT = new BigDecimal("0.2000");
 
 
 	@Autowired
@@ -121,6 +126,12 @@ public class BizUserServiceImpl implements BizUserService {
 
 	@Autowired
 	private IStakeHostingUserRewardSummaryService stakeHostingUserRewardSummaryService;
+
+	@Autowired
+	private IStakeHostingDailyTeamPerformanceService stakeHostingDailyTeamPerformanceService;
+
+	@Autowired
+	private IStakeHostingOrderService stakeHostingOrderService;
 
 
 	@Autowired
@@ -573,6 +584,107 @@ public class BizUserServiceImpl implements BizUserService {
 		dto.setTeamTotalHostingAmount(teamHostingAmount);
 		dto.setSelfTotalHostingAmount(selfHostingAmount);
 		return dto;
+	}
+
+	/**
+	 * 查询当前用户今日托管基础静态日利率。
+	 *
+	 * <p>该接口用于App简单展示，不发放收益。查询时会先补齐当天G7快照，
+	 * 只返回今日G值和当前命中的基础静态日利率。</p>
+	 *
+	 * @param userId 用户ID
+	 * @return 当前G值和托管基础静态日利率，单位均为%
+	 */
+	@Override
+	public CurrentStakeHostingStaticRateDto currentStakeHostingStaticRate(Long userId) {
+		UserInfo userInfo = userInfoServiceImpl.lambdaQuery()
+			.eq(UserInfo::getUserId, userId)
+			.eq(UserInfo::getDeleted, 0)
+			.one();
+		if (userInfo == null) {
+			throw new ServiceException("用户不存在");
+		}
+		Integer rewardDay = Integer.valueOf(DateUtil.format(DateUtil.date(), "yyyyMMdd"));
+		CurrentStakeHostingStaticRateDto dto = new CurrentStakeHostingStaticRateDto();
+		dto.setRewardDay(rewardDay);
+
+		// 查询展示利率前先补齐G7快照，前端只需要今日G值和当前命中的基础日利率。
+		stakeHostingDailyTeamPerformanceService.prepareDailySnapshots(rewardDay, Collections.singletonList(userId));
+		StakeHostingDailyTeamPerformance snapshot = stakeHostingDailyTeamPerformanceService.getCalculatedSnapshot(userId, rewardDay);
+		dto.setGDay(snapshot == null ? BigDecimal.ZERO : scaleRate(snapshot.getGDay()));
+
+		// 后台长期指定收益率优先级最高；G值仍取当天快照中的G_day用于展示。
+		if (userInfo.getStakeHostingStaticRate() != null && userInfo.getStakeHostingStaticRate().compareTo(BigDecimal.ZERO) > 0) {
+			dto.setCurrentStaticRate(scaleRate(userInfo.getStakeHostingStaticRate()));
+			return dto;
+		}
+		if (!hasG7NewPerformanceSnapshot(snapshot)) {
+			dto.setCurrentStaticRate(scaleRate(getPureStaticRatePercent(userId)));
+			return dto;
+		}
+		if (snapshot.getBaseStaticRate() == null) {
+			dto.setCurrentStaticRate(PLACEHOLDER_STATIC_RATE_PERCENT);
+			return dto;
+		}
+		dto.setCurrentStaticRate(scaleRate(snapshot.getBaseStaticRate()));
+		return dto;
+	}
+	/**
+	 * 判断用户当天是否存在可用于G7计算的团队新增业绩。
+	 *
+	 * <p>今日新增为0但昨日新增大于0时会产生负增长，仍需要按G7快照展示，不能走未推广纯静态。</p>
+	 *
+	 * @param snapshot G7每日团队新增业绩快照
+	 * @return true表示应按G7快照展示
+	 */
+	private boolean hasG7NewPerformanceSnapshot(StakeHostingDailyTeamPerformance snapshot) {
+		if (snapshot == null) {
+			return false;
+		}
+		BigDecimal previousTeamNewAmount = snapshot.getPreviousTeamTvl() == null ? BigDecimal.ZERO : snapshot.getPreviousTeamTvl();
+		BigDecimal currentTeamNewAmount = snapshot.getCurrentTeamTvl() == null ? BigDecimal.ZERO : snapshot.getCurrentTeamTvl();
+		return previousTeamNewAmount.compareTo(BigDecimal.ZERO) > 0 || currentTeamNewAmount.compareTo(BigDecimal.ZERO) > 0;
+	}
+
+	/**
+	 * 获取未推广纯静态展示收益率。
+	 *
+	 * <p>如果用户存在未回本的产出中托管订单，展示回本前0.5%；如果产出中订单均已回本，展示回本后0.2%。
+	 * 用户没有产出中托管订单时，按回本前基础档0.5%展示。</p>
+	 *
+	 * @param userId 用户ID
+	 * @return 纯静态收益率，单位%
+	 */
+	private BigDecimal getPureStaticRatePercent(Long userId) {
+		long runningCount = stakeHostingOrderService.lambdaQuery()
+			.eq(StakeHostingOrder::getUserId, userId)
+			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
+			.eq(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_RUNNING)
+			.eq(StakeHostingOrder::getDeleted, 0)
+			.count();
+		if (runningCount <= 0) {
+			return PURE_STATIC_RATE_BEFORE_RETURN_PERCENT;
+		}
+		long unreturnedCount = stakeHostingOrderService.lambdaQuery()
+			.eq(StakeHostingOrder::getUserId, userId)
+			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
+			.eq(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_RUNNING)
+			.eq(StakeHostingOrder::getDeleted, 0)
+			.and(wrapper -> wrapper.isNull(StakeHostingOrder::getIsReturnPrincipal)
+				.or()
+				.ne(StakeHostingOrder::getIsReturnPrincipal, 1))
+			.count();
+		return unreturnedCount > 0 ? PURE_STATIC_RATE_BEFORE_RETURN_PERCENT : PURE_STATIC_RATE_AFTER_RETURN_PERCENT;
+	}
+
+	/**
+	 * 统一格式化收益率百分比。
+	 *
+	 * @param ratePercent 收益率，单位%
+	 * @return 保留4位小数的收益率；空值返回0
+	 */
+	private BigDecimal scaleRate(BigDecimal ratePercent) {
+		return defaultAmount(ratePercent).setScale(4, RoundingMode.HALF_UP);
 	}
 
 	/**

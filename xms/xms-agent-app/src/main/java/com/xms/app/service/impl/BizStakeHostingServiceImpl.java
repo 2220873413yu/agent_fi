@@ -20,18 +20,12 @@ import com.xms.common.exception.ServiceException;
 import com.xms.common.result.ResponseCode;
 import com.xms.common.utils.SecurityUtils;
 import com.xms.common.utils.SignUtil;
-import com.xms.dao.domain.StakeHostingAfiAccelerateConfig;
-import com.xms.dao.domain.StakeHostingAfiPledge;
-import com.xms.dao.domain.StakeHostingOrder;
-import com.xms.dao.domain.StakeHostingPackage;
+import com.xms.dao.domain.*;
 import com.xms.dao.entity.domain.UserInfo;
-import com.xms.dao.service.IStakeHostingAfiAccelerateConfigService;
-import com.xms.dao.service.IStakeHostingOrderService;
-import com.xms.dao.service.IStakeHostingAfiPledgeService;
-import com.xms.dao.service.IStakeHostingPackageService;
-import com.xms.dao.service.UserInfoService;
+import com.xms.dao.service.*;
 import com.xms.dao.service.impl.StakeHostingOrderServiceImpl;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -55,6 +49,9 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 	private final UserInfoService userInfoService;
 	private final XmsRedis xmsRedis;
 	private final BizCommonService bizCommonService;
+
+	@Autowired
+	private  IStakeHostingStaticRateConfigService stakeHostingStaticRateConfigServiceImpl;
 
 	@Value("${lq.md5Key}")
 	private String md5Key;
@@ -93,7 +90,22 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		if (CollectionUtil.isEmpty(list)) {
 			return java.util.Collections.emptyList();
 		}
-		return list.stream().map(this::toPackageDto).collect(Collectors.toList());
+		BigDecimal minDayRatio = stakeHostingStaticRateConfigServiceImpl.lambdaQuery()
+			.eq(StakeHostingStaticRateConfig::getId, 1)
+			.one().getStaticRate();
+
+		BigDecimal maxDayRatio = stakeHostingStaticRateConfigServiceImpl.lambdaQuery()
+			.last("limit 1")
+			.orderByDesc(StakeHostingStaticRateConfig::getId)
+			.one().getStaticRate();
+		List<StakeHostingPackageDto> result = list.stream().map(record -> {
+			StakeHostingPackageDto dto = new StakeHostingPackageDto();
+			BeanUtil.copyProperties(record, dto);
+			dto.setMinDayRatio(minDayRatio);
+			dto.setMaxDayRatio(maxDayRatio);
+			return dto;
+		}).collect(Collectors.toList());
+		return result;
 	}
 
 	/**

@@ -383,10 +383,12 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			userInfoService.lambdaUpdate()
 				.eq(UserInfo::getUserId, userInfo.getInviteUserId())
 				.setSql("sub_node_performance = sub_node_performance + 1")
+				.setSql("sub_umbrella_node_performance = sub_umbrella_node_performance + " + packageOrder.getOrderValueUsdt())
 				.update();
 			userInfoService.lambdaUpdate()
 				.in(UserInfo::getUserId, userInfo.getParentIds())
 				.setSql("node_team_performance = node_team_performance + 1")
+				.setSql("umbrella_node_performance = umbrella_node_performance + " + packageOrder.getOrderValueUsdt())
 				.update();
 			//发放直推、间推、奖励
 			UserInfo inviteUserInfo = userInfoService.lambdaQuery()

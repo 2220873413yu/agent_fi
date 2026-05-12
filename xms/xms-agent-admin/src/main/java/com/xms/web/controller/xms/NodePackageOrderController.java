@@ -83,16 +83,16 @@ public class NodePackageOrderController extends BaseController
         return toAjax(nodePackageOrderService.saveNodePackageOrder(req));
     }
 
-    /**
-     * 修改节点购买记录
-     */
-    @PreAuthorize("@ss.hasPermi('xms:nodePackageOrder:edit')")
-    @Log(title = "节点购买记录", businessType = BusinessType.UPDATE)
-    @PutMapping
-    @RepeatSubmit
-    public AjaxResult edit(@RequestBody NodePackageOrder nodePackageOrder) {
-        return toAjax(nodePackageOrderService.updateById(nodePackageOrder));
-    }
+	/**
+	 * 修改节点购买记录
+	 */
+	@PreAuthorize("@ss.hasPermi('xms:nodePackageOrder:edit')")
+	@Log(title = "节点购买记录", businessType = BusinessType.UPDATE)
+	@PutMapping
+	@RepeatSubmit
+	public AjaxResult edit(@RequestBody NodePackageOrder nodePackageOrder) {
+		return toAjax(nodePackageOrderService.updateOrderById(nodePackageOrder));
+	}
 
     /**
      * 删除节点购买记录

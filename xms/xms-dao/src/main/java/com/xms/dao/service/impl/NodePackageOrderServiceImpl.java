@@ -1,11 +1,13 @@
 package com.xms.dao.service.impl;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 import java.nio.charset.StandardCharsets;
 
 import cn.hutool.core.util.StrUtil;
 import com.xms.common.exception.ServiceException;
+import com.xms.common.utils.CollectionUtil;
 import com.xms.common.utils.uuid.IDUtils;
 import com.xms.dao.domain.NodePackage;
 import com.xms.dao.entity.domain.UserInfo;
@@ -13,6 +15,7 @@ import com.xms.dao.entity.req.AllocateNodePackReq;
 import com.xms.dao.service.INodePackageService;
 import com.xms.dao.service.UserInfoService;
 import com.xms.dao.service.impl.XmsDataServiceImpl;
+import org.springframework.transaction.annotation.Transactional;
 import org.web3j.crypto.Hash;
 import org.web3j.utils.Numeric;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +39,69 @@ public class NodePackageOrderServiceImpl extends XmsDataServiceImpl<NodePackageO
 
 	@Autowired
 	private INodePackageService nodePackageService;
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public int updateOrderById(NodePackageOrder req) {
+		NodePackageOrder queryOrder = lambdaQuery()
+			.eq(NodePackageOrder::getId, req.getId())
+			.one();
+		if(req.getPackageLevel().equals(queryOrder.getPackageLevel())){
+			throw new ServiceException("节点等级未发生变化");
+		}
+		//查询用户
+		UserInfo userInfo = userInfoService.lambdaQuery()
+			.eq(UserInfo::getUserId, queryOrder.getUserId())
+			.one();
+		//查询等级套餐
+		NodePackage nodePackage = nodePackageService.lambdaQuery()
+			.eq(NodePackage::getLevel, req.getPackageLevel())
+			.one();
+
+		//修改订单
+		boolean update = lambdaUpdate()
+			.eq(NodePackageOrder::getId, req.getId())
+			.eq(NodePackageOrder::getPackageLevel, queryOrder.getPackageLevel())
+			.set(NodePackageOrder::getPackageLevel, nodePackage.getLevel())
+			.set(NodePackageOrder::getDirectReferralRate, nodePackage.getDirectReferralRate())
+			.set(NodePackageOrder::getIndirectReferralRate, nodePackage.getIndirectReferralRate())
+			.set(NodePackageOrder::getWeightMultiplier, nodePackage.getWeightMultiplier())
+			.set(NodePackageOrder::getPredOrderFeeReliefRate, nodePackage.getPredOrderFeeReliefRate())
+			.set(NodePackageOrder::getOrderValueUsdt, nodePackage.getPrice())
+			.set(NodePackageOrder::getUpdateTime, new Date())
+			.update();
+		if(!update){
+			throw new ServiceException("用户节点已经被修改了.请刷新页面后重试");
+		}
+
+		//修改用户节点等级、赠送节点信息
+		update = userInfoService.lambdaUpdate()
+			.eq(UserInfo::getUserId, queryOrder.getUserId())
+			.eq(UserInfo::getNodeLevel, queryOrder.getPackageLevel())
+			.set(UserInfo::getNodeLevel, req.getPackageLevel())
+			.set(UserInfo::getMinGameLevel, req.getPackageLevel())
+			.update();
+		if(!update){
+			throw new ServiceException("用户节点已经被修改了.请刷新页面后重试");
+		}
+		List<Long> parentIds = userInfo.getParentIds();
+		if(CollectionUtil.isNotEmpty(parentIds)){
+			BigDecimal p1 = queryOrder.getOrderValueUsdt().add(nodePackage.getPrice());
+			//直推
+			userInfoService.lambdaUpdate()
+				.eq(UserInfo::getUserId, userInfo.getInviteUserId())
+				.setSql("sub_umbrella_node_performance = sub_umbrella_node_performance + " + p1)
+				.update();
+
+			//修改团队业绩
+			userInfoService.lambdaUpdate()
+				.in(UserInfo::getUserId, parentIds)
+				.setSql("umbrella_node_performance = umbrella_node_performance + " + p1)
+				.update();
+		}
+		return 1;
+	}
+
 
 	/**
 	 * 后台拨付节点

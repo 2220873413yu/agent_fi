@@ -28,10 +28,10 @@ public class MyDirectMemberDto {
 	 */
 	private Integer gameLevel;
 
-//	/**
-//	 * 节点等级 0:A0,1:A1,2:A2,3:A3
-//	 */
-//	private Integer nodeLevel;
+	/**
+	 * 节点等级 0:A0,1:A1,2:A2,3:A3
+	 */
+	private Integer nodeLevel;
 
 //	/**
 //	 * 团队业绩(节点数量)
@@ -52,6 +52,18 @@ public class MyDirectMemberDto {
 	 * 团队人数
 	 */
 	private Integer umbrellaNum;
+
+	/**
+	 * 团队业绩(销售价值)
+	 */
+	private BigDecimal umbrellaNodePerformance;
+
+	/**
+	 * 直推节点业绩(销售额)
+	 */
+	private BigDecimal subUmbrellaNodePerformance;
+
+
 
 //	/**
 //	 * 团队业绩(质押量)

@@ -101,44 +101,54 @@
           v-hasPermi="['xms:nodePackageOrder:add']"
         >拨付节点</el-button>
       </el-col>
-<!--      <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
-          icon="el-icon-edit"
-          size="mini"
-          :disabled="single"
-          @click="handleUpdate"
-          v-hasPermi="['xms:nodePackageOrder:edit']"
-        >修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="el-icon-delete"
-          size="mini"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['xms:nodePackageOrder:remove']"
-        >删除</el-button>
-      </el-col>-->
-<!--      <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="el-icon-download"
-          size="mini"
-          @click="handleExport"
-          v-hasPermi="['xms:nodePackageOrder:export']"
-        >导出</el-button>
-      </el-col>-->
+      <!--      <el-col :span="1.5">
+
+            <el-col :span="1.5">
+              <el-button
+                type="danger"
+                plain
+                icon="el-icon-delete"
+                size="mini"
+                :disabled="multiple"
+                @click="handleDelete"
+                v-hasPermi="['xms:nodePackageOrder:remove']"
+              >删除</el-button>
+            </el-col>-->
+      <!--      <el-col :span="1.5">
+              <el-button
+                type="warning"
+                plain
+                icon="el-icon-download"
+                size="mini"
+                @click="handleExport"
+                v-hasPermi="['xms:nodePackageOrder:export']"
+              >导出</el-button>
+            </el-col>-->
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
     <el-table v-loading="loading" :data="nodePackageOrderList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="主键id" align="center" prop="id" v-if="false"/>
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width"   width="120">
+        <template slot-scope="scope">
+          <el-button
+            size="mini"
+            type="text"
+            icon="el-icon-edit"
+            v-if="scope.row.status == 1"
+            @click="handleUpdate(scope.row)"
+            v-hasPermi="['xms:nodePackageOrder:edit']"
+          >修改节点订单</el-button>
+          <!--          <el-button
+                      size="mini"
+                      type="text"
+                      icon="el-icon-delete"
+                      @click="handleDelete(scope.row)"
+                      v-hasPermi="['xms:nodePackageOrder:remove']"
+                    >删除</el-button>-->
+        </template>
+      </el-table-column>
       <el-table-column label="订单号" align="center" prop="orderNo" />
       <el-table-column label="用户ID" align="center" prop="userId" />
       <el-table-column label="钱包地址" align="center" prop="address" width="180"/>
@@ -148,16 +158,16 @@
           <dict-tag :options="dict.type.t_node_plan_node_level" :value="scope.row.packageLevel"/>
         </template>
       </el-table-column>
-<!--      <el-table-column label="直推奖励比例" align="center" prop="directReferralRate" >
-        <template slot-scope="scope">
-          {{scope.row.directReferralRate}}%
-        </template>
-      </el-table-column>
-      <el-table-column label="间推奖励比例" align="center" prop="indirectReferralRate"  >
-        <template slot-scope="scope">
-          {{scope.row.indirectReferralRate}}%
-        </template>
-      </el-table-column>-->
+      <!--      <el-table-column label="直推奖励比例" align="center" prop="directReferralRate" >
+              <template slot-scope="scope">
+                {{scope.row.directReferralRate}}%
+              </template>
+            </el-table-column>
+            <el-table-column label="间推奖励比例" align="center" prop="indirectReferralRate"  >
+              <template slot-scope="scope">
+                {{scope.row.indirectReferralRate}}%
+              </template>
+            </el-table-column>-->
       <el-table-column label="权重系数" align="center" prop="weightMultiplier" />
       <el-table-column label="手续费减免比例" align="center" prop="predOrderFeeReliefRate"  >
         <template slot-scope="scope">
@@ -195,24 +205,7 @@
           <span>{{ parseTime(scope.row.updateTime) }}</span>
         </template>
       </el-table-column>
-<!--      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['xms:nodePackageOrder:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['xms:nodePackageOrder:remove']"
-          >删除</el-button>
-        </template>
-      </el-table-column>-->
+
     </el-table>
 
     <pagination
@@ -222,6 +215,26 @@
       :limit.sync="queryParams.pageSize"
       @pagination="getList"
     />
+
+    <!-- 修改节点等级对话框 -->
+    <el-dialog title="修改节点等级" :visible.sync="editLevelOpen" width="400px" append-to-body>
+      <el-form ref="editLevelForm" :model="editLevelForm" :rules="editLevelRules" label-width="80px">
+        <el-form-item label="节点等级" prop="packageLevel">
+          <el-select v-model="editLevelForm.packageLevel" placeholder="请选择等级">
+            <el-option
+              v-for="dict in dict.type.t_node_plan_node_level.filter(item => Number(item.value) > 0)"
+              :key="dict.value"
+              :label="dict.label"
+              :value="parseInt(dict.value)"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="submitEditLevel">确 定</el-button>
+        <el-button @click="editLevelOpen = false">取 消</el-button>
+      </div>
+    </el-dialog>
 
     <!-- 添加或修改节点购买记录对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="500px" append-to-body>
@@ -283,6 +296,17 @@ export default {
       title: "",
       // 是否显示弹出层
       open: false,
+      // 修改节点等级弹窗
+      editLevelOpen: false,
+      editLevelForm: {
+        id: null,
+        packageLevel: null,
+      },
+      editLevelRules: {
+        packageLevel: [
+          { required: true, message: "节点等级不能为空", trigger: "change" }
+        ],
+      },
       // 支付时间时间范围
       daterangeCreateTime: [],
       // 查询参数
@@ -399,14 +423,27 @@ export default {
       this.open = true;
       this.title = "添加节点购买记录";
     },
-    /** 修改按钮操作 */
+    /** 修改节点等级按钮操作 */
     handleUpdate(row) {
-      this.reset();
-      const id = row.id || this.ids
-      getNodePackageOrder(id).then(response => {
-        this.form = response.data;
-        this.open = true;
-        this.title = "修改节点购买记录";
+      this.editLevelForm = {
+        id: row.id,
+        packageLevel: row.packageLevel,
+      };
+      this.$nextTick(() => {
+        this.$refs["editLevelForm"] && this.$refs["editLevelForm"].clearValidate();
+      });
+      this.editLevelOpen = true;
+    },
+    /** 修改节点等级提交 */
+    submitEditLevel() {
+      this.$refs["editLevelForm"].validate(valid => {
+        if (valid) {
+          updateNodePackageOrder(this.editLevelForm).then(() => {
+            this.$modal.msgSuccess("修改成功");
+            this.editLevelOpen = false;
+            this.getList();
+          });
+        }
       });
     },
     /** 提交按钮 */

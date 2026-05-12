@@ -29,4 +29,11 @@ public interface INodePackageOrderService extends XmsDataService<NodePackageOrde
 	 * @return
 	 */
 	int saveNodePackageOrder(AllocateNodePackReq req);
+
+	/**
+	 * 修改节点购买记录
+	 * @param nodePackageOrder
+	 * @return
+	 */
+	int updateOrderById(NodePackageOrder nodePackageOrder);
 }

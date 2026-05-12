@@ -95,6 +95,10 @@ public class BizUserServiceImpl implements BizUserService {
 
 
 	@Autowired
+	private INodePackageOrderService nodePackageOrderService;
+
+
+	@Autowired
 	private AsyncDynamicOrderSettlementService asyncDynamicOrderSettlementServiceImpl;
 
 
@@ -339,36 +343,50 @@ public class BizUserServiceImpl implements BizUserService {
 		PageHelper.startPage(pageIndex, pageSize);
 		List<UserInfo> userInfoList = userInfoServiceImpl.lambdaQuery()
 			.eq(UserInfo::getInviteUserId, SecurityUtils.getLoginAppUser().getUserId())
-			.eq(gameLevel!=null, UserInfo::getGameLevel, gameLevel)
-			.select(UserInfo::getAccount, UserInfo::getCreateTime, UserInfo::getUserId,
-				UserInfo::getMinGameLevel, UserInfo::getGameLevel,UserInfo::getAdminGameLevel,
-				UserInfo::getSubNum, UserInfo::getUmbrellaNum)
+			.select(UserInfo::getAccount, UserInfo::getCreateTime, UserInfo::getUserId, UserInfo::getUmbrellaNodePerformance, UserInfo::getSubUmbrellaNodePerformance,
+				UserInfo::getMinGameLevel, UserInfo::getGameLevel, UserInfo::getCommunityPerformance,
+				UserInfo::getSubNum, UserInfo::getUmbrellaNum, UserInfo::getUmbrellaPerformance,UserInfo::getPerformance,
+				UserInfo::getNodeLevel,UserInfo::getNodeTeamPerformance,UserInfo::getSubNodePerformance)
 			.list();
 
 		PageInfo<UserInfo> userInfoPageInfo = new PageInfo<>(userInfoList);
-		List<MyDirectMemberDto> result =
-			userInfoList
-			.stream().map(record -> {
-				MyDirectMemberDto entity = new MyDirectMemberDto();
-				entity.setUserId(record.getUserId());
-				entity.setAccount(record.getAccount());
-				entity.setGameLevel(effectiveLevel(record));
-//				entity.setNodeLevel(record.getNodeLevel());
-				entity.setSubNum(record.getSubNum());
-				entity.setUmbrellaNum(record.getUmbrellaNum());
-//				entity.setNodeTeamPerformance(record.getNodeTeamPerformance());
-//				entity.setSubNodePerformance(record.getSubNodePerformance());
+		List<MyDirectMemberDto> result =new ArrayList<>();
+		if(CollectionUtil.isNotEmpty(userInfoList)){
+			//查询单个人买的业绩
+			Set<Long> directIds = userInfoList.stream().map(UserInfo::getUserId).collect(Collectors.toSet());
+			Map<Long, BigDecimal> userPerformanceMap = nodePackageOrderService.lambdaQuery()
+				.in(NodePackageOrder::getUserId, directIds)
+				.select(NodePackageOrder::getUserId, NodePackageOrder::getOrderValueUsdt)
+				.list().stream().collect(Collectors.toMap(NodePackageOrder::getUserId, NodePackageOrder::getOrderValueUsdt, (k1, k2) -> k2));
+
+			result = userInfoList
+				.stream().map(record -> {
+					MyDirectMemberDto entity = new MyDirectMemberDto();
+					entity.setUserId(record.getUserId());
+					entity.setAccount(record.getAccount());
+					entity.setGameLevel(record.getGameLevel()>record.getMinGameLevel()?record.getGameLevel():record.getMinGameLevel());
+					entity.setNodeLevel(record.getNodeLevel());
+					entity.setSubNum(record.getSubNum());
+					entity.setUmbrellaNodePerformance(userPerformanceMap.getOrDefault(record.getUserId(),BigDecimal.ZERO).add(record.getUmbrellaNodePerformance()));
+					entity.setSubUmbrellaNodePerformance(record.getSubUmbrellaNodePerformance());
+					entity.setUmbrellaNum(record.getUmbrellaNum());
+					entity.setNodeTeamPerformance(record.getNodeTeamPerformance());
+					entity.setSubNodePerformance(record.getSubNodePerformance());
 //				entity.setPerformance(record.getPerformance());
 //				entity.setUmbrellaPerformance(record.getUmbrellaPerformance());
-				entity.setCreateTime(record.getCreateTime());
-				//entity.setCommunityPerformance(record.getCommunityPerformance());
-				return entity;
-			}).collect(Collectors.toList());
+					entity.setCreateTime(record.getCreateTime());
+					//entity.setCommunityPerformance(record.getCommunityPerformance());
+					return entity;
+				}).collect(Collectors.toList());
+		}
+
+
 		PageInfo<MyDirectMemberDto> pageInfo = new PageInfo<>();
 		BeanUtil.copyProperties(userInfoPageInfo, pageInfo);
 		pageInfo.setList(result);
 		return pageInfo;
 	}
+
 
 	/**
 	 * 我的团队数据

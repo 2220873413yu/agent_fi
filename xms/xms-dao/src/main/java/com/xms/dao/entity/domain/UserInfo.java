@@ -155,7 +155,18 @@ public class UserInfo extends BaseXmsEntity {
 	 */
 	private Integer openAiPaidStatus;
 
+	/**
+	 * 团队节点业绩(销售额)
+	 */
+	@Excel(name = "团队节点业绩(销售额)", sort = 7)
+	private BigDecimal umbrellaNodePerformance;
 
+
+	/**
+	 * 直推节点业绩(销售额)
+	 */
+	@Excel(name = "直推节点业绩(销售额)", sort = 7)
+	private BigDecimal subUmbrellaNodePerformance;
 
 
 	/**

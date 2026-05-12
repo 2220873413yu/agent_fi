@@ -150,6 +150,11 @@ public class UserInfo extends BaseXmsEntity {
 	 */
 	private BigDecimal stakeHostingStaticRate;
 
+	/**
+	 * OpenAI聊天扣费状态 0:未扣费 1:已扣费
+	 */
+	private Integer openAiPaidStatus;
+
 
 
 

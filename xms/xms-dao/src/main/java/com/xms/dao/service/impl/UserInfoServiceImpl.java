@@ -64,6 +64,20 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 	/**
 	 * 用户详情
 	 */
+	/**
+	 * 首次开通OpenAI聊天时原子标记用户已扣费。
+	 *
+	 * <p>底层SQL带 open_ai_paid_status=0 条件，调用方通过影响行数判断本次是否需要扣AFI。
+	 * 该方法不直接扣钱包，只负责提供并发安全的一次性扣费标记。</p>
+	 *
+	 * @param userId 用户ID
+	 * @return 1表示本次首次标记成功；0表示用户已扣费或用户不存在
+	 */
+	@Override
+	public int markOpenAiPaidIfUnpaid(Long userId) {
+		return baseMapper.markOpenAiPaidIfUnpaid(userId);
+	}
+
 	@Override
 	public UserInfoBo getUserInfo(Long userId) {
 		UserInfo userInfo = this.lambdaQuery()

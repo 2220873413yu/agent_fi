@@ -2,15 +2,19 @@ package com.xms.app.controller.chat;
 
 import cn.hutool.ai.core.Message;
 import cn.hutool.ai.model.openai.OpenaiService;
+import cn.hutool.core.util.IdUtil;
 import com.xms.app.entity.req.OpenAiActionReq;
 import com.xms.app.service.OpenAiService;
 import com.xms.common.annotation.RepeatSubmit;
 import com.xms.common.config.redis.XmsRedis;
 import com.xms.common.constant.RedisConstant;
+import com.xms.common.constant.SysConstant;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.exception.ServiceException;
 import com.xms.common.result.ResponseCode;
 import com.xms.common.utils.SecurityUtils;
+import com.xms.dao.entity.domain.UserInfo;
+import com.xms.dao.service.UserInfoService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -19,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * OpenAI（ChatGPT 兼容）对话接口。
@@ -33,6 +37,7 @@ public class OpenAiChatController {
 	private final OpenaiService openaiService;
 	private final XmsRedis xmsRedis;
 	private final OpenAiService openAiServiceImpl;
+	private final UserInfoService userInfoService;
 
 	/**
 	 * 付钱币种 开通AI，获取访问凭证，
@@ -45,15 +50,15 @@ public class OpenAiChatController {
 		return ResultPista.success();
 	}
 
-	/**
-	 * 关闭页面，销毁凭证
-	 */
-	@GetMapping("/closeGptAction")
-	@RepeatSubmit
-	public ResultPista closeGptAction() throws Exception {
-		xmsRedis.del(RedisConstant.DbConstant.USER_AI_AGENT + SecurityUtils.getFrontUserId());
-		return ResultPista.success();
-	}
+//	/**
+//	 * 关闭页面，销毁凭证(目前支付了就不会扣费了)
+//	 */
+//	@GetMapping("/closeGptAction")
+//	@RepeatSubmit
+//	public ResultPista closeGptAction() throws Exception {
+//		xmsRedis.del(RedisConstant.DbConstant.USER_AI_AGENT + SecurityUtils.getFrontUserId());
+//		return ResultPista.success();
+//	}
 
 	/**
 	 * 由目前为止的对话组成的消息列表，可以设置role，content。详细参考官方文档
@@ -107,10 +112,31 @@ public class OpenAiChatController {
 			}));
 	}
 
+	/**
+	 * 校验当前登录用户是否拥有OpenAI聊天权限。
+	 *
+	 * <p>Redis key 只是一天有效的临时访问凭证，用来减少每次聊天都查数据库。
+	 * 如果 Redis 凭证过期，则回查 t_user_info.open_ai_paid_status；已扣费用户会自动恢复Redis凭证，
+	 * 未扣费用户才提示先支付费用。</p>
+	 */
 	private void requireAiAgent() {
-		Boolean ok = xmsRedis.hasKey(RedisConstant.DbConstant.USER_AI_AGENT + SecurityUtils.getFrontUserId());
-		if (!Boolean.TRUE.equals(ok)) {
+		Long userId = SecurityUtils.getFrontUserId();
+		String redisKey = RedisConstant.DbConstant.USER_AI_AGENT + userId;
+		Boolean ok = xmsRedis.hasKey(redisKey);
+		if (Boolean.TRUE.equals(ok)) {
+			return;
+		}
+
+		// Redis过期不代表用户未购买，数据库扣费状态才是永久购买依据。
+		UserInfo userInfo = userInfoService.lambdaQuery()
+			.eq(UserInfo::getUserId, userId)
+			.eq(UserInfo::getDeleted, 0)
+			.one();
+		if (userInfo == null || userInfo.getOpenAiPaidStatus() == null || userInfo.getOpenAiPaidStatus() != 1) {
 			throw new ServiceException(ResponseCode.CODE_1075);
 		}
+
+		// 已扣费用户自动恢复临时访问凭证，避免Redis过期后必须重新走开通接口。
+		xmsRedis.set(redisKey, IdUtil.fastUUID(), SysConstant.ONE_LONG, TimeUnit.DAYS);
 	}
 }

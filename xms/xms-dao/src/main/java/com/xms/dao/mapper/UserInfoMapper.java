@@ -8,6 +8,7 @@ import com.xms.dao.entity.vo.ParentUserTaskVo;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -183,4 +184,16 @@ public interface UserInfoMapper extends BaseMapper<UserInfo> {
 	 * @return
 	 */
 	List<BatchUserBo> getBatchUser();
+
+	/**
+	 * 首次开通OpenAI聊天时原子标记用户已扣费。
+	 *
+	 * <p>只有 open_ai_paid_status=0 的用户才会更新成功，调用方通过影响行数判断是否需要扣AFI。
+	 * 这个条件更新用于避免同一用户并发调用开通接口时重复扣费。</p>
+	 *
+	 * @param userId 用户ID
+	 * @return 1表示本次首次标记成功；0表示已标记或用户不存在
+	 */
+	@Update("UPDATE t_user_info SET open_ai_paid_status = 1, update_time = NOW() WHERE user_id = #{userId} AND open_ai_paid_status = 0 AND deleted = 0")
+	int markOpenAiPaidIfUnpaid(@Param("userId") Long userId);
 }

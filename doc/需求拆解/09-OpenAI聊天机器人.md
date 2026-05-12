@@ -22,7 +22,8 @@
 
 - 用户进入聊天前先调用该接口开通 AI 访问凭证。
 - 当前实现会通过业务服务写入用户 AI 访问标识。
-- 当前实现已接入 AFI 代币扣费；用户每次聊天会按业务配置扣减 AFI。
+- 用户首次开通时扣减一次 AFI，扣费状态记录在 `t_user_info.open_ai_paid_status`。
+- 已扣费用户后续再次调用该接口，只刷新 Redis 访问凭证，不再扣 AFI。
 
 ### 关闭 AI 访问凭证
 
@@ -30,7 +31,7 @@
 
 说明：
 
-- 删除当前登录用户的 AI 访问标识。
+- 当前关闭接口已注释；如后续恢复，只删除当前登录用户的 AI 访问标识，不影响已扣费状态。
 
 ### 文本聊天
 
@@ -100,6 +101,13 @@
 - Redis key：`RedisConstant.DbConstant.USER_AI_AGENT + 当前登录用户ID`
 - 未开通时抛出 `ResponseCode.CODE_1075`
 
+扣费逻辑：
+
+- `openGptAction` 使用 `t_user_info.open_ai_paid_status` 做一次性扣费标识。
+- 首次开通时原子更新 `open_ai_paid_status=1`，再扣减用户 AFI 钱包 `valid_num2`。
+- 如果扣费失败，事务回滚，`open_ai_paid_status` 恢复为 `0`。
+- 已扣费用户再次开通只刷新 Redis 凭证。
+
 ## 历史消息口径
 
 当前版本不再使用后端 `t_chat_session`、`t_chat_message` 保存聊天历史。
@@ -133,6 +141,6 @@ openai:
 ## 说明
 
 - 当前聊天能力由 OpenAI API 提供。
-- 每次聊天已扣除用户 AFI 代币费用。
+- 每个用户只在首次开通聊天时扣除一次 AFI 费用。
 - 后端不再保存大量历史消息，避免额外聊天表和数据清理成本。
 - 前端如果需要上下文连续对话，应自行控制携带最近若干条消息。

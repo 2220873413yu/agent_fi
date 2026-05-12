@@ -158,4 +158,12 @@ public interface UserInfoService extends IService<UserInfo> {
 	 * @return
 	 */
 	List<BatchUserBo> getBatchUser();
+
+	/**
+	 * 首次开通OpenAI聊天时原子标记用户已扣费。
+	 *
+	 * @param userId 用户ID
+	 * @return 1表示本次首次标记成功；0表示已标记或用户不存在
+	 */
+	int markOpenAiPaidIfUnpaid(Long userId);
 }

@@ -4,6 +4,7 @@ import cn.hutool.core.date.DateUtil;
 import com.xms.common.constant.ConstantStatic;
 import com.xms.common.constant.ConstantType;
 import com.xms.common.exception.ServiceException;
+import com.xms.common.result.ResponseCode;
 import com.xms.common.utils.uuid.IDUtils;
 import com.xms.dao.domain.StakeHostingAfiAccelerateConfig;
 import com.xms.dao.domain.StakeHostingAfiPledge;
@@ -55,13 +56,13 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 	@Transactional(rollbackFor = Exception.class)
 	public StakeHostingAfiPledge pledgeAfi(Long userId, Long stakeHostingOrderId, Long afiAccelerateConfigId, BigDecimal afiPrice) {
 		if (userId == null) {
-			throw new ServiceException("用户ID不能为空");
+			throw new ServiceException(ResponseCode.CODE_1007);
 		}
 		if (stakeHostingOrderId == null) {
-			throw new ServiceException("托管订单不能为空");
+			throw new ServiceException(ResponseCode.CODE_1277);
 		}
 		if (afiAccelerateConfigId == null) {
-			throw new ServiceException("AFI质押加速套餐不能为空");
+			throw new ServiceException(ResponseCode.CODE_1276);
 		}
 		StakeHostingOrder order = stakeHostingOrderService.lambdaQuery()
 			.eq(StakeHostingOrder::getId, stakeHostingOrderId)
@@ -101,7 +102,7 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 		pledge.setStatus(STATUS_EFFECTIVE);
 		pledge.setCreateTime(now);
 		if (!save(pledge)) {
-			throw new ServiceException("生成AFI质押记录失败");
+			throw new ServiceException(ResponseCode.CODE_1271);
 		}
 
 		boolean updateOrder = stakeHostingOrderService.lambdaUpdate()
@@ -111,7 +112,7 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 			.set(StakeHostingOrder::getUpdateTime, now)
 			.update();
 		if (!updateOrder) {
-			throw new ServiceException("托管订单已绑定AFI加速");
+			throw new ServiceException(ResponseCode.CODE_1272);
 		}
 		return pledge;
 	}
@@ -131,13 +132,13 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 			.eq(StakeHostingAfiAccelerateConfig::getDeleted, 0)
 			.one();
 		if (config == null) {
-			throw new ServiceException("AFI质押加速套餐不存在或未启用");
+			throw new ServiceException(ResponseCode.CODE_1275);
 		}
 		if (config.getPledgeRatio() == null || config.getPledgeRatio().compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("AFI质押比例配置错误");
+			throw new ServiceException(ResponseCode.CODE_1273);
 		}
 		if (config.getAccelerateRate() == null || config.getAccelerateRate().compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("AFI加速倍率配置错误");
+			throw new ServiceException(ResponseCode.CODE_1274);
 		}
 		return config;
 	}

@@ -381,8 +381,8 @@ public class BizUserServiceImpl implements BizUserService {
 					entity.setUmbrellaNodePerformance(userPerformanceMap.getOrDefault(record.getUserId(),BigDecimal.ZERO).add(record.getUmbrellaNodePerformance()));
 					entity.setSubUmbrellaNodePerformance(record.getSubUmbrellaNodePerformance());
 					entity.setUmbrellaNum(record.getUmbrellaNum());
-					entity.setNodeTeamPerformance(record.getNodeTeamPerformance());
-					entity.setSubNodePerformance(record.getSubNodePerformance());
+//					entity.setNodeTeamPerformance(record.getNodeTeamPerformance());
+//					entity.setSubNodePerformance(record.getSubNodePerformance());
 //				entity.setPerformance(record.getPerformance());
 //				entity.setUmbrellaPerformance(record.getUmbrellaPerformance());
 					entity.setCreateTime(record.getCreateTime());
@@ -583,11 +583,19 @@ public class BizUserServiceImpl implements BizUserService {
 		BigDecimal diffRewardAmount = rewardSummary == null ? BigDecimal.ZERO : defaultAmount(rewardSummary.getDiffRewardAmount());
 		BigDecimal sameLevelRewardAmount = rewardSummary == null ? BigDecimal.ZERO : defaultAmount(rewardSummary.getSameLevelRewardAmount());
 		BigDecimal globalDividendAmount = rewardSummary == null ? BigDecimal.ZERO : defaultAmount(rewardSummary.getGlobalDividendAmount());
-
+		BigDecimal directRewardAmount = rewardRecordService.lambdaQuery()
+			.eq(RewardRecord::getUserId, userId)
+			.eq(RewardRecord::getSourceType, 1)
+			.select(RewardRecord::getAmount)
+			.list()
+			.stream()
+			.map(r -> defaultAmount(r.getAmount()))
+			.reduce(BigDecimal.ZERO, BigDecimal::add);
 		MyTeamInfoDto dto = new MyTeamInfoDto();
 		dto.setCurrentLevel(currentLevel);
 		dto.setTargetLevel(targetLevel);
 		dto.setSelfHostingAmount(selfHostingAmount);
+		dto.setDirectRewardAmount(directRewardAmount);
 		dto.setTargetSelfHostingAmount(targetSelfHostingAmount);
 		dto.setSelfHostingNeedAmount(needAmount(selfHostingAmount, targetSelfHostingAmount));
 		dto.setSelfHostingProgress(progressPercent(selfHostingAmount, targetSelfHostingAmount));

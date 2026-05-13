@@ -108,6 +108,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 		userInfoBo.setUmbrellaNum(userInfo.getUmbrellaNum());
 		userInfoBo.setSubNodePerformance(userInfo.getSubNodePerformance());
 		userInfoBo.setNodeTeamPerformance(userInfo.getNodeTeamPerformance());
+		userInfoBo.setOpenAiPaidStatus(userInfo.getOpenAiPaidStatus());
 		//userInfoBo.setUmbrellaPerformance(userInfo.getUmbrellaPerformance());
 		//userInfoBo.setPerformance(userInfo.getPerformance());
 		//userInfoBo.setCommunityPerformance(userInfo.getCommunityPerformance());

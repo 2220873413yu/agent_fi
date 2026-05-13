@@ -84,6 +84,12 @@ public class MyTeamInfoDto {
 	private Integer directUserCount;
 
 	/**
+	 * 直推收益
+	 */
+	@ApiModelProperty(value = "直推收益")
+	private BigDecimal directRewardAmount;
+
+	/**
 	 * 团队收益，等于托管极差奖累计加托管平级奖累计，单位USDT。
 	 */
 	@ApiModelProperty(value = "团队收益，托管极差奖累计+托管平级奖累计")

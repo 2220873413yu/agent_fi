@@ -4,7 +4,7 @@ swagger:
   enabled: false
 server:
   # 服务器的HTTP端口，默认为8080
-  port: 19875
+  port: 18675
   undertow:
     threads:
       # 设置IO线程数, 它主要执行非阻塞的任务,它们会负责多个连接, 默认设置每个CPU核心一个线程
@@ -58,9 +58,9 @@ spring:
     druid:
       # 主库数据源
       master:
-        url: jdbc:mysql://127.0.0.1:3307/xms_agent?useUnicode=true&allowMultiQueries=true&rewriteBatchedStatements=true&useAffectedRows=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&autoReconnectForPools=true&connectTimeout=30000&socketTimeout=60000&useSSL=false&serverTimezone=GMT%2B8
-        username: xmsobj
-        password: Aovi2tazap
+        url: jdbc:mysql://127.0.0.1:3306/xms_agent?useUnicode=true&allowMultiQueries=true&rewriteBatchedStatements=true&useAffectedRows=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&autoReconnectForPools=true&connectTimeout=30000&socketTimeout=60000&useSSL=false&serverTimezone=GMT%2B8
+        username: root
+        password: v3jvO8lK
       # 从库数据源
       slave:
         # 从数据源开关/默认关闭
@@ -112,14 +112,14 @@ spring:
   data:
     redis:
       # 地址
-      host: localhost
+      host: 127.0.0.1
       # 端口，默认为6379
       port: 6379
       # 数据库索引
-      database: 75
+      database: 0
       #username: yuxy
       # 密码
-      password: Lo29zaPf
+      password: fxiabb743
       timeout: 10000
       lettuce:
         pool:
@@ -149,9 +149,9 @@ renegade:
     ##是否启用分布式锁
     enabled: true
     ##将docker脚本部署的redis服务映射为宿主机ip
-    address: redis://localhost:6379
-    password: Lo29zaPf
-    database: 75
+    address: redis://127.0.0.1:6379
+    password: fxiabb743
+    database: 0
   #是否开启MQ管道 启动CLOUD-MQ时一定需要使用这个 @EnableBinding(XmsMQProcessor.class) 关闭mq的时候，使用@EnableBinding
   mq:
     enabled: flase
@@ -240,7 +240,7 @@ coinglass:
 # 对接合约回调md5Key
 lq:
   md5Key: "883c6bc288071f53ff4dd15f856c13e4eddbcc83db32904"
-  baseUrl: "http://127.0.0.1:10086"
+  baseUrl: "http://127.0.0.1:9596"
 
 # df资产划转md5key
 df:
@@ -251,3 +251,9 @@ juExchange:
   #prod  https://www.jucoin.vc
   #  url: https://www.jcwork.net
   url: https://www.bitport.one
+
+# tg机器人消息提醒
+telegram:
+  enabled: true
+  bot-token: ${TELEGRAM_BOT_TOKEN:}
+  chat-id: ${TELEGRAM_CHAT_ID:}

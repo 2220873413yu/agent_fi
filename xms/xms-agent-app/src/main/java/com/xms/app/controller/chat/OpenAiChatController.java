@@ -50,22 +50,23 @@ public class OpenAiChatController {
 		return ResultPista.success();
 	}
 
-//	/**
-//	 * 关闭页面，销毁凭证(目前支付了就不会扣费了)
-//	 */
-//	@GetMapping("/closeGptAction")
-//	@RepeatSubmit
-//	public ResultPista closeGptAction() throws Exception {
-//		xmsRedis.del(RedisConstant.DbConstant.USER_AI_AGENT + SecurityUtils.getFrontUserId());
-//		return ResultPista.success();
-//	}
+	/**
+	 * 关闭页面，销毁凭证(目前支付了就不会扣费了)
+	 */
+	@GetMapping("/closeGptAction")
+	@RepeatSubmit
+	public ResultPista closeGptAction() throws Exception {
+		Long userId = SecurityUtils.getFrontUserId();
+		xmsRedis.del(RedisConstant.DbConstant.USER_AI_AGENT + userId);
+		return ResultPista.success();
+	}
 
 	/**
 	 * 由目前为止的对话组成的消息列表，可以设置role，content。详细参考官方文档
 	 */
 	@PostMapping("/chat")
 	public ResultPista chat(@RequestBody List<Message> messages) {
-		requireAiAgent();
+		//requireAiAgent();
 		return ResultPista.data(openaiService.chat(messages));
 	}
 
@@ -74,7 +75,7 @@ public class OpenAiChatController {
 	 */
 	@PostMapping("/chat/sse")
 	public SseEmitter chatSSe(@RequestBody List<Message> messages) {
-		requireAiAgent();
+		//requireAiAgent();
 		return SseEmitterHelper.createEmitter(60000, emitter ->
 			openaiService.chat(messages, data -> {
 				try {
@@ -91,7 +92,7 @@ public class OpenAiChatController {
 	 */
 	@PostMapping("/chat/image")
 	public ResultPista chatImage(@RequestBody ChatImageReq req) {
-		requireAiAgent();
+		//requireAiAgent();
 		return ResultPista.data(openaiService.chatVision(req.getPrompt(), req.getImages()));
 	}
 
@@ -100,7 +101,7 @@ public class OpenAiChatController {
 	 */
 	@PostMapping(value = "/chat/sse/image", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public SseEmitter chatImageSse(@RequestBody ChatImageReq req) {
-		requireAiAgent();
+		//requireAiAgent();
 		return SseEmitterHelper.createEmitter(60000, emitter ->
 			openaiService.chatVision(req.getPrompt(), req.getImages(), data -> {
 				try {
@@ -126,17 +127,6 @@ public class OpenAiChatController {
 		if (Boolean.TRUE.equals(ok)) {
 			return;
 		}
-
-		// Redis过期不代表用户未购买，数据库扣费状态才是永久购买依据。
-		UserInfo userInfo = userInfoService.lambdaQuery()
-			.eq(UserInfo::getUserId, userId)
-			.eq(UserInfo::getDeleted, 0)
-			.one();
-		if (userInfo == null || userInfo.getOpenAiPaidStatus() == null || userInfo.getOpenAiPaidStatus() != 1) {
-			throw new ServiceException(ResponseCode.CODE_1075);
-		}
-
-		// 已扣费用户自动恢复临时访问凭证，避免Redis过期后必须重新走开通接口。
-		xmsRedis.set(redisKey, IdUtil.fastUUID(), SysConstant.ONE_LONG, TimeUnit.DAYS);
+		throw new ServiceException(ResponseCode.CODE_1075);
 	}
 }

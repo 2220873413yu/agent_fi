@@ -178,6 +178,8 @@ public class ConstantType {
 		public static final int type_36 = 36;
 		//托管全球分红
 		public static final int type_37 = 37;
+		//充值
+		public static final int type_38 = 38;
 		public static final int type_44 = 44;
 	}
 

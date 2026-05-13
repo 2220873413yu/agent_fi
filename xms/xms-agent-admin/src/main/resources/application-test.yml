@@ -7,7 +7,7 @@ logging:
 # 开发环境配置
 server:
   # 服务器的HTTP端口，默认为8080
-  port: 19876
+  port: 18676
   servlet:
     # 应用的访问路径
     context-path: /
@@ -36,10 +36,10 @@ spring:
           # 端口，默认为6379
           port: 6379
           # 密码
-          password: Lo29zaPf
+          password: fxiabb743
           # 连接超时时间
           timeout: 10000
-          database: 75
+          database: 0
           lettuce:
               pool:
                   # 连接池中的最小空闲连接
@@ -56,9 +56,9 @@ spring:
         druid:
             # 主库数据源
             master:
-                url: jdbc:mysql://localhost:3307/xms_agent?useUnicode=true&allowMultiQueries=true&rewriteBatchedStatements=true&useAffectedRows=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&autoReconnectForPools=true&connectTimeout=30000&socketTimeout=60000&useSSL=false&serverTimezone=GMT%2B8
-                username: xmsobj
-                password: Aovi2tazap
+                url: jdbc:mysql://localhost:3306/xms_agent?useUnicode=true&allowMultiQueries=true&rewriteBatchedStatements=true&useAffectedRows=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&autoReconnectForPools=true&connectTimeout=30000&socketTimeout=60000&useSSL=false&serverTimezone=GMT%2B8
+                username: root
+                password: v3jvO8lK
             # 从库数据源
             slave:
                 # 从数据源开关/默认关闭
@@ -127,8 +127,8 @@ renegade:
         enabled: true
         ##将docker脚本部署的redis服务映射为宿主机ip
         address: redis://localhost:6379
-        password: Lo29zaPf
-        database: 75
+        password: fxiabb743
+        database: 0
 #canal中间件配置, binlog只允许row，不允许其他，否则无法解析
 canal:
   #实例，要跟服务端的一一对应
@@ -199,7 +199,7 @@ udun.config:
 # 对接合约回调md5Key
 lq:
   md5Key: "883c6bc288071f53ff4dd15f856c13e4eddbcc83db32904"
-  baseUrl: "http://172.31.36.244:9596"
+  baseUrl: "http://127.0.0.1:9596"
 
 df:
   #获取oort价格url
@@ -211,3 +211,9 @@ juExchange:
   #prod  https://www.jucoin.vc
   #  url: https://www.jcwork.net
   url: https://www.bitport.one
+
+# tg机器人消息提醒
+telegram:
+  enabled: true
+  bot-token: ${TELEGRAM_BOT_TOKEN:}
+  chat-id: ${TELEGRAM_CHAT_ID:}

@@ -57,24 +57,7 @@ public class OpenAiServiceImpl implements OpenAiService {
 	@Transactional(rollbackFor = Exception.class)
 	public int openAiAction(OpenAiActionReq params) {
 		Long userId = SecurityUtils.getFrontUserId();
-
-		// 先用条件更新抢占“首次扣费资格”，避免并发调用时重复扣AFI。
-		int paidRows = userInfoService.markOpenAiPaidIfUnpaid(userId);
-		if (paidRows == 1) {
-			deductOpenAiAfiFee(userId);
-		} else {
-			// 未抢到首次扣费资格时，必须确认用户确实已扣费；避免用户不存在也被错误开通。
-			UserInfo userInfo = userInfoService.lambdaQuery()
-				.eq(UserInfo::getUserId, userId)
-				.one();
-			if (userInfo == null) {
-				throw new ServiceException(ResponseCode.CODE_1007);
-			}
-			if (userInfo.getOpenAiPaidStatus() != 1) {
-				throw new ServiceException(ResponseCode.CODE_1003);
-			}
-		}
-
+		deductOpenAiAfiFee(userId);
 		// 访问凭证仍然按当前业务放Redis一天；已扣费用户再次开通只刷新凭证，不再扣款。
 		xmsRedis.set(RedisConstant.DbConstant.USER_AI_AGENT + userId, IdUtil.fastUUID(), SysConstant.ONE_LONG, TimeUnit.DAYS);
 		return 1;
@@ -94,7 +77,7 @@ public class OpenAiServiceImpl implements OpenAiService {
 			.one();
 
 		BigDecimal payAfiAmount = new BigDecimal(sysParaServiceImpl.getValue(ConstantSys.biz_pay_afi_amount));
-		BigDecimal validNum2 = userMoney == null || userMoney.getValidNum2() == null ? BigDecimal.ZERO : userMoney.getValidNum2();
+		BigDecimal validNum2 = userMoney.getValidNum2();
 		if (validNum2.compareTo(payAfiAmount) < 0) {
 			throw new ServiceException(ResponseCode.CODE_1015);
 		}

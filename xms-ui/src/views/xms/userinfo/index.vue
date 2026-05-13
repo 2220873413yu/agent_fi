@@ -360,12 +360,12 @@
         </template>
       </el-table-column>
 
-      <el-table-column align="center" label="托管业绩" width="170">
+      <el-table-column align="center" label="质押业绩" width="190">
         <template slot-scope="scope">
           <div class="exchange-info" style="text-align: left;">
-            个人: {{ scope.row.performance || 0 }}<br>
-            团队: {{ scope.row.umbrellaPerformance || 0 }}<br>
-            小区: {{ scope.row.communityPerformance || 0 }}<br>
+            个人质押: {{ scope.row.performance || 0 }}<br>
+            团队质押: {{ scope.row.umbrellaPerformance || 0 }}<br>
+            小区质押: {{ scope.row.communityPerformance || 0 }}<br>
             指定收益率: {{ scope.row.stakeHostingStaticRate || 0 }}%
           </div>
         </template>

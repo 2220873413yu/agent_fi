@@ -25,7 +25,7 @@ public class DestroyCallbackBo {
      */
     @NotBlank(message = "hash not null")
     private String hash;
-
+	private String orderNo;
     /**
      * 签名
      */

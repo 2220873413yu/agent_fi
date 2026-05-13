@@ -151,8 +151,8 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 	 * @return 本次应质押 AFI 的等值USDT金额
 	 */
 	private BigDecimal calculateAfiUsdtAmount(BigDecimal stakeUsdtAmount, BigDecimal pledgeRatio) {
-		if (stakeUsdtAmount == null || stakeUsdtAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("托管订单金额错误");
+		if (stakeUsdtAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException(ResponseCode.CODE_1283);
 		}
 		return stakeUsdtAmount.multiply(pledgeRatio)
 			.divide(new BigDecimal("100"), ConstantStatic.newScale, ConstantStatic.roundingModeNew);
@@ -183,32 +183,33 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 			.set(StakeHostingAfiPledge::getUpdateTime, new Date())
 			.update();
 		if (!update) {
-			throw new ServiceException("AFI质押记录已退还");
+			throw new ServiceException(ResponseCode.CODE_1002);
 		}
 		return 1;
 	}
 
 	private void validateOrder(StakeHostingOrder order) {
 		if (order == null) {
-			throw new ServiceException("托管订单不存在");
+			throw new ServiceException(ResponseCode.CODE_1277);
 		}
 		if (StakeHostingOrderServiceImpl.STATUS_RUNNING != order.getStatus()) {
-			throw new ServiceException("只有产出中托管订单可以质押AFI");
+			throw new ServiceException(ResponseCode.CODE_1278);
 		}
-		if (order.getPackageDays() == null || order.getPackageDays() < 30) {
-			throw new ServiceException("只有30天及以上托管套餐可以质押AFI");
+		if (order.getPackageDays() == null || order.getPackageDays() <= 1) {
+			throw new ServiceException(ResponseCode.CODE_1279);
 		}
 		if (AFI_ACCELERATED_YES == nullToZero(order.getAfiAccelerated())) {
-			throw new ServiceException("托管订单已绑定AFI加速");
+
+			throw new ServiceException(ResponseCode.CODE_1280);
 		}
 	}
 
 	private BigDecimal normalizeAfiPrice(BigDecimal price) {
 		if (price == null) {
-			throw new ServiceException("AFI价格未配置");
+			throw new ServiceException(ResponseCode.CODE_1282);
 		}
 		if (price.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("AFI价格必须大于0");
+			throw new ServiceException(ResponseCode.CODE_1281);
 		}
 		return price.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 	}
@@ -229,7 +230,7 @@ public class StakeHostingAfiPledgeServiceImpl extends XmsDataServiceImpl<StakeHo
 			.build();
 		int update = userMoneyService.updateUserMoney(updateUserMoneyVo);
 		if (update != 1) {
-			throw new ServiceException("AFI钱包余额不足或更新失败");
+			throw new ServiceException(ResponseCode.CODE_1015);
 		}
 	}
 

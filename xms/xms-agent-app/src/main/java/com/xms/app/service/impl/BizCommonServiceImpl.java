@@ -12,6 +12,7 @@ import com.xms.app.service.BizCommonService;
 import com.xms.common.config.redis.XmsRedis;
 import com.xms.common.constant.RedisConstant;
 import com.xms.common.exception.ServiceException;
+import com.xms.common.result.ResponseCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -70,11 +71,11 @@ public class BizCommonServiceImpl implements BizCommonService {
 				return lastPrice;
 			} else {
 				log.warn("请求gate获取 coinPair:{} 返回值为空或格式不正确", coinPair);
-				throw new ServiceException("get coin price error");
+				throw new ServiceException(ResponseCode.CODE_1284);
 			}
 		} catch (Exception e) {
 			log.error("请求gate获取 coinPair:{}, 错误: {}", coinPair, e.getMessage());
-			throw new ServiceException("get coin price error");
+			throw new ServiceException(ResponseCode.CODE_1284);
 		}
 	}
 

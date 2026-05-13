@@ -45,13 +45,28 @@
       <el-table-column label="钱包地址" align="center" prop="account" min-width="180" show-overflow-tooltip />
       <el-table-column label="周开始" align="center" prop="weekStartTime" width="150" />
       <el-table-column label="周结束" align="center" prop="weekEndTime" width="150" />
-      <el-table-column label="个人新增" align="center" prop="selfNewPerformance" />
-      <el-table-column label="团队新增" align="center" prop="teamNewPerformance" />
-      <el-table-column label="直推区合计" align="center" prop="totalLinePerformance" />
-      <el-table-column label="最大区" align="center" prop="maxLinePerformance" />
-      <el-table-column label="上周末小区" align="center" prop="previousCommunityPerformance" />
-      <el-table-column label="本周末小区" align="center" prop="currentCommunityPerformance" />
-      <el-table-column label="新增小区" align="center" prop="communityNewPerformance" />
+      <el-table-column label="个人新增积分" align="center" prop="selfIncreasePoints" width="120" />
+      <el-table-column label="个人到期积分" align="center" prop="selfExpirePoints" width="120" />
+      <el-table-column label="个人净新增" align="center" prop="selfNewPerformance" width="120" />
+      <el-table-column label="团队新增积分" align="center" prop="teamIncreasePoints" width="120" />
+      <el-table-column label="团队到期积分" align="center" prop="teamExpirePoints" width="120" />
+      <el-table-column label="团队净新增" align="center" prop="teamNewPerformance" width="120" />
+      <el-table-column label="直推区有效合计" align="center" prop="totalLinePerformance" width="130" />
+      <el-table-column label="最大区有效积分" align="center" prop="maxLinePerformance" width="130" />
+      <el-table-column label="上周末小区" align="center" prop="previousCommunityPerformance" width="120" />
+      <el-table-column label="本周末小区" align="center" prop="currentCommunityPerformance" width="120" />
+      <el-table-column label="小区分红权重" align="center" prop="communityNewPerformance" width="120" />
+      <el-table-column label="个人新增业绩" align="center" prop="selfIncreaseAmount" width="120" />
+      <el-table-column label="个人到期业绩" align="center" prop="selfExpireAmount" width="120" />
+      <el-table-column label="个人净业绩" align="center" prop="selfNetAmount" width="120" />
+      <el-table-column label="团队新增业绩" align="center" prop="teamIncreaseAmount" width="120" />
+      <el-table-column label="团队到期业绩" align="center" prop="teamExpireAmount" width="120" />
+      <el-table-column label="团队净业绩" align="center" prop="teamNetAmount" width="120" />
+      <el-table-column label="直推区业绩合计" align="center" prop="totalLineAmount" width="130" />
+      <el-table-column label="最大区业绩" align="center" prop="maxLineAmount" width="120" />
+      <el-table-column label="上周末小区业绩" align="center" prop="previousCommunityAmount" width="130" />
+      <el-table-column label="本周末小区业绩" align="center" prop="currentCommunityAmount" width="130" />
+      <el-table-column label="小区净新增业绩" align="center" prop="communityNewAmount" width="130" />
       <el-table-column label="状态" align="center" prop="settleStatus" width="100">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.t_stake_hosting_weekly_community_performance_settle_status" :value="scope.row.settleStatus" />

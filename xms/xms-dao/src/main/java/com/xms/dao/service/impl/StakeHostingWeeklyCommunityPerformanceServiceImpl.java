@@ -176,20 +176,68 @@ public class StakeHostingWeeklyCommunityPerformanceServiceImpl
 			if (userInfo == null) {
 				continue;
 			}
-			// 个人/团队净新增积分按本周新增订单积分减本周到期订单积分汇总，使用订单 performance_points 快照。
-			BigDecimal selfNetPoints = nvl(baseMapper.selectSelfWeeklyNetPoints(userId, weekStartTime, weekEndTime));
-			BigDecimal teamNetPoints = nvl(baseMapper.selectTeamWeeklyNetPoints(userId, weekStartTime, weekEndTime));
+			// 本周新增和本周到期分开汇总，方便后台排查“净新增”是由新增订单还是到期订单造成。
+			BigDecimal selfIncreasePoints = nvl(baseMapper.selectSelfWeeklyIncreasePoints(userId, weekStartTime, weekEndTime));
+			BigDecimal selfExpirePoints = nvl(baseMapper.selectSelfWeeklyExpirePoints(userId, weekStartTime, weekEndTime));
+			BigDecimal teamIncreasePoints = nvl(baseMapper.selectTeamWeeklyIncreasePoints(userId, weekStartTime, weekEndTime));
+			BigDecimal teamExpirePoints = nvl(baseMapper.selectTeamWeeklyExpirePoints(userId, weekStartTime, weekEndTime));
+			BigDecimal selfIncreaseAmount = nvl(baseMapper.selectSelfWeeklyIncreaseAmount(userId, weekStartTime, weekEndTime));
+			BigDecimal selfExpireAmount = nvl(baseMapper.selectSelfWeeklyExpireAmount(userId, weekStartTime, weekEndTime));
+			BigDecimal teamIncreaseAmount = nvl(baseMapper.selectTeamWeeklyIncreaseAmount(userId, weekStartTime, weekEndTime));
+			BigDecimal teamExpireAmount = nvl(baseMapper.selectTeamWeeklyExpireAmount(userId, weekStartTime, weekEndTime));
+			// 净新增积分仍按“新增积分 - 到期积分”保存，全球分红最终使用小区净新增积分而不是原始USDT金额。
+			BigDecimal selfNetPoints = selfIncreasePoints.subtract(selfExpirePoints)
+				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			BigDecimal teamNetPoints = teamIncreasePoints.subtract(teamExpirePoints)
+				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			BigDecimal selfNetAmount = selfIncreaseAmount.subtract(selfExpireAmount)
+				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			BigDecimal teamNetAmount = teamIncreaseAmount.subtract(teamExpireAmount)
+				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 			// 先落本周基础汇总，再基于当前订单有效状态重算直推区快照和 community_new_performance。
-			upsertPerformance(userInfo.getUserId(), userInfo.getAccount(), weekStartTime, weekEndTime, selfNetPoints, teamNetPoints);
+			upsertPerformance(userInfo.getUserId(), userInfo.getAccount(), weekStartTime, weekEndTime,
+				selfIncreasePoints, selfExpirePoints, teamIncreasePoints, teamExpirePoints, selfNetPoints, teamNetPoints,
+				selfIncreaseAmount, selfExpireAmount, teamIncreaseAmount, teamExpireAmount, selfNetAmount, teamNetAmount);
 			recalculateCommunityPerformance(userId, weekStartTime, weekEndTime);
 		}
 		return true;
 	}
 
+	/**
+	 * 写入或刷新用户本周个人/团队积分汇总。
+	 *
+	 * <p>新增积分、到期积分、净新增积分会同时保存：新增/到期用于后台排查来源，
+	 * 净新增用于展示本周积分变化；小区有效积分和分红权重会在后续
+	 * {@link #recalculateCommunityPerformance(Long, Long, Long)} 中基于直推区快照重算。</p>
+	 *
+	 * @param userId 用户ID
+	 * @param account 钱包地址快照
+	 * @param weekStartTime 周开始时间，格式yyyyMMddHHmmss
+	 * @param weekEndTime 周结束时间，格式yyyyMMddHHmmss
+	 * @param selfIncreasePoints 本周个人新增积分
+	 * @param selfExpirePoints 本周个人到期积分
+	 * @param teamIncreasePoints 本周团队新增积分
+	 * @param teamExpirePoints 本周团队到期积分
+	 * @param selfNetPoints 本周个人净新增积分
+	 * @param teamNetPoints 本周团队净新增积分
+	 * @param selfIncreaseAmount 本周个人新增托管业绩，单位USDT
+	 * @param selfExpireAmount 本周个人到期托管业绩，单位USDT
+	 * @param teamIncreaseAmount 本周团队新增托管业绩，单位USDT
+	 * @param teamExpireAmount 本周团队到期托管业绩，单位USDT
+	 * @param selfNetAmount 本周个人净新增托管业绩，单位USDT
+	 * @param teamNetAmount 本周团队净新增托管业绩，单位USDT
+	 */
 	private void upsertPerformance(Long userId, String account, Long weekStartTime, Long weekEndTime,
-								   BigDecimal selfAmount, BigDecimal teamAmount) {
+								   BigDecimal selfIncreasePoints, BigDecimal selfExpirePoints,
+								   BigDecimal teamIncreasePoints, BigDecimal teamExpirePoints,
+								   BigDecimal selfNetPoints, BigDecimal teamNetPoints,
+								   BigDecimal selfIncreaseAmount, BigDecimal selfExpireAmount,
+								   BigDecimal teamIncreaseAmount, BigDecimal teamExpireAmount,
+								   BigDecimal selfNetAmount, BigDecimal teamNetAmount) {
 		baseMapper.upsertWeeklyPerformance(userId, account, weekStartTime, weekEndTime,
-			nvl(selfAmount), nvl(teamAmount));
+			nvl(selfIncreasePoints), nvl(selfExpirePoints), nvl(teamIncreasePoints), nvl(teamExpirePoints),
+			nvl(selfNetPoints), nvl(teamNetPoints), nvl(selfIncreaseAmount), nvl(selfExpireAmount),
+			nvl(teamIncreaseAmount), nvl(teamExpireAmount), nvl(selfNetAmount), nvl(teamNetAmount));
 	}
 
 	/**
@@ -211,7 +259,8 @@ public class StakeHostingWeeklyCommunityPerformanceServiceImpl
 			.list();
 		if (CollectionUtil.isEmpty(directUsers)) {
 			// 无直推用户无法形成小区，清空本周直推区快照和周新增小区业绩。
-			updateCommunity(userId, weekStartTime, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+			updateCommunity(userId, weekStartTime, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+				BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 			return;
 		}
 		// 上周末快照使用本周开始前一秒，代表本周开始前已经存在的有效小区积分。
@@ -221,30 +270,47 @@ public class StakeHostingWeeklyCommunityPerformanceServiceImpl
 		// 周新增小区业绩允许为负数；负数只做记录，全球分红发放时不会参与分母。
 		BigDecimal communityDelta = current.community.subtract(previous.community)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		BigDecimal communityAmountDelta = current.communityAmount.subtract(previous.communityAmount)
+			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 		// 保存直推区总积分、最大区积分、上周/本周小区快照和最终周新增小区业绩。
-		updateCommunity(userId, weekStartTime, current.total, current.max, previous.community, current.community, communityDelta);
+		updateCommunity(userId, weekStartTime, current.total, current.max, previous.community, current.community, communityDelta,
+			current.totalAmount, current.maxAmount, previous.communityAmount, current.communityAmount, communityAmountDelta);
 	}
 
 	private LineSnapshot calculateLineSnapshot(List<UserInfo> directUsers, Long snapshotTime) {
 		BigDecimal total = BigDecimal.ZERO;
 		BigDecimal max = BigDecimal.ZERO;
+		BigDecimal totalAmount = BigDecimal.ZERO;
+		BigDecimal maxAmount = BigDecimal.ZERO;
 		int effectiveLineCount = 0;
+		int effectiveAmountLineCount = 0;
 		for (UserInfo directUser : directUsers) {
 			BigDecimal linePoints = nvl(baseMapper.selectLineValidPoints(directUser.getUserId(), snapshotTime));
+			BigDecimal lineAmount = nvl(baseMapper.selectLineValidAmount(directUser.getUserId(), snapshotTime));
 			if (linePoints.compareTo(BigDecimal.ZERO) > 0) {
 				effectiveLineCount++;
 			}
+			if (lineAmount.compareTo(BigDecimal.ZERO) > 0) {
+				effectiveAmountLineCount++;
+			}
 			total = total.add(linePoints);
+			totalAmount = totalAmount.add(lineAmount);
 			if (linePoints.compareTo(max) > 0) {
 				max = linePoints;
 			}
+			if (lineAmount.compareTo(maxAmount) > 0) {
+				maxAmount = lineAmount;
+			}
 		}
 		BigDecimal community = effectiveLineCount <= 1 ? BigDecimal.ZERO : total.subtract(max);
-		return new LineSnapshot(total, max, community);
+		BigDecimal communityAmount = effectiveAmountLineCount <= 1 ? BigDecimal.ZERO : totalAmount.subtract(maxAmount);
+		return new LineSnapshot(total, max, community, totalAmount, maxAmount, communityAmount);
 	}
 
 	private void updateCommunity(Long userId, Long weekStartTime, BigDecimal total, BigDecimal max,
-								 BigDecimal previousCommunity, BigDecimal currentCommunity, BigDecimal communityDelta) {
+								 BigDecimal previousCommunity, BigDecimal currentCommunity, BigDecimal communityDelta,
+								 BigDecimal totalAmount, BigDecimal maxAmount, BigDecimal previousCommunityAmount,
+								 BigDecimal currentCommunityAmount, BigDecimal communityAmountDelta) {
 		lambdaUpdate()
 			.eq(StakeHostingWeeklyCommunityPerformance::getUserId, userId)
 			.eq(StakeHostingWeeklyCommunityPerformance::getWeekStartTime, weekStartTime)
@@ -253,6 +319,11 @@ public class StakeHostingWeeklyCommunityPerformanceServiceImpl
 			.set(StakeHostingWeeklyCommunityPerformance::getPreviousCommunityPerformance, previousCommunity)
 			.set(StakeHostingWeeklyCommunityPerformance::getCurrentCommunityPerformance, currentCommunity)
 			.set(StakeHostingWeeklyCommunityPerformance::getCommunityNewPerformance, communityDelta)
+			.set(StakeHostingWeeklyCommunityPerformance::getTotalLineAmount, totalAmount)
+			.set(StakeHostingWeeklyCommunityPerformance::getMaxLineAmount, maxAmount)
+			.set(StakeHostingWeeklyCommunityPerformance::getPreviousCommunityAmount, previousCommunityAmount)
+			.set(StakeHostingWeeklyCommunityPerformance::getCurrentCommunityAmount, currentCommunityAmount)
+			.set(StakeHostingWeeklyCommunityPerformance::getCommunityNewAmount, communityAmountDelta)
 			.set(StakeHostingWeeklyCommunityPerformance::getUpdateTime, new Date())
 			.update();
 	}
@@ -417,11 +488,18 @@ public class StakeHostingWeeklyCommunityPerformanceServiceImpl
 		private final BigDecimal total;
 		private final BigDecimal max;
 		private final BigDecimal community;
+		private final BigDecimal totalAmount;
+		private final BigDecimal maxAmount;
+		private final BigDecimal communityAmount;
 
-		private LineSnapshot(BigDecimal total, BigDecimal max, BigDecimal community) {
+		private LineSnapshot(BigDecimal total, BigDecimal max, BigDecimal community,
+							 BigDecimal totalAmount, BigDecimal maxAmount, BigDecimal communityAmount) {
 			this.total = total;
 			this.max = max;
 			this.community = community;
+			this.totalAmount = totalAmount;
+			this.maxAmount = maxAmount;
+			this.communityAmount = communityAmount;
 		}
 	}
 }

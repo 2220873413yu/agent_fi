@@ -217,24 +217,24 @@ public class IndexDataServiceImpl implements IndexDataService {
 				new QueryWrapper<Withdrawal>()
 					.select("IFNULL(SUM(change_balance),0) AS change_balance")
 					.eq("status", 3)
-					.eq("coin_type", 1),
+					.eq("coin_type", ConstantType.user_money_coin_type.type_1),
 				false
 			);
 			//累计提现USDT
 			BigDecimal v32 = usdtWdwSum == null || usdtWdwSum.getChangeBalance() == null
 				? BigDecimal.ZERO
 				: usdtWdwSum.getChangeBalance();
-			Withdrawal dfcWdwSum = withdrawalService.getOne(
+			Withdrawal afiWdwSum = withdrawalService.getOne(
 				new QueryWrapper<Withdrawal>()
 					.select("IFNULL(SUM(change_balance),0) AS change_balance")
 					.eq("status", 3)
-					.eq("coin_type", 2),
+					.eq("coin_type", ConstantType.user_money_coin_type.type_2),
 				false
 			);
-			//累计提现DFC
-			BigDecimal v33 = dfcWdwSum == null || dfcWdwSum.getChangeBalance() == null
+			//累计提现AFI
+			BigDecimal v33 = afiWdwSum == null || afiWdwSum.getChangeBalance() == null
 				? BigDecimal.ZERO
-				: dfcWdwSum.getChangeBalance();
+				: afiWdwSum.getChangeBalance();
 			Withdrawal oortWdwSum = withdrawalService.getOne(
 				new QueryWrapper<Withdrawal>()
 					.select("IFNULL(SUM(change_balance),0) AS change_balance")

@@ -171,7 +171,7 @@ public class IndexDataPanelVo {
 	private BigDecimal v32 = BigDecimal.ZERO;
 
 	/**
-	 * 累计提现DFC
+	 * 累计提现AFI
 	 */
 	private BigDecimal v33 = BigDecimal.ZERO;
 

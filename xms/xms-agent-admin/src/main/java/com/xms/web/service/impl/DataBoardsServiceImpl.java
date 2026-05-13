@@ -4,6 +4,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.extra.spring.SpringUtil;
 import com.xms.common.config.redis.XmsRedis;
 import com.xms.common.constant.ConstantStatic;
+import com.xms.common.constant.ConstantType;
 import com.xms.common.constant.RedisConstant;
 import com.xms.common.constant.SysConstant;
 import com.xms.common.thread.asyncTool.AsyncPlus;
@@ -294,18 +295,25 @@ public class DataBoardsServiceImpl implements DataBoardsService {
 			.build();
 	}
 
+	/**
+	 * 统计后台首页近7天提现趋势图数据。
+	 *
+	 * <p>当前图表只展示USDT和AFI两条提现曲线：`coin_type=1`累计到`withdrawUsdt`，
+	 * `coin_type=2`累计到`withdrawAfi`。缓存key使用`:v2`后缀，避免读取历史只包含USDT或旧DFC字段的缓存结构。</p>
+	 *
+	 * @return 异步任务包装结果，包含key日期列表、lineType币种列表、withdrawUsdt和withdrawAfi数据
+	 */
 	private WorkerWrapper<Long, Map<String, Object>> getLineWdwChartData() {
 		return new WorkerWrapper.Builder<Long, Map<String, Object>>()
 			.id("6")
 			.worker((Long userId, Map<String, WorkerWrapper> allWrappers) -> {
 				Map<String, Object> realData = new HashMap<>(4);
 				String yes = DateUtil.formatDate(DateUtil.yesterday());
-				Map<String, Object> yesData = xmsRedis.get(RedisConstant.USER_WITHDRAW_GROUP + yes, () -> {
+				// 昨天以前的近7天数据走Redis缓存；缓存版本升级到v2，确保返回USDT+AFI结构。
+				Map<String, Object> yesData = xmsRedis.get(RedisConstant.USER_WITHDRAW_GROUP + yes + ":v2", () -> {
 					Map<String, Object> map = new HashMap<>(8);
 					map.put("withdrawUsdt", null);
-//					map.put("withdrawDfc", null);
-//					map.put("withdrawOort", null);
-//					map.put("withdrawOutputDfc", null);
+					map.put("withdrawAfi", null);
 					map.put("key", null);
 
 					List<Withdrawal> list1 = SpringUtil.getBean(WithdrawalServiceImpl.class).lambdaQuery()
@@ -315,98 +323,70 @@ public class DataBoardsServiceImpl implements DataBoardsService {
 						.list();
 
 					List<BigDecimal> priceUsdt = new ArrayList<>();
-					List<BigDecimal> priceDfc = new ArrayList<>();
-					List<BigDecimal> priceOort = new ArrayList<>();
-					List<BigDecimal> priceOutputDfc = new ArrayList<>();
+					List<BigDecimal> priceAfi = new ArrayList<>();
 					List<String> everyDate = new ArrayList<>();
 					if (!list1.isEmpty()) {
-						//按照日期分组
+						// 按自然日分组后分别累计USDT和AFI提现数量，其他历史币种暂不在本图表展示。
 						TreeMap<String, List<Withdrawal>> temp = new TreeMap<>(list1.stream().collect(Collectors.groupingBy(recharge ->
 							DateUtil.formatDate(recharge.getCreateTime()))));
 						for (Map.Entry<String, List<Withdrawal>> entry : temp.entrySet()) {
 							everyDate.add(entry.getKey());
 							BigDecimal usdtNum = BigDecimal.ZERO;
-							BigDecimal dfcNum = BigDecimal.ZERO;
-							BigDecimal oortNum = BigDecimal.ZERO;
-							BigDecimal outputDfcNum = BigDecimal.ZERO;
+							BigDecimal afiNum = BigDecimal.ZERO;
 							for (Withdrawal withdrawal : entry.getValue()) {
-								if (withdrawal.getCoinType() != null && withdrawal.getCoinType() == 2) {
-									dfcNum = dfcNum.add(withdrawal.getChangeBalance());
-								} else if (withdrawal.getCoinType() != null && withdrawal.getCoinType() == 3) {
-									oortNum = oortNum.add(withdrawal.getChangeBalance());
-								} else if (withdrawal.getCoinType() != null && withdrawal.getCoinType() == 5) {
-									outputDfcNum = outputDfcNum.add(withdrawal.getChangeBalance());
-								} else {
+								if (withdrawal.getCoinType() != null
+									&& withdrawal.getCoinType() == ConstantType.user_money_coin_type.type_1) {
 									usdtNum = usdtNum.add(withdrawal.getChangeBalance());
+								} else if (withdrawal.getCoinType() != null
+									&& withdrawal.getCoinType() == ConstantType.user_money_coin_type.type_2) {
+									afiNum = afiNum.add(withdrawal.getChangeBalance());
 								}
-
-//								if (withdrawal.getCoinType().equals(SysConstant.ONE)) {
-//									usdtNum = usdtNum.add(withdrawal.getChangeBalance());
-//								} else {
-//									poolNum = poolNum.add(withdrawal.getChangeBalance());
-//								}
 							}
 							priceUsdt.add(usdtNum);
-							priceDfc.add(dfcNum);
-							priceOort.add(oortNum);
-							priceOutputDfc.add(outputDfcNum);
+							priceAfi.add(afiNum);
 						}
 						map.put("withdrawUsdt", priceUsdt);
-//						map.put("withdrawDfc", priceDfc);
-//						map.put("withdrawOort", priceOort);
-//						map.put("withdrawOutputDfc", priceOutputDfc);
+						map.put("withdrawAfi", priceAfi);
 						map.put("key", everyDate);
 					}
 					return map;
 				}, RedisConstant.SECONDS_EXPIRE_TIME / SysConstant.TWO, TimeUnit.MINUTES);
 				realData.putAll(yesData);
 
-				//计算今天的
+				// 今天数据不进缓存，每次实时查询后追加到历史日期和两条币种曲线后面。
 				List<Withdrawal> list = SpringUtil.getBean(WithdrawalServiceImpl.class).lambdaQuery()
 					.in(Withdrawal::getStatus, 3)
 					.apply(" create_time >=CURDATE() ").orderByAsc(Withdrawal::getId).list();
 
 				if (list != null && !list.isEmpty()) {
 					List<BigDecimal> priceUsdt = new ArrayList<>();
-//					List<BigDecimal> priceDfc = new ArrayList<>();
-//					List<BigDecimal> priceOort = new ArrayList<>();
-//					List<BigDecimal> priceOutputDfc = new ArrayList<>();
+					List<BigDecimal> priceAfi = new ArrayList<>();
 					List<String> everyDate = new ArrayList<>();
 					if (realData.get("key") != null) {
 						everyDate = (List<String>) realData.get("key");
 						priceUsdt = (List<BigDecimal>) realData.get("withdrawUsdt");
-//						priceDfc = (List<BigDecimal>) realData.get("withdrawDfc");
-//						priceOort = (List<BigDecimal>) realData.get("withdrawOort");
-//						priceOutputDfc = (List<BigDecimal>) realData.get("withdrawOutputDfc");
+						priceAfi = (List<BigDecimal>) realData.get("withdrawAfi");
 					}
 					everyDate.add(DateUtil.formatDate(list.getFirst().getCreateTime()));
 					BigDecimal usdtNum = BigDecimal.ZERO;
-					BigDecimal dfcNum = BigDecimal.ZERO;
-					BigDecimal oortNum = BigDecimal.ZERO;
-					BigDecimal outputDfcNum = BigDecimal.ZERO;
+					BigDecimal afiNum = BigDecimal.ZERO;
 					for (Withdrawal withdrawal : list) {
-						if (withdrawal.getCoinType() != null && withdrawal.getCoinType() == 2) {
-							dfcNum = dfcNum.add(withdrawal.getChangeBalance());
-						} else if (withdrawal.getCoinType() != null && withdrawal.getCoinType() == 3) {
-							oortNum = oortNum.add(withdrawal.getChangeBalance());
-						} else if (withdrawal.getCoinType() != null && withdrawal.getCoinType() == 5) {
-							outputDfcNum = outputDfcNum.add(withdrawal.getChangeBalance());
-						} else {
+						if (withdrawal.getCoinType() != null
+							&& withdrawal.getCoinType() == ConstantType.user_money_coin_type.type_1) {
 							usdtNum = usdtNum.add(withdrawal.getChangeBalance());
+						} else if (withdrawal.getCoinType() != null
+							&& withdrawal.getCoinType() == ConstantType.user_money_coin_type.type_2) {
+							afiNum = afiNum.add(withdrawal.getChangeBalance());
 						}
 					}
 					priceUsdt.add(usdtNum);
-//					priceDfc.add(dfcNum);
-//					priceOort.add(oortNum);
-//					priceOutputDfc.add(outputDfcNum);
+					priceAfi.add(afiNum);
 					realData.put("withdrawUsdt", priceUsdt);
-//					realData.put("withdrawDfc", priceDfc);
-//					realData.put("withdrawOort", priceOort);
-//					realData.put("withdrawOutputDfc", priceOutputDfc);
+					realData.put("withdrawAfi", priceAfi);
 					realData.put("key", everyDate);
 				}
-				realData.put("lineType", Arrays.asList("USDT"));
-				//realData.put("lineType", Arrays.asList("USDT", "DFC", "OORT", "产出DFC"));
+				// 前端BarChart按lineType数组从withdrawUsdt/withdrawAfi中取对应数据渲染多条柱状线。
+				realData.put("lineType", Arrays.asList("USDT", "AFI"));
 				return realData;
 			})
 			.param(SecurityUtils.getUserId())

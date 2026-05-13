@@ -199,11 +199,15 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	/**
 	 * 每周发放托管全球分红。
 	 *
-	 * <p>当前先按用户现有小区业绩作为权重，后续每周新增业绩快照确认后再替换权重来源。</p>
+	 * <p>102任务按上一自然周的周新增小区业绩快照发放USDT全球分红：
+	 * 先读取当前全球分红奖池余额生成分红批次，再按等级配置 `global_fee_dividend_ratio` 切分等级奖池，
+	 * 同等级内只使用 `community_new_performance > 0` 的用户按占比分配。发放成功后会写分红明细、
+	 * 增加用户USDT钱包、写RewardRecord、扣减奖池余额并标记周业绩记录已参与分红。</p>
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public void distributeWeeklyGlobalDividend() {
+		// 1. 102任务按结算日做日级幂等，避免同一天重复执行每周全球分红。
 		String strDate = DateUtil.format(DateUtil.date(), "yyyyMMdd");
 		int settlementDay = Integer.parseInt(strDate);
 		Map<String, Object> task = asyncTaskServiceImpl.getTask(SysConstant.TSK_TYPE_102, strDate);
@@ -211,6 +215,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			log.debug("任务类型102 每周托管全球分红任务已存在跳过");
 			return;
 		}
+		// 2. 读取当前全球分红奖池余额；没有余额时只记录任务完成，不生成批次和明细。
 		BigDecimal poolAmount = stakeHostingGlobalDividendPoolService.getOrInitPool().getBalanceAmount();
 		if (poolAmount == null || poolAmount.compareTo(BigDecimal.ZERO) <= 0) {
 			log.info("托管全球分红：奖池余额为0，跳过发放");
@@ -223,12 +228,19 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		StakeHostingGlobalDividendBatch batch = new StakeHostingGlobalDividendBatch();
 		batch.setBatchNo(batchNo);
 		batch.setSettlementDay(settlementDay);
+		// 3. 任务通常在周日24点/周一0点附近执行，用昨天作为参考日锁定“上一自然周”的统计周期。
 		Date weekReference = DateUtil.offsetDay(now, -1);
+		// 将参考日转为周业绩统一使用的 long 时间格式，例如 20260517235959。
 		Long referenceTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.formatDate(weekReference);
+		// 根据参考日定位本次分红使用的自然周开始时间：周一 00:00:00，格式yyyyMMddHHmmss。
 		Long weekStartTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.weekStartTimeOf(referenceTime);
+		// 根据参考日定位本次分红使用的自然周结束时间：周日 23:59:59，格式yyyyMMddHHmmss。
 		Long weekEndTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.weekEndTimeOf(referenceTime);
+		// 批次表使用 Date 类型展示分红周期，所以把 long 格式的周开始时间转回 Date。
 		Date weekStartDate = DateUtil.parse(String.valueOf(weekStartTime), "yyyyMMddHHmmss");
+		// 批次表使用 Date 类型展示分红周期，所以把 long 格式的周结束时间转回 Date。
 		Date weekEndDate = DateUtil.parse(String.valueOf(weekEndTime), "yyyyMMddHHmmss");
+		// 4. 先创建处理中批次，后续所有明细、钱包发放和奖池扣减都通过 batchNo 串起来追溯。
 		batch.setPeriodStartTime(weekStartDate);
 		batch.setPeriodEndTime(weekEndDate);
 		batch.setPlanAmount(poolAmount);
@@ -238,6 +250,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		batch.setCreateTime(now);
 		stakeHostingGlobalDividendBatchService.save(batch);
 
+		// 5. 按等级分红比例和本周正数小区新增积分生成用户分红明细；这里只计算，不写钱包。
 		List<StakeHostingGlobalDividendDetail> details = buildGlobalDividendDetails(batchNo, poolAmount, weekStartTime);
 		BigDecimal actualAmount = BigDecimal.ZERO;
 		for (StakeHostingGlobalDividendDetail detail : details) {
@@ -246,17 +259,23 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		actualAmount = actualAmount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 		if (actualAmount.compareTo(BigDecimal.ZERO) <= 0) {
 			log.info("托管全球分红：无满足小区业绩权重的用户，batchNo={}", batchNo);
+			// 6. 有奖池但没有可分用户时，批次结束为0发放，不扣奖池，不写分红明细。
 			finishGlobalDividendBatch(batch.getId(), actualAmount, 0, now);
 			addWeeklyTask(strDate);
 			return;
 		}
 
+		// 7. 保存分红明细快照，包含等级分红比例、等级奖池、用户权重和实际奖励金额。
 		stakeHostingGlobalDividendDetailService.saveBatch(details);
+		// 8. 逐笔发放用户USDT全球分红：增加钱包余额并写RewardRecord。
 		for (StakeHostingGlobalDividendDetail detail : details) {
 			grantGlobalDividend(batchNo, detail, now);
 		}
+		// 9. 按实际发放金额扣减全球分红奖池，并写奖池支出流水。
 		stakeHostingGlobalDividendPoolService.expenseWeeklyDividend(batchNo, actualAmount, "task102");
+		// 10. 标记本周参与分红的周业绩记录，写入批次号，避免后续排查不知道哪周记录被哪个批次使用。
 		markWeeklyPerformanceSettled(batchNo, weekStartTime, details, now);
+		// 11. 更新批次为已完成，并在最后写102任务记录，避免中途失败却被标记为已执行。
 		finishGlobalDividendBatch(batch.getId(), actualAmount, details.size(), now);
 		addWeeklyTask(strDate);
 	}
@@ -306,7 +325,21 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		}
 	}
 
+	/**
+	 * 计算本周全球分红明细。
+	 *
+	 * <p>本方法只负责计算并构造明细快照，不写钱包、不扣奖池。计算口径为：
+	 * 先按 `t_user_level_config.global_fee_dividend_ratio` 把本周可分奖池切成等级奖池；
+	 * 再在同等级内，只取 `community_new_performance > 0` 且仍为有效用户的成员，
+	 * 按用户本周正数新增小区业绩占该等级总正数新增小区业绩的比例分配等级奖池。</p>
+	 *
+	 * @param batchNo 本次全球分红批次号
+	 * @param poolAmount 本次计划用于分红的奖池金额，单位USDT
+	 * @param weekStartTime 本次分红对应自然周开始时间，格式yyyyMMddHHmmss
+	 * @return 本次应生成的全球分红明细列表；无可分用户时返回空列表
+	 */
 	private List<StakeHostingGlobalDividendDetail> buildGlobalDividendDetails(String batchNo, BigDecimal poolAmount, Long weekStartTime) {
+		// 1. 读取配置了全球分红占比的F等级；没有等级占比就无法切分等级奖池。
 		List<UserLevelConfig> configs = userLevelConfigService.lambdaQuery()
 			.gt(UserLevelConfig::getLevel, 0)
 			.gt(UserLevelConfig::getGlobalFeeDividendRatio, BigDecimal.ZERO)
@@ -314,6 +347,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		if (CollectionUtil.isEmpty(configs)) {
 			return new ArrayList<>();
 		}
+		// 2. 读取本周正数新增小区业绩记录；0和负数只保留记录，不参与全球分红分母，也不生成明细。
 		List<StakeHostingWeeklyCommunityPerformance> performances = stakeHostingWeeklyCommunityPerformanceService.lambdaQuery()
 			.eq(StakeHostingWeeklyCommunityPerformance::getWeekStartTime, weekStartTime)
 			.eq(StakeHostingWeeklyCommunityPerformance::getDeleted, 0)
@@ -322,8 +356,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		if (CollectionUtil.isEmpty(performances)) {
 			return new ArrayList<>();
 		}
+		// 3. 转成 userId -> 周业绩快照，后续按用户快速取本周正数新增小区业绩。
 		Map<Long, StakeHostingWeeklyCommunityPerformance> performanceMap = performances.stream()
 			.collect(Collectors.toMap(StakeHostingWeeklyCommunityPerformance::getUserId, Function.identity(), (a, b) -> a));
+		// 4. 只允许当前有效用户参与全球分红；有效用户口径为持有未完成托管订单。
 		List<UserInfo> users = userInfoService.lambdaQuery()
 			.eq(UserInfo::getIsValid, 1)
 			.in(UserInfo::getUserId, new ArrayList<>(performanceMap.keySet()))
@@ -331,20 +367,24 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		if (CollectionUtil.isEmpty(users)) {
 			return new ArrayList<>();
 		}
+		// 5. 按用户最终生效F等级分组；同等级用户只在本等级奖池内按权重分配。
 		Map<Integer, List<UserInfo>> userMap = users.stream()
 			.filter(user -> effectiveLevel(user) > 0)
 			.collect(Collectors.groupingBy(this::effectiveLevel));
 		List<StakeHostingGlobalDividendDetail> details = new ArrayList<>();
 		for (UserLevelConfig config : configs) {
+			// 6. 当前等级没有符合条件的用户时，跳过该等级奖池。
 			List<UserInfo> levelUsers = userMap.get(config.getLevel());
 			if (CollectionUtil.isEmpty(levelUsers)) {
 				continue;
 			}
+			// 7. 等级奖池 = 本次奖池总额 × 等级全球分红比例。
 			BigDecimal levelPool = poolAmount.multiply(config.getGlobalFeeDividendRatio())
 				.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 			if (levelPool.compareTo(BigDecimal.ZERO) <= 0) {
 				continue;
 			}
+			// 8. 当前等级分母 = 本等级所有有效用户的正数周新增小区业绩之和。
 			BigDecimal levelPerformance = levelUsers.stream()
 				.map(user -> weeklyCommunityPerformance(performanceMap, user.getUserId()))
 				.reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -352,12 +392,14 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 				continue;
 			}
 			for (UserInfo user : levelUsers) {
+				// 9. 用户分红 = 等级奖池 × 用户周新增小区业绩 / 本等级周新增小区业绩总和。
 				BigDecimal userPerformance = weeklyCommunityPerformance(performanceMap, user.getUserId());
 				BigDecimal rewardAmount = levelPool.multiply(userPerformance)
 					.divide(levelPerformance, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 				if (rewardAmount.compareTo(BigDecimal.ZERO) <= 0) {
 					continue;
 				}
+				// 10. 明细保存本次计算快照，后续等级比例或用户业绩变化不影响历史分红记录。
 				StakeHostingGlobalDividendDetail detail = new StakeHostingGlobalDividendDetail();
 				detail.setBatchNo(batchNo);
 				detail.setUserId(user.getUserId());

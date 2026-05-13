@@ -221,34 +221,16 @@
                   </div>
                   <div class="single-stat-tip">历史累计提现金额</div>
                 </div>
-<!--                <div class="data-item">
-                  <div class="data-label">累计提现DFC</div>
-                  <div class="data-value">
+                <div class="data-item single-stat-item">
+                  <div class="data-label">累计提现AFI</div>
+                  <div class="data-value single-stat-value">
                     <count-to :decimals="getDecimalLen(fromData.v33)"
                               :duration='2000'
                               :endVal='toNumber(fromData.v33)'
                               :startVal='0' />
                   </div>
+                  <div class="single-stat-tip">历史累计提现AFI数量</div>
                 </div>
-                <div class="data-item">
-                  <div class="data-label">累计提现OORT</div>
-                  <div class="data-value">
-                    <count-to :decimals="getDecimalLen(fromData.v34)"
-                              :duration='2000'
-                              :endVal='toNumber(fromData.v34)'
-                              :startVal='0' />
-                  </div>
-                </div>
-
-                <div class="data-item">
-                  <div class="data-label">累计提现产出DFC</div>
-                  <div class="data-value">
-                    <count-to :decimals="getDecimalLen(fromData.v35)"
-                              :duration='2000'
-                              :endVal='toNumber(fromData.v35)'
-                              :startVal='0' />
-                  </div>
-                </div>-->
               </div>
             </div>
           </el-card>

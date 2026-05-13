@@ -64,11 +64,12 @@ export default {
       this.chart = echarts.init(this.$el, 'macarons')
       this.setOptions(this.chartData)
     },
-    setOptions({withdrawEnergyPool, key, lineType, lineTypePool, withdrawUsdt, withdrawDfc, withdrawOort, withdrawOutputDfc} = {}) {
+    setOptions({withdrawEnergyPool, key, lineType, lineTypePool, withdrawUsdt, withdrawAfi, withdrawDfc, withdrawOort, withdrawOutputDfc} = {}) {
       const isMultiLine = Array.isArray(lineType)
       const colorList = ['#E6A23C', '#409EFF', '#67C23A', '#909399']
       const dataMap = {
         USDT: withdrawUsdt || [],
+        AFI: withdrawAfi || [],
         DFC: withdrawDfc || [],
         OORT: withdrawOort || [],
         '产出DFC': withdrawOutputDfc || []

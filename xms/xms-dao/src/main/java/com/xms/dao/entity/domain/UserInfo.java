@@ -247,6 +247,13 @@ public class UserInfo extends BaseXmsEntity {
 	 */
 	private String lastLoginIp;
 
+	/**
+	 * 后台用户备注
+	 */
+	@Excel(name = "备注", sort = 10, width = 40)
+	@ApiModelProperty(value = "后台用户备注")
+	private String remark;
+
 
 
 	/**

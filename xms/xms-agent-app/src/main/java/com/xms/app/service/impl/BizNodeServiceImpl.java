@@ -1,5 +1,6 @@
 package com.xms.app.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.system.SystemUtil;
 import com.xms.app.entity.dto.NodeInfoDTO;
 import com.xms.app.entity.dto.NodePackageOrderDto;
@@ -360,21 +361,22 @@ public class BizNodeServiceImpl implements BizNodeService {
 				asyncDynamicOrderSettlementServiceImpl.sendMessage(orderMsgDOList);
 
 				// Telegram 改为提交后入 Redis Stream，避免回调线程直接等待外部 HTTP。
-				sendNodePurchaseTelegramAsync(packageOrder);
+				sendNodePurchaseTelegramAsync(packageOrder,userInfo.getRemark());
 
 			}
 		});
 		return ResultPista.data("success");
 	}
 
-	private void sendNodePurchaseTelegramAsync(NodePackageOrder packageOrder) {
+	private void sendNodePurchaseTelegramAsync(NodePackageOrder packageOrder,String remark) {
 		// 这里只负责组装推送内容并入队，真正发送由后台 Stream 消费者处理。
 		String address = packageOrder.getAddress();
 		String nodeLevelText = "A" + packageOrder.getPackageLevel() + "节点";
 		String amountText = packageOrder.getOrderValueUsdt() == null
 			? "0"
 			: packageOrder.getOrderValueUsdt().stripTrailingZeros().toPlainString();
-		String text = String.format("备注:%s，购买 %s，%su", address, nodeLevelText, amountText);
+		String remarkText = StrUtil.blankToDefault(remark, "备注");
+		String text = String.format("%s:%s，购买 %s，%su", remarkText, address, nodeLevelText, amountText);
 		TelegramMessageDTO telegramMessageDTO = new TelegramMessageDTO();
 		telegramMessageDTO.setChatId(telegramChatId);
 		telegramMessageDTO.setText(text);

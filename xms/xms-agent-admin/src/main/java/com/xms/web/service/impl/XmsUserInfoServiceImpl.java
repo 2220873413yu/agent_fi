@@ -95,10 +95,14 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 
 
 	/**
-	 * 更新用戶
+	 * 更新后台用户资料。
 	 *
-	 * @param req
-	 * @return
+	 * <p>该方法用于用户管理页面的修改弹框，只更新后台允许维护的字段：
+	 * 管理员保底等级、托管指定收益率、钱包地址、账号/提现状态和后台备注。
+	 * 更新前会校验用户存在、托管指定收益率不能小于0，并校验Google验证码。</p>
+	 *
+	 * @param req 用户修改请求，包含用户ID、状态、等级、提现开关、托管指定收益率和备注
+	 * @return 更新结果
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
@@ -125,6 +129,8 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 		updateUser.setStatus(req.getStatus());
 		//提现状态
 		updateUser.setWithdrawalOpenOrClose(req.getWithdrawalOpenOrClose());
+		//后台备注允许被清空，直接使用前端提交值覆盖。
+		updateUser.setRemark(req.getRemark());
 		//验证码验证
 		sysUserService.pubValidate(req.getAutoCode());
 

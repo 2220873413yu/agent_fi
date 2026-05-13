@@ -404,6 +404,7 @@
       </el-table-column>-->
 <!--      -->
 <!--      <el-table-column label="备注" align="center" prop="mnemonic" />-->
+      <el-table-column align="center" label="备注" prop="remark" show-overflow-tooltip width="180"/>
 
 
 
@@ -511,12 +512,16 @@
           </el-input>
         </el-form-item>
 
-<!--
-        <el-form-item label="备注" prop="mnemonic">
-          <el-input v-model="form.mnemonic"/>
+        <el-form-item label="备注" prop="remark">
+          <el-input
+            v-model="form.remark"
+            :autosize="{ minRows: 3, maxRows: 5 }"
+            maxlength="500"
+            placeholder="请输入后台用户备注"
+            show-word-limit
+            type="textarea"
+          />
         </el-form-item>
-
-        -->
 
 <!--        <el-form-item label="团队流水分润" prop="teamRewardRatio">
           <el-input v-model="form.teamRewardRatio"
@@ -816,6 +821,7 @@ export default {
         email: null,
         loginPwd: null,
         mnemonic: null,
+        remark: null,
         googleKey: null,
         minGameLevel: null,
         adminGameLevel: null,

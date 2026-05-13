@@ -33,6 +33,7 @@
         <result column="update_time" property="updateTime" />
         <result column="withdrawal_open_or_close" property="withdrawalOpenOrClose" />
         <result column="last_login_ip" property="lastLoginIp" />
+        <result column="remark" property="remark" />
         <result column="avatar" property="avatar" />
         <result column="deleted" property="deleted" />
 

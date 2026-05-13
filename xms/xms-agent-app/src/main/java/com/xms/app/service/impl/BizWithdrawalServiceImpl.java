@@ -352,18 +352,19 @@ public class BizWithdrawalServiceImpl implements BizWithdrawalService {
 		}
 
 		// 提现通知放到事务提交后异步入队，避免影响提单主流程。
-		sendWithdrawalTelegramAsync(withdrawal);
+		sendWithdrawalTelegramAsync(withdrawal,userInfo.getRemark());
 
 		return 1;
 	}
 
-	private void sendWithdrawalTelegramAsync(Withdrawal withdrawal) {
+	private void sendWithdrawalTelegramAsync(Withdrawal withdrawal,String remark) {
 		// 这里只入 Redis Stream，Telegram HTTP 发送交给独立消费者慢慢处理。
 		String amountText = withdrawal.getChangeBalance().stripTrailingZeros().toPlainString();
 		String auditText = withdrawal.getStatus().equals(ConstantType.withdrawal_status.type_3)
 			? "已自动审核"
 			: "需人工审核";
-		String text = String.format("备注:%s，发起提现,金额%sUSDT,%s", withdrawal.getAccountNo(), amountText, auditText);
+		String remarkText = StrUtil.blankToDefault(remark, "备注");
+		String text = String.format("%s:%s，发起提现,金额%sUSDT,%s", remarkText,withdrawal.getAccountNo(), amountText, auditText);
 		TelegramMessageDTO telegramMessageDTO = new TelegramMessageDTO();
 		telegramMessageDTO.setChatId(telegramChatId);
 		telegramMessageDTO.setText(text);

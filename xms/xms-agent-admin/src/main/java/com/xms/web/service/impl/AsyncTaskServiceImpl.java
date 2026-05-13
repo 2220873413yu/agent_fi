@@ -274,7 +274,7 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public void getIdoOrder() {
-		//查询所有的用户计算等级
+/*		//查询所有的用户计算等级
 		List<UserInfo> parentUserInfoList = userInfoService.lambdaQuery()
 			.orderByDesc(UserInfo::getUserId)
 			.list();
@@ -290,6 +290,28 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 				stakeOrderService.calculateCommunityPerformance(parentIds);
 			}
 			stakeOrderService.callUserLevel(info, userLevelConfigList);
+		}*/
+		List<NodePackageOrder> nodePackageOrders = nodePackageOrderService.lambdaQuery()
+			.eq(NodePackageOrder::getStatus,1)
+			.list();
+		for (NodePackageOrder nodePackageOrder : nodePackageOrders) {
+			UserInfo userInfo = userInfoService.lambdaQuery()
+				.eq(UserInfo::getUserId, nodePackageOrder.getUserId())
+				.one();
+			List<Long> parentIds = userInfo.getParentIds();
+			if(CollectionUtil.isNotEmpty(parentIds)){
+				//直推
+				userInfoService.lambdaUpdate()
+					.eq(UserInfo::getUserId, userInfo.getInviteUserId())
+					.setSql("sub_umbrella_node_performance = sub_umbrella_node_performance + " + nodePackageOrder.getOrderValueUsdt())
+					.update();
+
+				//团队
+				userInfoService.lambdaUpdate()
+					.in(UserInfo::getUserId, parentIds)
+					.setSql("umbrella_node_performance = umbrella_node_performance + " + nodePackageOrder.getOrderValueUsdt())
+					.update();
+			}
 		}
 	}
 

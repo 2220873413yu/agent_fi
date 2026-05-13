@@ -342,6 +342,15 @@
         </template>
       </el-table-column>
 
+      <el-table-column align="center" label="节点销售业绩" prop="account">
+        <template slot-scope="scope">
+          <div class="exchange-info" style="text-align: left;">
+            直推: {{ scope.row.subUmbrellaNodePerformance }} USDT<br>
+            团队: {{ scope.row.umbrellaNodePerformance }} USDT<br>
+          </div>
+        </template>
+      </el-table-column>
+
       <el-table-column align="center" label="节点业绩" width="150">
         <template slot-scope="scope">
           <div class="exchange-info" style="text-align: left;">

@@ -159,14 +159,35 @@ public class StakeHostingOrder extends BaseEntity {
 	@ApiModelProperty(value = "创建日期，格式yyyyMMdd")
 	private Long performanceStartTime;
 
+	/** 周业绩结束时间，格式yyyyMMddHHmmss */
+	@ApiModelProperty(value = "周业绩结束时间，格式yyyyMMddHHmmss")
 	private Long performanceEndTime;
 
+	/** 周新增小区业绩处理状态 0:未处理 1:队列中 2:处理中 3:已处理 4:处理失败 */
+	@ApiModelProperty(value = "周新增小区业绩处理状态 0:未处理 1:队列中 2:处理中 3:已处理 4:处理失败")
 	private Integer weeklyPerformanceStatus;
 
+	/** 周新增小区业绩跳过/失败原因 */
+	@ApiModelProperty(value = "周新增小区业绩跳过/失败原因")
 	private String weeklyPerformanceSkipReason;
 
+	/** 周新增小区业绩处理时间 */
 	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@ApiModelProperty(value = "周新增小区业绩处理时间")
 	private Date weeklyPerformanceTime;
+
+	/** 周到期小区业绩重算状态 0:未处理 1:队列中 2:处理中 3:已处理 4:处理失败 */
+	@ApiModelProperty(value = "周到期小区业绩重算状态 0:未处理 1:队列中 2:处理中 3:已处理 4:处理失败")
+	private Integer weeklyExpirePerformanceStatus;
+
+	/** 周到期小区业绩重算跳过/失败原因 */
+	@ApiModelProperty(value = "周到期小区业绩重算跳过/失败原因")
+	private String weeklyExpirePerformanceSkipReason;
+
+	/** 周到期小区业绩重算处理时间 */
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@ApiModelProperty(value = "周到期小区业绩重算处理时间")
+	private Date weeklyExpirePerformanceTime;
 
 	/** G7团队新增统计状态 0未处理 1已处理 */
 	@ApiModelProperty(value = "G7团队新增统计状态 0未处理 1已处理")

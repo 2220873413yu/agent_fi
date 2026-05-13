@@ -356,6 +356,7 @@
           <div class="exchange-info" style="text-align: left;">
             个人: {{ scope.row.performance || 0 }}<br>
             团队: {{ scope.row.umbrellaPerformance || 0 }}<br>
+            小区: {{ scope.row.communityPerformance || 0 }}<br>
             指定收益率: {{ scope.row.stakeHostingStaticRate || 0 }}%
           </div>
         </template>

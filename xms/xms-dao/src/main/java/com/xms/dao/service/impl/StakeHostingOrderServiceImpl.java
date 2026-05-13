@@ -54,7 +54,6 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	public static final int WEEKLY_STATUS_QUEUED = 1;
 	public static final int WEEKLY_STATUS_DONE = 3;
 	public static final int G7_STATUS_WAIT = 0;
-	private static final BigDecimal DEFAULT_PERFORMANCE_COEFFICIENT = BigDecimal.ONE;
 	private static final int DAILY_WAIT_PAY_LIMIT = 10;
 	private static final String WEEKLY_SKIP_EXPIRED_IN_WEEK = "本周内到期，不计入周新增业绩";
 
@@ -166,6 +165,9 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.set(StakeHostingOrder::getWeeklyPerformanceStatus, weeklyPrepare.status)
 			.set(StakeHostingOrder::getWeeklyPerformanceSkipReason, weeklyPrepare.skipReason)
 			.set(StakeHostingOrder::getWeeklyPerformanceTime, weeklyPrepare.done ? now : null)
+			.set(StakeHostingOrder::getWeeklyExpirePerformanceStatus, WEEKLY_STATUS_WAIT)
+			.set(StakeHostingOrder::getWeeklyExpirePerformanceSkipReason, null)
+			.set(StakeHostingOrder::getWeeklyExpirePerformanceTime, null)
 			.set(StakeHostingOrder::getG7NewPerformanceStatus, G7_STATUS_WAIT)
 			.set(StakeHostingOrder::getG7ExpirePerformanceStatus, G7_STATUS_WAIT)
 			.set(StakeHostingOrder::getUpdateTime, now)
@@ -205,6 +207,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setWeeklyPerformanceStatus(weeklyPrepare.status);
 		order.setWeeklyPerformanceSkipReason(weeklyPrepare.skipReason);
 		order.setWeeklyPerformanceTime(weeklyPrepare.done ? now : null);
+		order.setWeeklyExpirePerformanceStatus(WEEKLY_STATUS_WAIT);
 		order.setG7NewPerformanceStatus(G7_STATUS_WAIT);
 		order.setG7ExpirePerformanceStatus(G7_STATUS_WAIT);
 		order.setRemark(req.getRemark());
@@ -311,7 +314,8 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 				.one();
 			recalculateOrderId = order == null ? null : order.getId();
 		}
-		sendStakeHostingWeeklyPerformanceAfterCommit(recalculateOrderId);
+		markWeeklyExpirePerformanceQueued(recalculateOrderId);
+		sendStakeHostingWeeklyExpirePerformanceAfterCommit(recalculateOrderId);
 	}
 
 	/**
@@ -422,6 +426,41 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	}
 
 	/**
+	 * 将订单到期周业绩重算状态标记为队列中。
+	 *
+	 * <p>101任务把订单更新为已完成并扣减托管业绩后调用。该状态只表示“到期导致的小区快照重算”，
+	 * 不影响订单生效时的 `weekly_performance_status` 新增处理状态。</p>
+	 *
+	 * @param orderId 已完成的托管订单ID
+	 */
+	private void markWeeklyExpirePerformanceQueued(Long orderId) {
+		if (orderId == null) {
+			return;
+		}
+		lambdaUpdate()
+			.eq(StakeHostingOrder::getId, orderId)
+			.and(wrapper -> wrapper.isNull(StakeHostingOrder::getWeeklyExpirePerformanceStatus)
+				.or()
+				.ne(StakeHostingOrder::getWeeklyExpirePerformanceStatus, WEEKLY_STATUS_DONE))
+			.set(StakeHostingOrder::getWeeklyExpirePerformanceStatus, WEEKLY_STATUS_QUEUED)
+			.set(StakeHostingOrder::getWeeklyExpirePerformanceSkipReason, null)
+			.set(StakeHostingOrder::getWeeklyExpirePerformanceTime, null)
+			.set(StakeHostingOrder::getUpdateTime, new Date())
+			.update();
+	}
+
+	/**
+	 * 事务提交后发送托管订单到期周业绩重算消息。
+	 *
+	 * <p>bizType=7 专门用于订单到期完成后的周小区业绩快照重算，和订单生效时的 bizType=5 新增处理分开。</p>
+	 *
+	 * @param orderId 托管订单ID
+	 */
+	private void sendStakeHostingWeeklyExpirePerformanceAfterCommit(Long orderId) {
+		sendStakeHostingOrderMessageAfterCommit(orderId, 7);
+	}
+
+	/**
 	 * 事务提交后发送托管订单生效后置处理消息。
 	 *
 	 * <p>订单生效后的G7团队新增、周新增、小区业绩和等级重算属于同一条业务链路，只发送一条 bizType=6 消息，
@@ -496,6 +535,18 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		private boolean shouldSend;
 	}
 
+	/**
+	 * 构建托管订单基础快照。
+	 *
+	 * <p>套餐服务费比例和全球分红套餐权重都会在下单/后台拨付时写入订单快照；
+	 * 后续后台调整套餐配置，不影响历史订单的服务费、周新增小区业绩积分和全球分红权重。</p>
+	 *
+	 * @param userInfo 下单用户
+	 * @param hostingPackage 当前命中的托管套餐配置
+	 * @param amount 托管USDT金额
+	 * @param createDay 创建日期，格式yyyyMMdd
+	 * @return 待保存的托管订单
+	 */
 	private StakeHostingOrder buildBaseOrder(UserInfo userInfo, StakeHostingPackage hostingPackage, BigDecimal amount, int createDay) {
 		StakeHostingOrder order = new StakeHostingOrder();
 		order.setOrderNo(IDUtils.getSnowflakeStr());
@@ -507,8 +558,11 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setStakeUsdtAmount(amount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
 		// Snapshot the package service fee ratio at order creation. Future settlement must not be affected by package config changes.
 		order.setServiceFeeRatio(hostingPackage.getServiceFeeRatio() == null ? BigDecimal.ZERO : hostingPackage.getServiceFeeRatio());
-		BigDecimal performanceCoefficient = hostingPackage.getPerformanceCoefficient() == null
-			? DEFAULT_PERFORMANCE_COEFFICIENT : hostingPackage.getPerformanceCoefficient();
+		if (hostingPackage.getPerformanceCoefficient() == null) {
+			throw new ServiceException("托管套餐业绩积分系数未配置");
+		}
+		// 全球分红使用“托管金额 × 套餐权重”的订单积分；1天套餐权重为0，必须按套餐配置快照写入。
+		BigDecimal performanceCoefficient = hostingPackage.getPerformanceCoefficient();
 		order.setPerformanceCoefficient(performanceCoefficient.setScale(4, ConstantStatic.roundingModeNew));
 		order.setPerformancePoints(order.getStakeUsdtAmount().multiply(performanceCoefficient)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
@@ -518,6 +572,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setIsReturnPrincipal(0);
 		order.setAfiAccelerated(0);
 		order.setWeeklyPerformanceStatus(WEEKLY_STATUS_WAIT);
+		order.setWeeklyExpirePerformanceStatus(WEEKLY_STATUS_WAIT);
 		order.setG7NewPerformanceStatus(G7_STATUS_WAIT);
 		order.setG7ExpirePerformanceStatus(G7_STATUS_WAIT);
 		order.setCreateDay(createDay);

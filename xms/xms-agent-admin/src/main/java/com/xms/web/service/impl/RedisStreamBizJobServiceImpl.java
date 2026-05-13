@@ -32,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
@@ -128,16 +129,41 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 				handleBizType3(orderMsgDO);
 			}else if(orderMsgDO.getBizType().equals(4)){
 				//托管订单支付/拨付/结束后重算小区业绩和真实等级
-				handleBizType4(orderMsgDO);
+				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
 			}else if(orderMsgDO.getBizType().equals(5)){
 				//托管订单周新增业绩统计
-				stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(orderMsgDO.getId());
+				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
 			}else if(orderMsgDO.getBizType().equals(6)){
 				//托管订单生效后置处理：G7新增 -> 周新增 -> 小区业绩和等级重算
-				handleStakeHostingEffectiveAfter(orderMsgDO);
+				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
+			}else if(orderMsgDO.getBizType().equals(7)){
+				//托管订单到期周小区业绩重算
+				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
 			}
 		}
 		return 1;
+	}
+
+	/**
+	 * 托管订单后置消息处理入口。
+	 *
+	 * <p>外层 Redis 分发方法保留事务是为了兼容旧的节点/钱包批量业务；托管订单后置处理不复用这个大事务。
+	 * 这里通过 Spring 代理以 NOT_SUPPORTED 挂起外层事务，让 G7、周业绩、到期重算和等级重算各自使用自己的事务边界，
+	 * 避免 bizType=6 这种编排方法把多个步骤塞进同一个长事务里。</p>
+	 *
+	 * @param orderMsgDO Redis 消费到的托管订单消息
+	 */
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
+	public void handleStakeHostingMessageNoTransaction(OrderMsgDO orderMsgDO) {
+		if (orderMsgDO.getBizType().equals(4)) {
+			handleBizType4(orderMsgDO);
+		} else if (orderMsgDO.getBizType().equals(5)) {
+			stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(orderMsgDO.getId());
+		} else if (orderMsgDO.getBizType().equals(6)) {
+			handleStakeHostingEffectiveAfter(orderMsgDO);
+		} else if (orderMsgDO.getBizType().equals(7)) {
+			stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyExpirePerformance(orderMsgDO.getId());
+		}
 	}
 
 	/**

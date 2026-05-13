@@ -12,5 +12,17 @@ import java.util.List;
 public interface IStakeHostingWeeklyCommunityPerformanceService extends XmsDataService<StakeHostingWeeklyCommunityPerformance> {
 	List<StakeHostingWeeklyCommunityPerformance> selectStakeHostingWeeklyCommunityPerformanceList(StakeHostingWeeklyCommunityPerformance performance);
 
+	/**
+	 * 处理托管订单生效时的周新增小区业绩重算。
+	 *
+	 * @param orderId 托管订单ID
+	 */
 	void processOrderWeeklyPerformance(Long orderId);
+
+	/**
+	 * 处理托管订单到期完成时的周小区业绩重算。
+	 *
+	 * @param orderId 托管订单ID
+	 */
+	void processOrderWeeklyExpirePerformance(Long orderId);
 }

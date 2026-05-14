@@ -54,9 +54,20 @@ public class MyDirectMemberDto {
 	private Integer umbrellaNum;
 
 	/**
+	 * 直推业绩(托管量)
+	 */
+	private BigDecimal subPerformance;
+
+	/**
+	 * 团队业绩(质押量)
+	 */
+	private BigDecimal umbrellaPerformance;
+
+	/**
 	 * 团队业绩(销售价值)
 	 */
 	private BigDecimal umbrellaNodePerformance;
+
 
 	/**
 	 * 直推节点业绩(销售额)

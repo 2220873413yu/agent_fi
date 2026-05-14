@@ -828,9 +828,9 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 */
 	private BigDecimal calculateStaticRate(StakeHostingOrder order, int rewardDay, StaticRewardCalculateContext context) {
 		// 临时测试代码：所有托管订单静态日利率固定为1%，测完恢复正式收益率逻辑。
-		if (FORCE_TEST_STATIC_RATE) {
-			return percentToRate(TEST_STATIC_RATE_PERCENT);
-		}
+//		if (FORCE_TEST_STATIC_RATE) {
+//			return percentToRate(TEST_STATIC_RATE_PERCENT);
+//		}
 
 		UserInfo user = context.userMap.get(order.getUserId());
 		if (user != null && user.getStakeHostingStaticRate() != null && user.getStakeHostingStaticRate().compareTo(BigDecimal.ZERO) > 0) {

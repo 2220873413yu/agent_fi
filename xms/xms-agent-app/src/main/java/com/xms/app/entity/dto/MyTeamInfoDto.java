@@ -29,6 +29,12 @@ public class MyTeamInfoDto {
 	@ApiModelProperty(value = "当前个人托管金额")
 	private BigDecimal selfHostingAmount;
 
+
+	/**
+	 * 团队业绩(托管量)
+	 */
+	private BigDecimal umbrellaPerformance;
+
 	/**
 	 * 目标个人托管金额，单位USDT。
 	 */

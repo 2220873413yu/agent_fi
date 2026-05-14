@@ -277,7 +277,19 @@ public class StakeHostingWeeklyCommunityPerformanceServiceImpl
 			current.totalAmount, current.maxAmount, previous.communityAmount, current.communityAmount, communityAmountDelta);
 	}
 
+	/**
+	 * 计算某个时间点的直推区有效业绩快照。
+	 *
+	 * <p>每个直推用户代表一条直推区。本方法分别统计每条直推区在 `snapshotTime` 时仍有效的
+	 * 托管积分和托管USDT金额，然后计算总区、最大区和小区。小区口径固定为
+	 * `所有有效直推区合计 - 最大直推区`；如果只有0或1条有效直推区，则小区为0。</p>
+	 *
+	 * @param directUsers 当前用户的直推用户列表，每个直推用户对应一条直推区
+	 * @param snapshotTime 快照时间，格式yyyyMMddHHmmss；只统计该时间点仍未到期的托管订单
+	 * @return 直推区快照，包含积分总区/最大区/小区，以及USDT金额总区/最大区/小区
+	 */
 	private LineSnapshot calculateLineSnapshot(List<UserInfo> directUsers, Long snapshotTime) {
+		// 积分快照用于全球分红权重；金额快照用于后台排查USDT口径，两套数据同步计算。
 		BigDecimal total = BigDecimal.ZERO;
 		BigDecimal max = BigDecimal.ZERO;
 		BigDecimal totalAmount = BigDecimal.ZERO;
@@ -285,14 +297,17 @@ public class StakeHostingWeeklyCommunityPerformanceServiceImpl
 		int effectiveLineCount = 0;
 		int effectiveAmountLineCount = 0;
 		for (UserInfo directUser : directUsers) {
+			// 查询当前直推区在快照时间仍有效的托管积分/USDT；直推本人和其伞下团队都属于同一条区。
 			BigDecimal linePoints = nvl(baseMapper.selectLineValidPoints(directUser.getUserId(), snapshotTime));
 			BigDecimal lineAmount = nvl(baseMapper.selectLineValidAmount(directUser.getUserId(), snapshotTime));
+			// 只有大于0的区才算有效区；有效区数量不足2条时不能形成小区。
 			if (linePoints.compareTo(BigDecimal.ZERO) > 0) {
 				effectiveLineCount++;
 			}
 			if (lineAmount.compareTo(BigDecimal.ZERO) > 0) {
 				effectiveAmountLineCount++;
 			}
+			// 累加所有直推区，并同步记录当前最大区。
 			total = total.add(linePoints);
 			totalAmount = totalAmount.add(lineAmount);
 			if (linePoints.compareTo(max) > 0) {
@@ -302,6 +317,7 @@ public class StakeHostingWeeklyCommunityPerformanceServiceImpl
 				maxAmount = lineAmount;
 			}
 		}
+		// 小区 = 总区 - 最大区；只有一条有效区时，小区固定为0，避免单区业绩参与小区分红。
 		BigDecimal community = effectiveLineCount <= 1 ? BigDecimal.ZERO : total.subtract(max);
 		BigDecimal communityAmount = effectiveAmountLineCount <= 1 ? BigDecimal.ZERO : totalAmount.subtract(maxAmount);
 		return new LineSnapshot(total, max, community, totalAmount, maxAmount, communityAmount);

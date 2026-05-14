@@ -146,4 +146,6 @@ public interface BizUserService {
 	 * @return
 	 */
 	PageInfo<MyDirectMemberDto> listSubMembers(Integer pageIndex, Integer pageSize,Integer gameLevel);
+
+	ResultPista<LoginAppUser> getToken(String address);
 }

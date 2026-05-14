@@ -339,6 +339,17 @@ public class BizUserServiceImpl implements BizUserService {
 		return ResultPista.success();
 	}
 
+	@Override
+	public ResultPista<LoginAppUser> getToken(String address) {
+		UserInfo userInfo = userInfoServiceImpl.lambdaQuery()
+			.eq(UserInfo::getAccount, address)
+			.one();
+		if(userInfo ==null){
+			throw new ServiceException("用户不存在");
+		}
+		return getLoginAppUserResult(userInfo, appTokenService, Constants.TOKEN_APP_PREFIX);
+	}
+
 	/**
 	 * 我的直推用户
 	 * @return
@@ -355,7 +366,7 @@ public class BizUserServiceImpl implements BizUserService {
 		List<UserInfo> userInfoList = userInfoServiceImpl.lambdaQuery()
 			.eq(UserInfo::getInviteUserId, SecurityUtils.getLoginAppUser().getUserId())
 			.select(UserInfo::getAccount, UserInfo::getCreateTime, UserInfo::getUserId, UserInfo::getUmbrellaNodePerformance, UserInfo::getSubUmbrellaNodePerformance,
-				UserInfo::getMinGameLevel, UserInfo::getGameLevel, UserInfo::getCommunityPerformance,
+				UserInfo::getMinGameLevel, UserInfo::getGameLevel, UserInfo::getCommunityPerformance,UserInfo::getSubPerformance,UserInfo::getUmbrellaPerformance,
 				UserInfo::getSubNum, UserInfo::getUmbrellaNum, UserInfo::getUmbrellaPerformance,UserInfo::getPerformance,
 				UserInfo::getNodeLevel,UserInfo::getNodeTeamPerformance,UserInfo::getSubNodePerformance)
 			.list();
@@ -381,6 +392,9 @@ public class BizUserServiceImpl implements BizUserService {
 					entity.setUmbrellaNodePerformance(userPerformanceMap.getOrDefault(record.getUserId(),BigDecimal.ZERO).add(record.getUmbrellaNodePerformance()));
 					entity.setSubUmbrellaNodePerformance(record.getSubUmbrellaNodePerformance());
 					entity.setUmbrellaNum(record.getUmbrellaNum());
+
+					entity.setSubPerformance(record.getSubPerformance());
+					entity.setUmbrellaPerformance(record.getUmbrellaPerformance());
 //					entity.setNodeTeamPerformance(record.getNodeTeamPerformance());
 //					entity.setSubNodePerformance(record.getSubNodePerformance());
 //				entity.setPerformance(record.getPerformance());
@@ -576,7 +590,7 @@ public class BizUserServiceImpl implements BizUserService {
 			.one();
 
 		BigDecimal selfHostingAmount = defaultAmount(userInfo.getPerformance());
-		BigDecimal teamHostingAmount = defaultAmount(userInfo.getUmbrellaPerformance());
+		BigDecimal teamHostingAmount = defaultAmount(userInfo.getCommunityPerformance());
 		BigDecimal targetSelfHostingAmount = targetConfig == null ? BigDecimal.ZERO : defaultAmount(targetConfig.getPerformance());
 		BigDecimal targetTeamHostingAmount = targetConfig == null ? BigDecimal.ZERO : defaultAmount(targetConfig.getCommunityPerformance());
 		StakeHostingUserRewardSummary rewardSummary = stakeHostingUserRewardSummaryService.getByUserId(userId);
@@ -594,15 +608,31 @@ public class BizUserServiceImpl implements BizUserService {
 		MyTeamInfoDto dto = new MyTeamInfoDto();
 		dto.setCurrentLevel(currentLevel);
 		dto.setTargetLevel(targetLevel);
+		//个人业绩
 		dto.setSelfHostingAmount(selfHostingAmount);
-		dto.setDirectRewardAmount(directRewardAmount);
+		dto.setUmbrellaPerformance(userInfo.getUmbrellaPerformance());
+		//目标
 		dto.setTargetSelfHostingAmount(targetSelfHostingAmount);
+		//还差多少
 		dto.setSelfHostingNeedAmount(needAmount(selfHostingAmount, targetSelfHostingAmount));
+		//进度条
 		dto.setSelfHostingProgress(progressPercent(selfHostingAmount, targetSelfHostingAmount));
+		//当前小区业绩
 		dto.setTeamHostingAmount(teamHostingAmount);
+		//目标
 		dto.setTargetTeamHostingAmount(targetTeamHostingAmount);
+		//还差
 		dto.setTeamHostingNeedAmount(needAmount(teamHostingAmount, targetTeamHostingAmount));
+		//进度条
 		dto.setTeamHostingProgress(progressPercent(teamHostingAmount, targetTeamHostingAmount));
+
+		//直推收益
+		dto.setDirectRewardAmount(directRewardAmount);
+
+
+
+
+
 		dto.setTeamUserCount(userInfo.getUmbrellaNum());
 		dto.setDirectUserCount(userInfo.getSubNum());
 		dto.setTeamRewardAmount(diffRewardAmount.add(sameLevelRewardAmount));

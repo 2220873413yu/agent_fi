@@ -197,7 +197,7 @@ public class UserInfo extends BaseXmsEntity {
 
 
 	/**
-	 * 直推业绩(废弃)
+	 * 直推业绩(托管量)
 	 */
 	//@Excel(name = "直推业绩(废弃)", sort = 13)
 	private BigDecimal subPerformance;

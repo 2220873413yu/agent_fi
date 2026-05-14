@@ -10,6 +10,7 @@ import com.xms.app.entity.dto.MyTeamInfoDto;
 import com.xms.app.entity.vo.*;
 import com.xms.app.service.BizUserService;
 import com.xms.common.annotation.Anonymous;
+import com.xms.common.constant.Constants;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.core.domain.model.xms.LoginAppUser;
 import com.xms.common.utils.SecurityUtils;
@@ -119,6 +120,22 @@ public class UserInfoController {
 		}
 		return ResultPista.data(true);
 	}
+
+
+
+	/**
+	 * 登录接口
+	 *
+	 * @param address
+	 * @return
+	 */
+	@ApiOperation(value = "登录")
+	@GetMapping(value = "/getToken")
+	@Anonymous
+	public ResultPista<LoginAppUser> getToken(String address) {
+		return bizUserService.getToken(address);
+	}
+
 
 	/**
 	 * 登录接口

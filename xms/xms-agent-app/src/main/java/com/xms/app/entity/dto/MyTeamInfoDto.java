@@ -54,25 +54,25 @@ public class MyTeamInfoDto {
 	private BigDecimal selfHostingProgress;
 
 	/**
-	 * 当前团队托管金额，单位USDT。
+	 * 当前小区托管金额，单位USDT。
 	 */
 	@ApiModelProperty(value = "当前团队托管金额")
 	private BigDecimal teamHostingAmount;
 
 	/**
-	 * 目标团队托管金额，单位USDT。
+	 * 目标小区托管金额，单位USDT。
 	 */
 	@ApiModelProperty(value = "目标团队托管金额")
 	private BigDecimal targetTeamHostingAmount;
 
 	/**
-	 * 距离目标团队托管还需金额，单位USDT。
+	 * 距离目标小区托管还需金额，单位USDT。
 	 */
 	@ApiModelProperty(value = "距离目标团队托管还需金额")
 	private BigDecimal teamHostingNeedAmount;
 
 	/**
-	 * 团队托管进度，单位%。
+	 * 小区托管进度，单位%。
 	 */
 	@ApiModelProperty(value = "团队托管进度，单位%")
 	private BigDecimal teamHostingProgress;

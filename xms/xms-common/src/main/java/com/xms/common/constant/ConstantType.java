@@ -180,6 +180,8 @@ public class ConstantType {
 		public static final int type_37 = 37;
 		//充值
 		public static final int type_38 = 38;
+		//质押退还
+		public static final int type_39 = 39;
 		public static final int type_44 = 44;
 	}
 

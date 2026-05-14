@@ -176,8 +176,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		}
 		// 直推、极差、平级奖励统一批量落库：钱包、奖励记录、结算明细和团队收益汇总。
 		flushTeamRewardContext(teamRewardContext);
-		// 本轮所有静态和团队奖励都计算落库后，再统一刷新到期用户状态并触发等级重算，避免中间态影响奖励口径。
-		refreshFinishedUserStateAfterRewards(staticRewardResults);
+		// 本轮所有静态和团队奖励都计算落库后，再统一处理到期订单后置动作，避免中间态影响奖励口径。
+		handleFinishedOrdersAfterRewards(staticRewardResults, now);
 		// 101 每日静态收益任务扣出的服务费不逐单入池，这里按当天累计服务费写一笔全球分红奖池收入流水。
 		stakeHostingGlobalDividendPoolService.incomeDailyServiceFee(rewardDay,
 			dailyServiceFee.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew), "task101");
@@ -476,10 +476,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 *
 	 * <p>主要步骤：</p>
 	 * <p>1. 按当前静态收益率计算本次收益，并叠加已生效 AFI 加速倍率。</p>
-	 * <p>2. 收益入账用户 USDT 钱包，并写入奖励记录。</p>
+	 * <p>2. 构造静态收益结算明细，收益钱包入账和奖励记录由调用方统一批量落库。</p>
 	 * <p>3. 累加订单已发收益和运行天数，更新最近发放日期。</p>
 	 * <p>4. 判断是否回本、是否达到套餐天数。</p>
-	 * <p>5. 订单发满后改为已完成，扣减对应托管业绩，并自动退还绑定的 AFI。</p>
+	 * <p>5. 订单发满后仅标记为已完成；本金退还、托管业绩扣减、AFI退还和等级重算放到本轮奖励全部完成后统一处理。</p>
 	 *
 	 * @param order 本次待发放的产出中托管订单
 	 * @param rewardDay 收益日期，格式yyyyMMdd
@@ -534,40 +534,92 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		if (!stakeHostingOrderService.updateById(update)) {
 			throw new ServiceException("更新托管订单收益失败，orderNo=" + order.getOrderNo());
 		}
-		if (finished) {
-			// 订单完成后扣减用户托管业绩，保持个人/团队托管业绩口径随订单生命周期变化。
-			stakeHostingOrderService.subtractHostingPerformance(order.getUserId(), order.getStakeUsdtAmount(), order.getId());
-			// 若订单绑定AFI质押且未退还，则到期自动退回用户AFI余额并写AFI退还钱包流水。
-			stakeHostingAfiPledgeService.returnPledgeByOrderId(order.getId());
-			// G7静态日利率按每日新增对比计算，订单到期不再写入G7扣减。
-		}
 		// 返回本订单完整静态收益计算结果，调用方统一批量入账静态收益并继续发放团队奖励。
 		return new StaticRewardResult(order, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 			serviceFeeRatio, serviceFee, reward, staticSettlement, finished);
 	}
 
 	/**
-	 * 批量刷新本轮101完成订单用户的有效状态并触发等级重算。
+	 * 统一处理本轮101完成订单的到期后置动作。
 	 *
-	 * <p>刷新和等级重算消息放在静态收益、直推、极差、平级奖励都处理完之后。
-	 * 这样同一用户多笔订单同批次完成时，先按原有等级完成本轮奖励，再基于最终扣减后的业绩统一判断是否降级。</p>
+	 * <p>到期后置动作必须放在静态收益、直推、极差、平级奖励都处理完之后。
+	 * 这样同一用户同时存在1天和30天订单时，1天订单完成不会提前扣减业绩、失效用户或触发降级，
+	 * 从而影响同批次其它订单的奖励判断。</p>
 	 *
 	 * @param results 本轮101任务已计算完成的静态收益结果
+	 * @param now 本次任务执行时间
 	 */
-	private void refreshFinishedUserStateAfterRewards(List<StaticRewardResult> results) {
+	private void handleFinishedOrdersAfterRewards(List<StaticRewardResult> results, Date now) {
 		if (CollectionUtil.isEmpty(results)) {
 			return;
 		}
+		List<StaticRewardResult> finishedResults = results.stream()
+			.filter(result -> result.finished)
+			.collect(Collectors.toList());
+		if (CollectionUtil.isEmpty(finishedResults)) {
+			return;
+		}
+
+		// 用户购买订单到期后需要退还USDT本金；后台拨付订单不是用户支付，不生成本金退还流水。
+		refundFinishedUserPrincipal(finishedResults, now);
+
 		Map<Long, Long> finishedUserOrderMap = new HashMap<>();
-		for (StaticRewardResult result : results) {
-			if (result.finished) {
-				finishedUserOrderMap.putIfAbsent(result.order.getUserId(), result.order.getId());
-			}
+		for (StaticRewardResult result : finishedResults) {
+			StakeHostingOrder order = result.order;
+			// 奖励全部发放完成后再扣减托管业绩，保持本批次奖励资格读取的是订单完成前的口径。
+			stakeHostingOrderService.subtractHostingPerformance(order.getUserId(), order.getStakeUsdtAmount(), order.getId());
+			// AFI加速质押退还沿用原有服务能力；本次只调整USDT本金退还，不改变AFI退还逻辑。
+			stakeHostingAfiPledgeService.returnPledgeByOrderId(order.getId());
+			// G7静态日利率按每日新增对比计算，订单到期不再写入G7扣减；这里只收集用户用于刷新有效状态和等级。
+			finishedUserOrderMap.putIfAbsent(order.getUserId(), order.getId());
 		}
 		for (Map.Entry<Long, Long> entry : finishedUserOrderMap.entrySet()) {
 			stakeHostingOrderService.refreshUserValidByUnfinishedHostingOrder(entry.getKey());
 			stakeHostingOrderService.sendStakeHostingLevelRecalculateAfterCommit(entry.getValue());
 		}
+	}
+
+	/**
+	 * 批量退还本轮到期用户购买订单的USDT本金。
+	 *
+	 * <p>本金退还不是收益奖励，所以只增加用户USDT钱包并写钱包流水，不写 RewardRecord。
+	 * 只有 `source_type=0` 的用户购买订单才退还本金；`source_type=1` 的后台拨付订单不退还。</p>
+	 *
+	 * @param finishedResults 本轮101任务中已经达到套餐天数并完成的订单结果
+	 * @param now 本次任务执行时间
+	 */
+	private void refundFinishedUserPrincipal(List<StaticRewardResult> finishedResults, Date now) {
+		if (CollectionUtil.isEmpty(finishedResults)) {
+			return;
+		}
+		int batchSize = 1000;
+		List<UserMoney> userMoneyList = new ArrayList<>(Math.min(finishedResults.size(), batchSize));
+		for (StaticRewardResult result : finishedResults) {
+			StakeHostingOrder order = result.order;
+			// 只退还用户购买订单本金；后台拨付订单没有真实USDT支付动作，不能生成“质押退还”流水。
+			if (order.getSourceType() == null || order.getSourceType() != StakeHostingOrderServiceImpl.SOURCE_USER) {
+				continue;
+			}
+			// 金额异常时跳过，避免写入0或负数本金退还流水。
+			if (order.getStakeUsdtAmount() == null || order.getStakeUsdtAmount().compareTo(BigDecimal.ZERO) <= 0) {
+				continue;
+			}
+			UserMoney userMoney = new UserMoney();
+			userMoney.setId(order.getUserId());
+			userMoney.setValidNum1(order.getStakeUsdtAmount().setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
+			userMoney.setGtId(IDUtils.getSnowflakeStr());
+			userMoney.setSourceCode(order.getOrderNo());
+			userMoney.setSourceId(order.getUserId());
+			userMoney.setSourceType(ConstantType.user_money_log_source_type.type_39);
+			userMoney.setUpdateTime(now);
+			userMoneyList.add(userMoney);
+			if (userMoneyList.size() >= batchSize) {
+				batchUpdateMoneyValid1(userMoneyList);
+				userMoneyList.clear();
+			}
+		}
+		batchUpdateMoneyValid1(userMoneyList);
+		userMoneyList.clear();
 	}
 
 	/**
@@ -1503,9 +1555,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	/**
 	 * 批量增加用户 USDT 钱包余额。
 	 *
-	 * <p>本方法专供 101 托管奖励批量结算使用，能力对齐 AsyncTaskServiceImpl 中的
+	 * <p>本方法专供 101 托管USDT批量入账使用，覆盖静态收益、团队奖励和用户购买订单到期本金退还。
+	 * 能力对齐 AsyncTaskServiceImpl 中的
 	 * bachUpdateMoneyValid1：每条记录按 userId 更新 t_user_money.valid_num1，并同步写入
-	 * gtId/sourceCode/sourceType/sourceId/updateTime，方便钱包流水追溯奖励来源。</p>
+	 * gtId/sourceCode/sourceType/sourceId/updateTime，方便钱包流水追溯资金来源。</p>
 	 *
 	 * @param userMoneyList 待入账的钱包增量记录，金额取 validNum1，币种为 USDT
 	 */
@@ -1533,8 +1586,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		});
 		if (ArrayUtil.contains(rows, 0)) {
 			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-			log.error("101托管奖励批量更新USDT钱包余额失败，存在未更新的钱包记录");
-			throw new ServiceException("批量发放托管奖励入账失败");
+			log.error("101托管USDT批量更新钱包余额失败，存在未更新的钱包记录");
+			throw new ServiceException("101托管USDT批量入账失败");
 		}
 	}
 

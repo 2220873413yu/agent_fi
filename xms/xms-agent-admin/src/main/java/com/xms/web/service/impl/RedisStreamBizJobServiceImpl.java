@@ -85,9 +85,6 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	private IStakeHostingOrderService stakeHostingOrderService;
 
 	@Autowired
-	private IStakeHostingWeeklyCommunityPerformanceService stakeHostingWeeklyCommunityPerformanceService;
-
-	@Autowired
 	private IStakeHostingDailyTeamPerformanceService stakeHostingDailyTeamPerformanceService;
 
 	@Autowired
@@ -158,11 +155,11 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 		if (orderMsgDO.getBizType().equals(4)) {
 			handleBizType4(orderMsgDO);
 		} else if (orderMsgDO.getBizType().equals(5)) {
-			stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(orderMsgDO.getId());
+			log.info("忽略旧托管周新增业绩消息，orderId={}", orderMsgDO.getId());
 		} else if (orderMsgDO.getBizType().equals(6)) {
 			handleStakeHostingEffectiveAfter(orderMsgDO);
 		} else if (orderMsgDO.getBizType().equals(7)) {
-			stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyExpirePerformance(orderMsgDO.getId());
+			log.info("忽略旧托管到期周业绩消息，orderId={}", orderMsgDO.getId());
 		}
 	}
 
@@ -186,10 +183,6 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 		// 1. G7使用当天团队新增业绩，先按订单用户上级链路累加当天新增USDT。
 		stakeHostingDailyTeamPerformanceService.recordOrderTeamNewAmount(order.getId());
 		// 2. 只有周新增状态为队列中时才处理；本周内到期或已处理的订单不重复初始化周业绩。
-		if (order.getWeeklyPerformanceStatus() != null
-			&& order.getWeeklyPerformanceStatus().equals(StakeHostingOrderServiceImpl.WEEKLY_STATUS_QUEUED)) {
-			stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(order.getId());
-		}
 		// 3. 最后重算小区业绩和真实等级，确保等级判断读取到最新G7/周业绩相关基础数据。
 		stakeHostingOrderService.recalculateStakeHostingLevel(order.getId());
 	}

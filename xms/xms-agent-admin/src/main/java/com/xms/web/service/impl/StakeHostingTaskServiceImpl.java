@@ -15,10 +15,10 @@ import com.xms.dao.domain.StakeHostingDailyTeamPerformance;
 import com.xms.dao.domain.StakeHostingAfiPledge;
 import com.xms.dao.domain.StakeHostingGlobalDividendBatch;
 import com.xms.dao.domain.StakeHostingGlobalDividendDetail;
+import com.xms.dao.domain.StakeHostingGlobalDividendWeightSnapshot;
 import com.xms.dao.domain.StakeHostingOrder;
 import com.xms.dao.domain.StakeHostingRewardSettlement;
 import com.xms.dao.domain.StakeHostingUserRewardSummary;
-import com.xms.dao.domain.StakeHostingWeeklyCommunityPerformance;
 import com.xms.dao.domain.UserLevelConfig;
 import com.xms.dao.entity.domain.UserMoney;
 import com.xms.dao.entity.domain.UserInfo;
@@ -32,15 +32,15 @@ import com.xms.dao.service.IStakeHostingRewardSettlementService;
 import com.xms.dao.service.IStakeHostingGlobalDividendPoolService;
 import com.xms.dao.service.IStakeHostingGlobalDividendBatchService;
 import com.xms.dao.service.IStakeHostingGlobalDividendDetailService;
+import com.xms.dao.service.IStakeHostingGlobalDividendWeightSnapshotService;
 import com.xms.dao.service.IStakeHostingUserRewardSummaryService;
-import com.xms.dao.service.IStakeHostingWeeklyCommunityPerformanceService;
 import com.xms.dao.service.ISysParaService;
 import com.xms.dao.service.IUserLevelConfigService;
 import com.xms.dao.service.UserInfoService;
 import com.xms.dao.service.UserWalletService;
 import com.xms.dao.service.impl.StakeHostingAfiPledgeServiceImpl;
+import com.xms.dao.service.impl.StakeHostingGlobalDividendWeightSnapshotServiceImpl;
 import com.xms.dao.service.impl.StakeHostingOrderServiceImpl;
-import com.xms.dao.service.impl.StakeHostingWeeklyCommunityPerformanceServiceImpl;
 import com.xms.web.service.IAsyncTaskService;
 import com.xms.web.service.IStakeHostingTaskService;
 import lombok.AllArgsConstructor;
@@ -91,7 +91,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	private final IStakeHostingGlobalDividendBatchService stakeHostingGlobalDividendBatchService;
 	private final IStakeHostingGlobalDividendDetailService stakeHostingGlobalDividendDetailService;
 	private final IStakeHostingUserRewardSummaryService stakeHostingUserRewardSummaryService;
-	private final IStakeHostingWeeklyCommunityPerformanceService stakeHostingWeeklyCommunityPerformanceService;
+	private final IStakeHostingGlobalDividendWeightSnapshotService stakeHostingGlobalDividendWeightSnapshotService;
 	private final UserInfoService userInfoService;
 	private final IUserLevelConfigService userLevelConfigService;
 	private final ISysParaService sysParaServiceImpl;
@@ -107,7 +107,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	private static final int SKIP_NO_ACTIVE_ORDER = 2;
 	private static final int GLOBAL_DIVIDEND_BATCH_PROCESSING = 0;
 	private static final int GLOBAL_DIVIDEND_BATCH_FINISHED = 1;
-	private static final int WEEKLY_PERFORMANCE_SETTLED = 2;
+	private static final int GLOBAL_DIVIDEND_WEIGHT_SETTLED = 1;
 	private static final int G7_CALC_STATUS_DONE = 1;
 	private static final int DELETED_NO = 0;
 
@@ -218,6 +218,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		// 2. 读取当前全球分红奖池余额；没有余额时只记录任务完成，不生成批次和明细。
 		BigDecimal poolAmount = stakeHostingGlobalDividendPoolService.getOrInitPool().getBalanceAmount();
 		if (poolAmount == null || poolAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			Date emptyPoolNow = new Date();
+			Date emptyPoolWeekReference = DateUtil.offsetDay(emptyPoolNow, -1);
+			Long emptyPoolReferenceTime = StakeHostingGlobalDividendWeightSnapshotServiceImpl.formatDate(emptyPoolWeekReference);
+			Long emptyPoolWeekStartTime = StakeHostingGlobalDividendWeightSnapshotServiceImpl.weekStartTimeOf(emptyPoolReferenceTime);
+			Long emptyPoolWeekEndTime = StakeHostingGlobalDividendWeightSnapshotServiceImpl.weekEndTimeOf(emptyPoolReferenceTime);
+			stakeHostingGlobalDividendWeightSnapshotService.prepareWeeklySnapshots(emptyPoolWeekStartTime, emptyPoolWeekEndTime);
 			log.info("托管全球分红：奖池余额为0，跳过发放");
 			addWeeklyTask(strDate);
 			return;
@@ -231,11 +237,11 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		// 3. 任务通常在周日24点/周一0点附近执行，用昨天作为参考日锁定“上一自然周”的统计周期。
 		Date weekReference = DateUtil.offsetDay(now, -1);
 		// 将参考日转为周业绩统一使用的 long 时间格式，例如 20260517235959。
-		Long referenceTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.formatDate(weekReference);
+		Long referenceTime = StakeHostingGlobalDividendWeightSnapshotServiceImpl.formatDate(weekReference);
 		// 根据参考日定位本次分红使用的自然周开始时间：周一 00:00:00，格式yyyyMMddHHmmss。
-		Long weekStartTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.weekStartTimeOf(referenceTime);
+		Long weekStartTime = StakeHostingGlobalDividendWeightSnapshotServiceImpl.weekStartTimeOf(referenceTime);
 		// 根据参考日定位本次分红使用的自然周结束时间：周日 23:59:59，格式yyyyMMddHHmmss。
-		Long weekEndTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.weekEndTimeOf(referenceTime);
+		Long weekEndTime = StakeHostingGlobalDividendWeightSnapshotServiceImpl.weekEndTimeOf(referenceTime);
 		// 批次表使用 Date 类型展示分红周期，所以把 long 格式的周开始时间转回 Date。
 		Date weekStartDate = DateUtil.parse(String.valueOf(weekStartTime), "yyyyMMddHHmmss");
 		// 批次表使用 Date 类型展示分红周期，所以把 long 格式的周结束时间转回 Date。
@@ -250,7 +256,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		batch.setCreateTime(now);
 		stakeHostingGlobalDividendBatchService.save(batch);
 
-		// 5. 按等级分红比例和本周正数小区新增积分生成用户分红明细；这里只计算，不写钱包。
+		// 5. 先按结算时刻重建本周全球分红权重快照，再基于正数分红权重生成明细。
+		stakeHostingGlobalDividendWeightSnapshotService.prepareWeeklySnapshots(weekStartTime, weekEndTime);
 		List<StakeHostingGlobalDividendDetail> details = buildGlobalDividendDetails(batchNo, poolAmount, weekStartTime);
 		BigDecimal actualAmount = BigDecimal.ZERO;
 		for (StakeHostingGlobalDividendDetail detail : details) {
@@ -273,8 +280,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		}
 		// 9. 按实际发放金额扣减全球分红奖池，并写奖池支出流水。
 		stakeHostingGlobalDividendPoolService.expenseWeeklyDividend(batchNo, actualAmount, "task102");
-		// 10. 标记本周参与分红的周业绩记录，写入批次号，避免后续排查不知道哪周记录被哪个批次使用。
-		markWeeklyPerformanceSettled(batchNo, weekStartTime, details, now);
+		// 10. 标记本周参与分红的权重快照，写入批次号，避免后续排查不知道哪周记录被哪个批次使用。
+		markWeightSnapshotsSettled(batchNo, weekStartTime, details, now);
 		// 11. 更新批次为已完成，并在最后写102任务记录，避免中途失败却被标记为已执行。
 		finishGlobalDividendBatch(batch.getId(), actualAmount, details.size(), now);
 		addWeeklyTask(strDate);
@@ -347,22 +354,22 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		if (CollectionUtil.isEmpty(configs)) {
 			return new ArrayList<>();
 		}
-		// 2. 读取本周正数新增小区业绩记录；0和负数只保留记录，不参与全球分红分母，也不生成明细。
-		List<StakeHostingWeeklyCommunityPerformance> performances = stakeHostingWeeklyCommunityPerformanceService.lambdaQuery()
-			.eq(StakeHostingWeeklyCommunityPerformance::getWeekStartTime, weekStartTime)
-			.eq(StakeHostingWeeklyCommunityPerformance::getDeleted, 0)
-			.gt(StakeHostingWeeklyCommunityPerformance::getCommunityNewPerformance, BigDecimal.ZERO)
+		// 2. 读取本周正数分红权重快照；0权重只保留快照，不参与全球分红分母，也不生成明细。
+		List<StakeHostingGlobalDividendWeightSnapshot> snapshots = stakeHostingGlobalDividendWeightSnapshotService.lambdaQuery()
+			.eq(StakeHostingGlobalDividendWeightSnapshot::getWeekStartTime, weekStartTime)
+			.eq(StakeHostingGlobalDividendWeightSnapshot::getDeleted, 0)
+			.gt(StakeHostingGlobalDividendWeightSnapshot::getDividendWeight, BigDecimal.ZERO)
 			.list();
-		if (CollectionUtil.isEmpty(performances)) {
+		if (CollectionUtil.isEmpty(snapshots)) {
 			return new ArrayList<>();
 		}
-		// 3. 转成 userId -> 周业绩快照，后续按用户快速取本周正数新增小区业绩。
-		Map<Long, StakeHostingWeeklyCommunityPerformance> performanceMap = performances.stream()
-			.collect(Collectors.toMap(StakeHostingWeeklyCommunityPerformance::getUserId, Function.identity(), (a, b) -> a));
+		// 3. 转成 userId -> 权重快照，后续按用户快速取本周正数分红权重。
+		Map<Long, StakeHostingGlobalDividendWeightSnapshot> snapshotMap = snapshots.stream()
+			.collect(Collectors.toMap(StakeHostingGlobalDividendWeightSnapshot::getUserId, Function.identity(), (a, b) -> a));
 		// 4. 只允许当前有效用户参与全球分红；有效用户口径为持有未完成托管订单。
 		List<UserInfo> users = userInfoService.lambdaQuery()
 			.eq(UserInfo::getIsValid, 1)
-			.in(UserInfo::getUserId, new ArrayList<>(performanceMap.keySet()))
+			.in(UserInfo::getUserId, new ArrayList<>(snapshotMap.keySet()))
 			.list();
 		if (CollectionUtil.isEmpty(users)) {
 			return new ArrayList<>();
@@ -384,18 +391,19 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			if (levelPool.compareTo(BigDecimal.ZERO) <= 0) {
 				continue;
 			}
-			// 8. 当前等级分母 = 本等级所有有效用户的正数周新增小区业绩之和。
-			BigDecimal levelPerformance = levelUsers.stream()
-				.map(user -> weeklyCommunityPerformance(performanceMap, user.getUserId()))
+			// 8. 当前等级分母 = 本等级所有有效用户的正数分红权重之和。
+			BigDecimal levelDividendWeight = levelUsers.stream()
+				.map(user -> dividendWeight(snapshotMap, user.getUserId()))
 				.reduce(BigDecimal.ZERO, BigDecimal::add);
-			if (levelPerformance.compareTo(BigDecimal.ZERO) <= 0) {
+			if (levelDividendWeight.compareTo(BigDecimal.ZERO) <= 0) {
 				continue;
 			}
 			for (UserInfo user : levelUsers) {
-				// 9. 用户分红 = 等级奖池 × 用户周新增小区业绩 / 本等级周新增小区业绩总和。
-				BigDecimal userPerformance = weeklyCommunityPerformance(performanceMap, user.getUserId());
-				BigDecimal rewardAmount = levelPool.multiply(userPerformance)
-					.divide(levelPerformance, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+				// 9. 用户分红 = 等级奖池 * 用户本期分红权重 / 本等级分红权重合计。
+				StakeHostingGlobalDividendWeightSnapshot snapshot = snapshotMap.get(user.getUserId());
+				BigDecimal userDividendWeight = dividendWeight(snapshotMap, user.getUserId());
+				BigDecimal rewardAmount = levelPool.multiply(userDividendWeight)
+					.divide(levelDividendWeight, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 				if (rewardAmount.compareTo(BigDecimal.ZERO) <= 0) {
 					continue;
 				}
@@ -407,8 +415,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 				detail.setRewardLevel(config.getLevel());
 				detail.setLevelDividendRatio(config.getGlobalFeeDividendRatio());
 				detail.setLevelPoolAmount(levelPool);
-				detail.setUserCommunityPerformance(userPerformance);
-				detail.setLevelCommunityPerformance(levelPerformance);
+				detail.setPreviousCommunityWeight(snapshot.getPreviousCommunityWeight());
+				detail.setCommunityWeight(snapshot.getCommunityWeight());
+				detail.setDividendWeight(userDividendWeight);
+				detail.setLevelDividendWeight(levelDividendWeight);
 				detail.setRewardAmount(rewardAmount);
 				detail.setCreateTime(new Date());
 				details.add(detail);
@@ -417,27 +427,42 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		return details;
 	}
 
-	private BigDecimal weeklyCommunityPerformance(Map<Long, StakeHostingWeeklyCommunityPerformance> performanceMap, Long userId) {
-		StakeHostingWeeklyCommunityPerformance performance = performanceMap.get(userId);
-		if (performance == null || performance.getCommunityNewPerformance() == null) {
+	/**
+	 * Reads a user's positive dividend weight from the prepared weekly snapshot map.
+	 *
+	 * @param snapshotMap weekly snapshot map keyed by user id
+	 * @param userId user id
+	 * @return this week's dividend weight, or zero when the user has no positive weight
+	 */
+	private BigDecimal dividendWeight(Map<Long, StakeHostingGlobalDividendWeightSnapshot> snapshotMap, Long userId) {
+		StakeHostingGlobalDividendWeightSnapshot snapshot = snapshotMap.get(userId);
+		if (snapshot == null || snapshot.getDividendWeight() == null) {
 			return BigDecimal.ZERO;
 		}
-		return performance.getCommunityNewPerformance();
+		return snapshot.getDividendWeight();
 	}
 
-	private void markWeeklyPerformanceSettled(String batchNo, Long weekStartTime, List<StakeHostingGlobalDividendDetail> details, Date now) {
+	/**
+	 * Marks weight snapshots that produced actual dividend detail rows as settled.
+	 *
+	 * @param batchNo global dividend batch number
+	 * @param weekStartTime natural week start time in yyyyMMddHHmmss format
+	 * @param details paid detail rows
+	 * @param now task execution time
+	 */
+	private void markWeightSnapshotsSettled(String batchNo, Long weekStartTime, List<StakeHostingGlobalDividendDetail> details, Date now) {
 		if (CollectionUtil.isEmpty(details)) {
 			return;
 		}
 		List<Long> userIds = details.stream()
 			.map(StakeHostingGlobalDividendDetail::getUserId)
 			.collect(Collectors.toList());
-		stakeHostingWeeklyCommunityPerformanceService.lambdaUpdate()
-			.eq(StakeHostingWeeklyCommunityPerformance::getWeekStartTime, weekStartTime)
-			.in(StakeHostingWeeklyCommunityPerformance::getUserId, userIds)
-			.set(StakeHostingWeeklyCommunityPerformance::getSettleStatus, WEEKLY_PERFORMANCE_SETTLED)
-			.set(StakeHostingWeeklyCommunityPerformance::getBatchNo, batchNo)
-			.set(StakeHostingWeeklyCommunityPerformance::getUpdateTime, now)
+		stakeHostingGlobalDividendWeightSnapshotService.lambdaUpdate()
+			.eq(StakeHostingGlobalDividendWeightSnapshot::getWeekStartTime, weekStartTime)
+			.in(StakeHostingGlobalDividendWeightSnapshot::getUserId, userIds)
+			.set(StakeHostingGlobalDividendWeightSnapshot::getSettleStatus, GLOBAL_DIVIDEND_WEIGHT_SETTLED)
+			.set(StakeHostingGlobalDividendWeightSnapshot::getBatchNo, batchNo)
+			.set(StakeHostingGlobalDividendWeightSnapshot::getUpdateTime, now)
 			.update();
 	}
 

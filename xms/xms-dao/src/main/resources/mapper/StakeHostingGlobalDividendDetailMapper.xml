@@ -12,8 +12,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="rewardLevel" column="reward_level" />
         <result property="levelDividendRatio" column="level_dividend_ratio" />
         <result property="levelPoolAmount" column="level_pool_amount" />
-        <result property="userCommunityPerformance" column="user_community_performance" />
-        <result property="levelCommunityPerformance" column="level_community_performance" />
+        <result property="previousCommunityWeight" column="previous_community_weight" />
+        <result property="communityWeight" column="community_weight" />
+        <result property="dividendWeight" column="dividend_weight" />
+        <result property="levelDividendWeight" column="level_dividend_weight" />
         <result property="rewardAmount" column="reward_amount" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
@@ -25,8 +27,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectStakeHostingGlobalDividendDetailVo">
         select id, batch_no, user_id, account, reward_level, level_dividend_ratio,
-               level_pool_amount, user_community_performance, level_community_performance,
-               reward_amount, create_by, create_time, update_by, update_time, remark, deleted
+               level_pool_amount, previous_community_weight, community_weight, dividend_weight,
+               level_dividend_weight, reward_amount, create_by, create_time, update_by, update_time,
+               remark, deleted
         from t_stake_hosting_global_dividend_detail
     </sql>
 

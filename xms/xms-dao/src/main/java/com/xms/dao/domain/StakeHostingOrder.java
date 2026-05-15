@@ -1,6 +1,7 @@
 package com.xms.dao.domain;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -165,28 +166,34 @@ public class StakeHostingOrder extends BaseEntity {
 
 	/** 周新增小区业绩处理状态 0:未处理 1:队列中 2:处理中 3:已处理 4:处理失败 */
 	@ApiModelProperty(value = "周新增小区业绩处理状态 0:未处理 1:队列中 2:处理中 3:已处理 4:处理失败")
+	@TableField(exist = false)
 	private Integer weeklyPerformanceStatus;
 
 	/** 周新增小区业绩跳过/失败原因 */
 	@ApiModelProperty(value = "周新增小区业绩跳过/失败原因")
+	@TableField(exist = false)
 	private String weeklyPerformanceSkipReason;
 
 	/** 周新增小区业绩处理时间 */
 	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
 	@ApiModelProperty(value = "周新增小区业绩处理时间")
+	@TableField(exist = false)
 	private Date weeklyPerformanceTime;
 
 	/** 周到期小区业绩重算状态 0:未处理 1:队列中 2:处理中 3:已处理 4:处理失败 */
 	@ApiModelProperty(value = "周到期小区业绩重算状态 0:未处理 1:队列中 2:处理中 3:已处理 4:处理失败")
+	@TableField(exist = false)
 	private Integer weeklyExpirePerformanceStatus;
 
 	/** 周到期小区业绩重算跳过/失败原因 */
 	@ApiModelProperty(value = "周到期小区业绩重算跳过/失败原因")
+	@TableField(exist = false)
 	private String weeklyExpirePerformanceSkipReason;
 
 	/** 周到期小区业绩重算处理时间 */
 	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
 	@ApiModelProperty(value = "周到期小区业绩重算处理时间")
+	@TableField(exist = false)
 	private Date weeklyExpirePerformanceTime;
 
 	/** G7团队新增统计状态 0未处理 1已处理 */

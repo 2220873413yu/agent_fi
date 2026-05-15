@@ -52,19 +52,21 @@
     </el-row>
 
     <el-table v-loading="loading" :data="detailList">
-      <el-table-column label="批次号" align="center" prop="batchNo" width="180" />
+      <el-table-column label="批次号" align="center" prop="batchNo" width="180" show-overflow-tooltip />
       <el-table-column label="用户ID" align="center" prop="userId" width="100" />
-      <el-table-column label="钱包地址" align="center" prop="account" width="180" />
-      <el-table-column label="奖励等级" align="center" prop="rewardLevel">
+      <el-table-column label="钱包地址" align="center" prop="account" width="180" show-overflow-tooltip />
+      <el-table-column label="奖励等级" align="center" prop="rewardLevel" width="100">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.t_user_info_game_level" :value="scope.row.rewardLevel" />
         </template>
       </el-table-column>
-      <el-table-column label="等级分红比例(%)" align="center" prop="levelDividendRatio" />
-      <el-table-column label="等级奖池金额" align="center" prop="levelPoolAmount" />
-      <el-table-column label="用户小区业绩" align="center" prop="userCommunityPerformance" />
-      <el-table-column label="等级小区业绩总和" align="center" prop="levelCommunityPerformance" />
-      <el-table-column label="分红金额" align="center" prop="rewardAmount" />
+      <el-table-column label="等级分红比例(%)" align="center" prop="levelDividendRatio" width="130" />
+      <el-table-column label="等级奖池金额" align="center" prop="levelPoolAmount" width="120" />
+      <el-table-column label="上期小区权重" align="center" prop="previousCommunityWeight" width="130" />
+      <el-table-column label="本期小区权重" align="center" prop="communityWeight" width="130" />
+      <el-table-column label="本期分红权重" align="center" prop="dividendWeight" width="130" />
+      <el-table-column label="等级分红权重" align="center" prop="levelDividendWeight" width="130" />
+      <el-table-column label="分红金额" align="center" prop="rewardAmount" width="120" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template slot-scope="scope">
           <span>{{ parseTime(scope.row.createTime) }}</span>

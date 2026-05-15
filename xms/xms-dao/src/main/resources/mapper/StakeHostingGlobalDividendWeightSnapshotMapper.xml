@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeHostingGlobalDividendWeightSnapshotMapper">
+
+    <resultMap type="StakeHostingGlobalDividendWeightSnapshot" id="StakeHostingGlobalDividendWeightSnapshotResult">
+        <result property="id" column="id" />
+        <result property="userId" column="user_id" />
+        <result property="account" column="account" />
+        <result property="weekStartTime" column="week_start_time" />
+        <result property="weekEndTime" column="week_end_time" />
+        <result property="totalLineWeight" column="total_line_weight" />
+        <result property="maxLineWeight" column="max_line_weight" />
+        <result property="communityWeight" column="community_weight" />
+        <result property="previousCommunityWeight" column="previous_community_weight" />
+        <result property="dividendWeight" column="dividend_weight" />
+        <result property="settleStatus" column="settle_status" />
+        <result property="batchNo" column="batch_no" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <sql id="selectStakeHostingGlobalDividendWeightSnapshotVo">
+        select id, user_id, account, week_start_time, week_end_time, total_line_weight, max_line_weight,
+               community_weight, previous_community_weight, dividend_weight, settle_status, batch_no,
+               create_by, create_time, update_by, update_time, remark, deleted
+        from t_stake_hosting_global_dividend_weight_snapshot
+    </sql>
+
+    <select id="selectStakeHostingGlobalDividendWeightSnapshotList" parameterType="StakeHostingGlobalDividendWeightSnapshot" resultMap="StakeHostingGlobalDividendWeightSnapshotResult">
+        <include refid="selectStakeHostingGlobalDividendWeightSnapshotVo"/>
+        <where>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="account != null and account != ''"> and account like concat('%', #{account}, '%')</if>
+            <if test="weekStartTime != null"> and week_start_time = #{weekStartTime}</if>
+            <if test="weekEndTime != null"> and week_end_time = #{weekEndTime}</if>
+            <if test="settleStatus != null"> and settle_status = #{settleStatus}</if>
+            <if test="batchNo != null and batchNo != ''"> and batch_no = #{batchNo}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+            and deleted = 0
+        </where>
+        order by week_start_time desc, id desc
+    </select>
+
+    <insert id="upsertWeightSnapshot">
+        insert into t_stake_hosting_global_dividend_weight_snapshot (
+            user_id, account, week_start_time, week_end_time, total_line_weight, max_line_weight,
+            community_weight, previous_community_weight, dividend_weight, settle_status,
+            create_time, update_time, deleted
+        ) values (
+            #{userId}, #{account}, #{weekStartTime}, #{weekEndTime}, #{totalLineWeight}, #{maxLineWeight},
+            #{communityWeight}, #{previousCommunityWeight}, #{dividendWeight}, 0,
+            now(), now(), 0
+        )
+        on duplicate key update
+            account = values(account),
+            week_end_time = values(week_end_time),
+            total_line_weight = values(total_line_weight),
+            max_line_weight = values(max_line_weight),
+            community_weight = values(community_weight),
+            previous_community_weight = values(previous_community_weight),
+            dividend_weight = values(dividend_weight),
+            settle_status = if(settle_status = 1, settle_status, values(settle_status)),
+            update_time = now()
+    </insert>
+
+    <select id="selectLineValidWeight" resultType="java.math.BigDecimal">
+        select ifnull(sum(
+            case
+                when o.performance_points is not null and o.performance_points > 0 then o.performance_points
+                else ifnull(o.stake_usdt_amount, 0) * ifnull(o.performance_coefficient, 0)
+            end
+        ), 0)
+        from t_stake_hosting_order o
+        where o.deleted = 0
+          and o.pay_status = 1
+          and o.performance_start_time is not null
+          and o.performance_end_time is not null
+          and o.performance_start_time &lt;= #{snapshotTime}
+          and o.performance_end_time &gt; #{snapshotTime}
+          and (
+              o.user_id = #{directUserId}
+              or exists (
+                  select 1
+                  from t_user_relation r
+                  where r.par_user_id = #{directUserId}
+                    and r.pos_user_id = o.user_id
+                    and r.distance > 0
+                    and r.active_flag = 1
+              )
+          )
+    </select>
+
+    <select id="selectPreviousCommunityWeight" resultType="java.math.BigDecimal">
+        select community_weight
+        from t_stake_hosting_global_dividend_weight_snapshot
+        where user_id = #{userId}
+          and week_start_time &lt; #{weekStartTime}
+          and deleted = 0
+        order by week_start_time desc
+        limit 1
+    </select>
+</mapper>

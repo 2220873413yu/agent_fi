@@ -371,6 +371,16 @@
         </template>
       </el-table-column>
 
+      <el-table-column align="center" label="全球分红权重" width="190">
+        <template slot-scope="scope">
+          <div class="exchange-info" style="text-align: left;">
+            个人权重: {{ scope.row.globalDividendWeight || 0 }}<br>
+            团队权重: {{ scope.row.globalDividendUmbrellaWeight || 0 }}<br>
+            小区权重: {{ scope.row.globalDividendCommunityWeight || 0 }}
+          </div>
+        </template>
+      </el-table-column>
+
 <!--      <el-table-column label="提现信息" align="center"width="150">
         <template slot-scope="scope">
           <div class="exchange-info" style="text-align: left;">

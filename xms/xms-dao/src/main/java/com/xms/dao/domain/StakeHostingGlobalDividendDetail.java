@@ -54,12 +54,12 @@ public class StakeHostingGlobalDividendDetail extends BaseEntity {
 	@ApiModelProperty(value = "等级奖池金额")
 	private BigDecimal levelPoolAmount;
 
-	@Excel(name = "用户小区业绩", sort = 7)
-	@ApiModelProperty(value = "用户小区业绩")
+	@Excel(name = "用户分红权重", sort = 7)
+	@ApiModelProperty(value = "用户分红权重")
 	private BigDecimal userCommunityPerformance;
 
-	@Excel(name = "等级小区业绩总和", sort = 8)
-	@ApiModelProperty(value = "等级小区业绩总和")
+	@Excel(name = "等级分红权重总和", sort = 8)
+	@ApiModelProperty(value = "等级分红权重总和")
 	private BigDecimal levelCommunityPerformance;
 
 	@Excel(name = "分红金额", sort = 9)

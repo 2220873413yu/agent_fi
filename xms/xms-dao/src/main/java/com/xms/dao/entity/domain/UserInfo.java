@@ -150,6 +150,21 @@ public class UserInfo extends BaseXmsEntity {
 	private BigDecimal performanceMining;
 
 	/**
+	 * 我的全球分红权重.
+	 */
+	private BigDecimal globalDividendWeight;
+
+	/**
+	 * 团队全球分红权重.
+	 */
+	private BigDecimal globalDividendUmbrellaWeight;
+
+	/**
+	 * 小区全球分红权重.
+	 */
+	private BigDecimal globalDividendCommunityWeight;
+
+	/**
 	 * 托管指定静态收益率，单位%，0表示按G7规则
 	 */
 	private BigDecimal stakeHostingStaticRate;

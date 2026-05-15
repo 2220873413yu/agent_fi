@@ -31,11 +31,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 
 /**
- * 托管订单Service业务层处理
+ *
  *
  * @author xms
  */
@@ -50,12 +52,8 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	public static final int STATUS_RUNNING = 1;
 	public static final int STATUS_FINISHED = 2;
 	public static final int STATUS_PAUSED = 3;
-	public static final int WEEKLY_STATUS_WAIT = 0;
-	public static final int WEEKLY_STATUS_QUEUED = 1;
-	public static final int WEEKLY_STATUS_DONE = 3;
 	public static final int G7_STATUS_WAIT = 0;
 	private static final int DAILY_WAIT_PAY_LIMIT = 10;
-	private static final String WEEKLY_SKIP_EXPIRED_IN_WEEK = "本周内到期，不计入周新增业绩";
 
 	private final IStakeHostingPackageService stakeHostingPackageService;
 	private final IStakeHostingDailyTeamPerformanceService stakeHostingDailyTeamPerformanceService;
@@ -70,12 +68,13 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	}
 
 	/**
-	 * 查询后台托管订单列表展示数据。
+	 * Adds legacy stake amount performance for compatibility callers.
 	 *
-	 * <p>列表和导出返回DTO，附带 AFI 质押比例和加速倍率快照，避免后台接口直接使用数据库实体作为展示对象。</p>
+	 * <p>New stake hosting effective-order paths should call {@link #addHostingPerformance(StakeHostingOrder)}
+	 * so the current global dividend weight fields are maintained together with amount performance.</p>
 	 *
-	 * @param query 查询条件
-	 * @return 后台托管订单列表
+	 * @param userId effective order user id
+	 * @param amount stake USDT amount
 	 */
 	@Override
 	public List<StakeHostingOrderListDto> selectStakeHostingOrderDtoList(StakeHostingOrderListDto query) {
@@ -96,60 +95,58 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.eq(StakeHostingOrder::getCreateDay, createDay)
 			.count();
 		if (todayWaitCount >= DAILY_WAIT_PAY_LIMIT) {
-			throw new ServiceException("每天最多创建10笔待支付托管订单");
+			throw new ServiceException("Daily pending order limit exceeded");
 		}
 		StakeHostingOrder order = buildBaseOrder(userInfo, hostingPackage, amount, createDay);
 		order.setSourceType(SOURCE_USER);
 		order.setPayStatus(PAY_WAIT);
 		order.setStatus(STATUS_WAIT);
 		if (!save(order)) {
-			throw new ServiceException("创建托管订单失败");
+			throw new ServiceException("Create stake hosting order failed");
 		}
 		return order;
 	}
 
 	/**
-	 * 确认用户购买托管订单的链上支付结果。
 	 *
-	 * <p>该方法由HTTP回调/接口触发，可能重复调用，也可能和其他业务请求乱序到达。
-	 * 只有订单仍处于待支付、未开始状态时，才会把订单推进到支付成功和产出中；
-	 * 后续个人/团队托管业绩、G7每日新增业绩、周新增业绩消息和等级重算消息都属于本次支付确认后的副作用。</p>
 	 *
-	 * @param orderNo 托管订单号
-	 * @param payHash 链上支付hash
-	 * @param payAmount 链上实际支付USDT金额
-	 * @return 1表示回调处理完成或已幂等处理
+	 *
+	 *
+	 *
+	 *
+	 *
+	 *
+	 *
+	 *
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public int confirmChainPaid(String orderNo, String payHash, BigDecimal payAmount) {
-		// 1. 校验HTTP回调入参，金额必须大于0，避免错误回调推进订单状态。
+		// Business processing note.
 		if (StrUtil.isBlank(orderNo) || StrUtil.isBlank(payHash)) {
-			throw new ServiceException("订单号和支付hash不能为空");
+			throw new ServiceException("Order no and pay hash are required");
 		}
 		if (payAmount == null || payAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("支付金额必须大于0");
+			throw new ServiceException("Business processing failed");
 		}
-		// 2. 根据订单号查询本地托管订单；链上回调可能早于本地查询或重复通知，查不到时按当前口径返回成功。
+		// Business processing note.
 		StakeHostingOrder order = lambdaQuery()
 			.eq(StakeHostingOrder::getOrderNo, orderNo)
 			.one();
 		if (order == null) {
 			return 1;
-			//throw new ServiceException("托管订单不存在");
 		}
-		// 3. 支付成功订单直接幂等返回，避免重复回调再次累计业绩或重复发送后续消息。
+		// Business processing note.
 		if (PAY_SUCCESS == order.getPayStatus()) {
 			return 1;
 		}
-		// 4. 校验链上支付金额是否覆盖托管本金；不足额不能生效托管订单。
+		// Business processing note.
 		if (payAmount.compareTo(order.getStakeUsdtAmount()) < 0) {
-			throw new ServiceException("支付金额小于托管金额");
+			throw new ServiceException("Pay amount is less than stake amount");
 		}
 		Date now = new Date();
-		// 5. 计算周新增业绩时间窗口，决定订单是否进入周新增队列或直接标记跳过。
-		WeeklyPerformancePrepare weeklyPrepare = prepareWeeklyPerformance(now, order.getPackageDays());
-		// 6. 用订单状态条件做原子推进，确保并发/重复HTTP回调只有一个线程能从待支付推进到产出中。
+		// Business processing note.
+		// Business processing note.
 		boolean update = lambdaUpdate()
 			.eq(StakeHostingOrder::getId, order.getId())
 			.eq(StakeHostingOrder::getPayStatus, PAY_WAIT)
@@ -160,25 +157,15 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.set(StakeHostingOrder::getPayAmount, payAmount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew))
 			.set(StakeHostingOrder::getPayTime, now)
 			.set(StakeHostingOrder::getEffectiveTime, now)
-			.set(StakeHostingOrder::getPerformanceStartTime, weeklyPrepare.startTime)
-			.set(StakeHostingOrder::getPerformanceEndTime, weeklyPrepare.endTime)
-			.set(StakeHostingOrder::getWeeklyPerformanceStatus, weeklyPrepare.status)
-			.set(StakeHostingOrder::getWeeklyPerformanceSkipReason, weeklyPrepare.skipReason)
-			.set(StakeHostingOrder::getWeeklyPerformanceTime, weeklyPrepare.done ? now : null)
-			.set(StakeHostingOrder::getWeeklyExpirePerformanceStatus, WEEKLY_STATUS_WAIT)
-			.set(StakeHostingOrder::getWeeklyExpirePerformanceSkipReason, null)
-			.set(StakeHostingOrder::getWeeklyExpirePerformanceTime, null)
 			.set(StakeHostingOrder::getG7NewPerformanceStatus, G7_STATUS_WAIT)
 			.set(StakeHostingOrder::getG7ExpirePerformanceStatus, G7_STATUS_WAIT)
 			.set(StakeHostingOrder::getUpdateTime, now)
 			.update();
 		if (!update) {
-			throw new ServiceException("托管订单状态已变更");
+			throw new ServiceException("Stake hosting order status changed");
 		}
-		// 7. 订单生效后增加用户个人和上级团队托管业绩，并维护用户is_valid有效状态。
-		addHostingPerformance(order.getUserId(), order.getStakeUsdtAmount());
-		// 8. 订单生效后的G7新增、小区业绩和等级重算统一发一条队列消息，消费者内按固定顺序处理。
-		// 旧全球分红周业绩收集已停用；全球分红后续改由t_user_info当前权重和每周快照驱动。
+		// Business processing note.
+		addHostingPerformance(order);
 		sendStakeHostingEffectiveAfterCommit(order.getId());
 		return 1;
 	}
@@ -188,7 +175,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	@RedisLock(value = RedisConstant.LockConstant.XMS_STAKE_APPLY, param = "#req.userId")
 	public int createAdminGrantOrder(StakeHostingOrder req) {
 		if (req == null) {
-			throw new ServiceException("拨付参数不能为空");
+			throw new ServiceException("Grant request is required");
 		}
 		UserInfo userInfo = getGrantUser(req);
 		StakeHostingPackage hostingPackage = getEnabledPackage(req.getPackageId());
@@ -202,40 +189,83 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setPayAmount(req.getStakeUsdtAmount().setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
 		order.setPayTime(now);
 		order.setEffectiveTime(now);
-		WeeklyPerformancePrepare weeklyPrepare = prepareWeeklyPerformance(now, order.getPackageDays());
-		order.setPerformanceStartTime(weeklyPrepare.startTime);
-		order.setPerformanceEndTime(weeklyPrepare.endTime);
-		order.setWeeklyPerformanceStatus(weeklyPrepare.status);
-		order.setWeeklyPerformanceSkipReason(weeklyPrepare.skipReason);
-		order.setWeeklyPerformanceTime(weeklyPrepare.done ? now : null);
-		order.setWeeklyExpirePerformanceStatus(WEEKLY_STATUS_WAIT);
 		order.setG7NewPerformanceStatus(G7_STATUS_WAIT);
 		order.setG7ExpirePerformanceStatus(G7_STATUS_WAIT);
 		order.setRemark(req.getRemark());
 		if (!save(order)) {
-			throw new ServiceException("后台拨付托管订单失败");
+			throw new ServiceException("Create admin grant order failed");
 		}
-		addHostingPerformance(order.getUserId(), order.getStakeUsdtAmount());
-		// 后台拨付订单生效后同样只发一条后置队列消息，避免后台请求被多个耗时任务阻塞。
+		addHostingPerformance(order);
+		// Business processing note.
 		sendStakeHostingEffectiveAfterCommit(order.getId());
 		return 1;
 	}
 
 	/**
-	 * 托管订单生效后累加用户及上级托管业绩。
+	 * Adds stake amount performance and current global dividend weight after an order becomes effective.
 	 *
-	 * <p>购买订单支付回调成功、后台拨付订单创建成功都会调用本方法。除业绩累加外，
-	 * 会将当前用户 `is_valid` 维护为 1，表示用户持有未完成托管订单，可参与团队奖励资格判断。</p>
+	 * <p>Amount performance still uses the order USDT amount. Global dividend weight uses the order
+	 * performance point snapshot, with a package coefficient fallback for historical orders.</p>
 	 *
-	 * @param userId 生效托管订单所属用户ID
-	 * @param amount 托管USDT金额
+	 * @param order effective stake hosting order
+	 */
+	public void addHostingPerformance(StakeHostingOrder order) {
+		if (order == null) {
+			return;
+		}
+		BigDecimal amount = order.getStakeUsdtAmount();
+		if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+			return;
+		}
+		UserInfo userInfo = getUserInfo(order.getUserId());
+		BigDecimal globalDividendWeight = readGlobalDividendWeight(order);
+		boolean update = userInfoService.lambdaUpdate()
+			.eq(UserInfo::getUserId, order.getUserId())
+			.setSql("performance = IFNULL(performance,0) + " + amount.toPlainString())
+			.setSql(globalDividendWeight.compareTo(BigDecimal.ZERO) > 0,
+				"global_dividend_weight = IFNULL(global_dividend_weight,0) + " + globalDividendWeight.toPlainString())
+			.set(UserInfo::getIsValid, 1)
+			.set(UserInfo::getUpdateTime, new Date())
+			.update();
+		if (!update) {
+			throw new ServiceException("Update user hosting performance failed");
+		}
+		if (userInfo.getInviteUserId() != null) {
+			userInfoService.lambdaUpdate()
+				.eq(UserInfo::getUserId, userInfo.getInviteUserId())
+				.setSql("sub_performance = IFNULL(sub_performance,0) + " + amount.toPlainString())
+				.update();
+		}
+		List<Long> parentIds = userInfo.getParentIds();
+		if (CollectionUtil.isNotEmpty(parentIds)) {
+			update = userInfoService.lambdaUpdate()
+				.in(UserInfo::getUserId, parentIds)
+				.setSql("umbrella_performance = IFNULL(umbrella_performance,0) + " + amount.toPlainString())
+				.setSql("performance_mining = IFNULL(performance_mining,0) + " + amount.toPlainString())
+				.setSql(globalDividendWeight.compareTo(BigDecimal.ZERO) > 0,
+					"global_dividend_umbrella_weight = IFNULL(global_dividend_umbrella_weight,0) + " + globalDividendWeight.toPlainString())
+				.update();
+			if (!update) {
+				throw new ServiceException("Update team hosting performance failed");
+			}
+			recalculateGlobalDividendCommunityWeight(parentIds);
+		}
+	}
+
+	/**
+	 *
+	 *
+	 *
+	 *
+	 *
+	 *
 	 */
 	public void addHostingPerformance(Long userId, BigDecimal amount) {
 		if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
 			return;
 		}
 		UserInfo userInfo = getUserInfo(userId);
-		// 托管订单生效后，用户持有未完成托管订单，团队奖励资格字段同步维护为有效。
+		// Business processing note.
 		boolean update = userInfoService.lambdaUpdate()
 			.eq(UserInfo::getUserId, userId)
 			.setSql("performance = IFNULL(performance,0) + " + amount.toPlainString())
@@ -243,7 +273,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.set(UserInfo::getUpdateTime, new Date())
 			.update();
 		if (!update) {
-			throw new ServiceException("更新个人托管业绩失败");
+			throw new ServiceException("Update user hosting performance failed");
 		}
 		if (userInfo.getInviteUserId() != null) {
 			userInfoService.lambdaUpdate()
@@ -259,9 +289,9 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 				.setSql("performance_mining = IFNULL(performance_mining,0) + " + amount.toPlainString())
 				.update();
 			if (!update) {
-				throw new ServiceException("更新团队托管业绩失败");
+				throw new ServiceException("Update team hosting performance failed");
 			}
-			// 小区业绩重算放到等级重算队列统一处理，避免支付回调同步遍历所有上级直推区。
+			// Business processing note.
 		}
 	}
 
@@ -271,14 +301,13 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	}
 
 	/**
-	 * 托管订单完成后扣减用户及上级托管业绩。
 	 *
-	 * <p>101 任务在订单达到套餐天数、状态更新为已完成后调用本方法。本方法只处理业绩扣减；
-	 * `is_valid` 和等级重算需要等本轮101所有订单状态更新完成后，由任务统一处理，避免同一用户多笔订单同批次完成时提前判断。</p>
 	 *
-	 * @param userId 完成托管订单所属用户ID
-	 * @param amount 扣减的托管USDT金额
-	 * @param orderId 完成的托管订单ID，用于后续等级和周业绩重算消息
+	 *
+	 *
+	 *
+	 *
+	 *
 	 */
 	@Override
 	public void subtractHostingPerformance(Long userId, BigDecimal amount, Long orderId) {
@@ -286,10 +315,15 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			return;
 		}
 		UserInfo userInfo = getUserInfo(userId);
-		// 托管订单完成后扣减个人托管业绩；is_valid 和等级重算等101批次内所有订单状态更新完后统一处理。
+		StakeHostingOrder finishedOrder = orderId == null ? null : lambdaQuery()
+			.eq(StakeHostingOrder::getId, orderId)
+			.one();
+		BigDecimal globalDividendWeight = readGlobalDividendWeight(finishedOrder);
 		userInfoService.lambdaUpdate()
 			.eq(UserInfo::getUserId, userId)
 			.setSql("performance = GREATEST(IFNULL(performance,0) - " + amount.toPlainString() + ", 0)")
+			.setSql(globalDividendWeight.compareTo(BigDecimal.ZERO) > 0,
+				"global_dividend_weight = GREATEST(IFNULL(global_dividend_weight,0) - " + globalDividendWeight.toPlainString() + ", 0)")
 			.set(UserInfo::getUpdateTime, new Date())
 			.update();
 		if (userInfo.getInviteUserId() != null) {
@@ -304,29 +338,117 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 				.in(UserInfo::getUserId, parentIds)
 				.setSql("umbrella_performance = GREATEST(IFNULL(umbrella_performance,0) - " + amount.toPlainString() + ", 0)")
 				.setSql("performance_mining = GREATEST(IFNULL(performance_mining,0) - " + amount.toPlainString() + ", 0)")
+				.setSql(globalDividendWeight.compareTo(BigDecimal.ZERO) > 0,
+					"global_dividend_umbrella_weight = GREATEST(IFNULL(global_dividend_umbrella_weight,0) - " + globalDividendWeight.toPlainString() + ", 0)")
 				.update();
+			recalculateGlobalDividendCommunityWeight(parentIds);
 		}
 		Long recalculateOrderId = orderId;
 		if (recalculateOrderId == null) {
-			StakeHostingOrder order = lambdaQuery()
+			StakeHostingOrder order = finishedOrder != null ? finishedOrder : lambdaQuery()
 				.eq(StakeHostingOrder::getUserId, userId)
 				.orderByDesc(StakeHostingOrder::getId)
 				.last("limit 1")
 				.one();
 			recalculateOrderId = order == null ? null : order.getId();
 		}
-		// 旧全球分红到期周业绩重算链路已停用；订单到期只保留现有托管业绩扣减、有效状态刷新和等级重算。
-		// markWeeklyExpirePerformanceQueued(recalculateOrderId);
-		// sendStakeHostingWeeklyExpirePerformanceAfterCommit(recalculateOrderId);
 	}
 
 	/**
-	 * 按用户剩余未完成托管订单刷新团队奖励有效用户标识。
+	 * Reads the order weight used by the current global dividend weight fields.
 	 *
-	 * <p>`t_user_info.is_valid` 本批定义为：是否持有支付成功且未完成的托管订单。
-	 * 只在订单达到套餐天数并完成后重新判断，不使用 `is_return_principal` 回本状态。</p>
+	 * <p>Global dividend weight must use the order snapshot first. If historical data misses
+	 * {@code performance_points}, this method falls back to {@code stake_usdt_amount * performance_coefficient};
+	 * if the result is still not positive, the order does not affect current global dividend weight.</p>
 	 *
-	 * @param userId 需要刷新的用户ID
+	 * @param order stake hosting order
+	 * @return positive global dividend weight, or zero when the order is not eligible
+	 */
+	private BigDecimal readGlobalDividendWeight(StakeHostingOrder order) {
+		if (order == null) {
+			return BigDecimal.ZERO;
+		}
+		if (order.getPerformancePoints() != null && order.getPerformancePoints().compareTo(BigDecimal.ZERO) > 0) {
+			return order.getPerformancePoints().setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		}
+		if (order.getStakeUsdtAmount() == null || order.getPerformanceCoefficient() == null) {
+			return BigDecimal.ZERO;
+		}
+		BigDecimal weight = order.getStakeUsdtAmount().multiply(order.getPerformanceCoefficient())
+			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		return weight.compareTo(BigDecimal.ZERO) > 0 ? weight : BigDecimal.ZERO;
+	}
+
+	/**
+	 * Recalculates current global dividend community weight for affected parent users.
+	 *
+	 * <p>Each direct invitee is one line. A line's current global dividend weight is the direct user's
+	 * own global dividend weight plus their umbrella global dividend weight. The parent community weight is
+	 * the sum of all direct lines minus the largest direct line. This updates only the current fields on
+	 * {@code t_user_info}; weekly immutable snapshots are produced later by the 102 global dividend task.</p>
+	 *
+	 * @param parentIds parent users whose direct-line global dividend weight may have changed
+	 */
+	private void recalculateGlobalDividendCommunityWeight(List<Long> parentIds) {
+		if (CollectionUtil.isEmpty(parentIds)) {
+			return;
+		}
+		// Batch-load all direct invitees for the affected parents, avoiding a query per parent.
+		List<UserInfo> directUsers = userInfoService.lambdaQuery()
+			.in(UserInfo::getInviteUserId, parentIds)
+			.eq(UserInfo::getDeleted, 0)
+			.list();
+		Map<Long, List<UserInfo>> directUserMap = new HashMap<>();
+		for (UserInfo directUser : directUsers) {
+			if (directUser.getInviteUserId() == null) {
+				continue;
+			}
+			directUserMap.computeIfAbsent(directUser.getInviteUserId(), key -> new ArrayList<>()).add(directUser);
+		}
+		Date now = new Date();
+		for (Long parentId : parentIds) {
+			BigDecimal totalLineWeight = BigDecimal.ZERO;
+			BigDecimal maxLineWeight = BigDecimal.ZERO;
+			List<UserInfo> directUserList = directUserMap.get(parentId);
+			if (CollectionUtil.isNotEmpty(directUserList)) {
+				for (UserInfo directUser : directUserList) {
+					BigDecimal lineWeight = nvl(directUser.getGlobalDividendWeight())
+						.add(nvl(directUser.getGlobalDividendUmbrellaWeight()));
+					totalLineWeight = totalLineWeight.add(lineWeight);
+					if (lineWeight.compareTo(maxLineWeight) > 0) {
+						maxLineWeight = lineWeight;
+					}
+				}
+			}
+			BigDecimal communityWeight = totalLineWeight.subtract(maxLineWeight)
+				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			if (communityWeight.compareTo(BigDecimal.ZERO) < 0) {
+				communityWeight = BigDecimal.ZERO;
+			}
+			userInfoService.lambdaUpdate()
+				.eq(UserInfo::getUserId, parentId)
+				.set(UserInfo::getGlobalDividendCommunityWeight, communityWeight)
+				.set(UserInfo::getUpdateTime, now)
+				.update();
+		}
+	}
+
+	/**
+	 * Converts nullable weight values to zero for line-weight aggregation.
+	 *
+	 * @param value nullable weight value
+	 * @return original value, or zero when null
+	 */
+	private BigDecimal nvl(BigDecimal value) {
+		return value == null ? BigDecimal.ZERO : value;
+	}
+
+	/**
+	 *
+	 *
+	 *
+	 *
+	 *
 	 */
 	@Override
 	public void refreshUserValidByUnfinishedHostingOrder(Long userId) {
@@ -334,7 +456,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			return;
 		}
 		UserInfo userInfo = getUserInfo(userId);
-		// 101批次内所有完成订单状态都更新后，再判断用户是否仍有支付成功且未完成的托管订单。
+		// Business processing note.
 		long unfinishedCount = lambdaQuery()
 			.eq(StakeHostingOrder::getUserId, userId)
 			.eq(StakeHostingOrder::getPayStatus, PAY_SUCCESS)
@@ -351,24 +473,24 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.set(UserInfo::getUpdateTime, new Date())
 			.update();
 		if (!update) {
-			throw new ServiceException("刷新托管有效用户状态失败");
+			throw new ServiceException("Refresh user valid status failed");
 		}
 	}
 
 	/**
-	 * 同步重算托管订单相关用户的小区业绩和真实等级。
 	 *
-	 * <p>该方法由Redis消费者执行实际重算。购买回调、后台拨付和101订单完成只负责发送队列消息，
-	 * 避免HTTP回调或后台请求同步遍历上级链路。</p>
 	 *
-	 * @param orderId 用于定位下单用户及其上级链路的托管订单ID
+	 *
+	 *
+	 *
+	 *
 	 */
 	@Override
 	public void recalculateStakeHostingLevel(Long orderId) {
 		if (orderId == null) {
 			return;
 		}
-		// 1. 只处理已支付成功的托管订单，未支付或不存在的订单不参与等级重算。
+		// Business processing note.
 		StakeHostingOrder order = lambdaQuery()
 			.eq(StakeHostingOrder::getId, orderId)
 			.eq(StakeHostingOrder::getPayStatus, PAY_SUCCESS)
@@ -376,7 +498,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		if (order == null) {
 			return;
 		}
-		// 2. 找到下单用户，并把用户本人和所有上级都纳入本次重算范围。
+		// Business processing note.
 		UserInfo userInfo = userInfoService.lambdaQuery()
 			.eq(UserInfo::getUserId, order.getUserId())
 			.one();
@@ -389,9 +511,9 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		if (CollectionUtil.isNotEmpty(parentIds)) {
 			recalculateUserIds.addAll(parentIds);
 		}
-		// 3. 先重算小区业绩，因为真实等级判断依赖个人托管业绩和小区托管业绩。
+		// Business processing note.
 		stakeOrderService.calculateCommunityPerformance(new ArrayList<>(recalculateUserIds));
-		// 4. 一次性加载等级配置，再逐个用户刷新真实等级，避免每个用户重复查配置表。
+		// Business processing note.
 		List<UserLevelConfig> userLevelConfigList = userLevelConfigService.lambdaQuery()
 			.gt(UserLevelConfig::getLevel, 0)
 			.orderByAsc(UserLevelConfig::getLevel)
@@ -405,11 +527,11 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	}
 
 	/**
-	 * 事务提交后发送托管等级重算消息。
 	 *
-	 * <p>等级重算需要重算小区业绩并遍历上级链路，不能压在HTTP回调或后台拨付请求里同步执行。</p>
 	 *
-	 * @param orderId 托管订单ID
+	 *
+	 *
+	 *
 	 */
 	@Override
 	public void sendStakeHostingLevelRecalculateAfterCommit(Long orderId) {
@@ -417,61 +539,22 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	}
 
 	/**
-	 * 事务提交后发送周新增业绩顺序消费消息。
 	 *
-	 * <p>旧全球分红周业绩收集链路已废弃，后续全球分红改由 t_user_info 当前权重和每周快照计算。
-	 * 本方法保留待后续删除，不再发送 bizType=5 消息。</p>
 	 *
-	 * @param orderId 托管订单ID
-	 */
-	private void sendStakeHostingWeeklyPerformanceAfterCommit(Long orderId) {
-		// sendStakeHostingOrderMessageAfterCommit(orderId, 5);
-	}
-
-	/**
-	 * 将订单到期周业绩重算状态标记为队列中。
 	 *
-	 * <p>旧全球分红周业绩收集链路已废弃，后续全球分红改由 t_user_info 当前权重和每周快照计算。
-	 * 本方法保留待后续删除，不再标记旧周到期业绩队列状态。</p>
 	 *
-	 * @param orderId 已完成的托管订单ID
-	 */
-	private void markWeeklyExpirePerformanceQueued(Long orderId) {
-		// 旧 weekly_expire_performance_* 状态字段暂时保留，后续随旧周业绩链路统一删除。
-		return;
-	}
-
-	/**
-	 * 事务提交后发送托管订单到期周业绩重算消息。
-	 *
-	 * <p>旧全球分红周业绩收集链路已废弃，后续全球分红改由 t_user_info 当前权重和每周快照计算。
-	 * 本方法保留待后续删除，不再发送 bizType=7 消息。</p>
-	 *
-	 * @param orderId 托管订单ID
-	 */
-	private void sendStakeHostingWeeklyExpirePerformanceAfterCommit(Long orderId) {
-		// sendStakeHostingOrderMessageAfterCommit(orderId, 7);
-	}
-
-	/**
-	 * 事务提交后发送托管订单生效后置处理消息。
-	 *
-	 * <p>订单生效后的G7团队新增、小区业绩和等级重算属于同一条业务链路，只发送一条 bizType=6 消息，
-	 * 由消费者按固定顺序处理，避免同一订单连续入队多条后置任务。</p>
-	 *
-	 * @param orderId 托管订单ID
 	 */
 	private void sendStakeHostingEffectiveAfterCommit(Long orderId) {
 		sendStakeHostingOrderMessageAfterCommit(orderId, 6);
 	}
 
 	/**
-	 * 事务提交后发送托管订单后置处理消息。
 	 *
-	 * <p>该方法只注册 afterCommit 回调并调用现有Redis/MQ生产者，不创建线程，也不使用本地 Runnable.run() 伪异步。</p>
 	 *
-	 * @param orderId 托管订单ID
-	 * @param bizType Redis业务类型
+	 *
+	 *
+	 *
+	 *
 	 */
 	private void sendStakeHostingOrderMessageAfterCommit(Long orderId, Integer bizType) {
 		if (orderId == null) {
@@ -486,10 +569,10 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	}
 
 	/**
-	 * 发送单笔托管订单后置处理消息。
 	 *
-	 * @param orderId 托管订单ID
-	 * @param bizType Redis业务类型
+	 *
+	 *
+	 *
 	 */
 	private void sendStakeHostingOrderMessage(Long orderId, Integer bizType) {
 		List<OrderMsgDO> orderMsgDOList = new ArrayList<>();
@@ -500,45 +583,18 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		asyncDynamicOrderSettlementServiceImpl.sendMessage(orderMsgDOList);
 	}
 
-	private WeeklyPerformancePrepare prepareWeeklyPerformance(Date startDate, Integer packageDays) {
-		Long startTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.formatDate(startDate);
-		int days = packageDays == null ? 0 : packageDays;
-		Long endTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.plusDays(startTime, days);
-		Long weekEndTime = StakeHostingWeeklyCommunityPerformanceServiceImpl.weekEndTimeOf(startTime);
-		WeeklyPerformancePrepare prepare = new WeeklyPerformancePrepare();
-		prepare.startTime = startTime;
-		prepare.endTime = endTime;
-		if (endTime <= weekEndTime) {
-			prepare.status = WEEKLY_STATUS_DONE;
-			prepare.skipReason = WEEKLY_SKIP_EXPIRED_IN_WEEK;
-			prepare.done = true;
-			return prepare;
-		}
-		prepare.status = WEEKLY_STATUS_QUEUED;
-		prepare.shouldSend = true;
-		return prepare;
-	}
-
-	private static class WeeklyPerformancePrepare {
-		private Long startTime;
-		private Long endTime;
-		private Integer status;
-		private String skipReason;
-		private boolean done;
-		private boolean shouldSend;
-	}
 
 	/**
-	 * 构建托管订单基础快照。
 	 *
-	 * <p>套餐服务费比例和全球分红套餐权重都会在下单/后台拨付时写入订单快照；
-	 * 后续后台调整套餐配置，不影响历史订单的服务费、周新增小区业绩积分和全球分红权重。</p>
 	 *
-	 * @param userInfo 下单用户
-	 * @param hostingPackage 当前命中的托管套餐配置
-	 * @param amount 托管USDT金额
-	 * @param createDay 创建日期，格式yyyyMMdd
-	 * @return 待保存的托管订单
+	 *
+	 *
+	 *
+	 *
+	 *
+	 *
+	 *
+	 *
 	 */
 	private StakeHostingOrder buildBaseOrder(UserInfo userInfo, StakeHostingPackage hostingPackage, BigDecimal amount, int createDay) {
 		StakeHostingOrder order = new StakeHostingOrder();
@@ -552,9 +608,9 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		// Snapshot the package service fee ratio at order creation. Future settlement must not be affected by package config changes.
 		order.setServiceFeeRatio(hostingPackage.getServiceFeeRatio() == null ? BigDecimal.ZERO : hostingPackage.getServiceFeeRatio());
 		if (hostingPackage.getPerformanceCoefficient() == null) {
-			throw new ServiceException("托管套餐业绩积分系数未配置");
+			throw new ServiceException("Package performance coefficient is required");
 		}
-		// 全球分红使用“托管金额 × 套餐权重”的订单积分；1天套餐权重为0，必须按套餐配置快照写入。
+		// Business processing note.
 		BigDecimal performanceCoefficient = hostingPackage.getPerformanceCoefficient();
 		order.setPerformanceCoefficient(performanceCoefficient.setScale(4, ConstantStatic.roundingModeNew));
 		order.setPerformancePoints(order.getStakeUsdtAmount().multiply(performanceCoefficient)
@@ -564,8 +620,6 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setTotalStaticReward(BigDecimal.ZERO);
 		order.setIsReturnPrincipal(0);
 		order.setAfiAccelerated(0);
-		order.setWeeklyPerformanceStatus(WEEKLY_STATUS_WAIT);
-		order.setWeeklyExpirePerformanceStatus(WEEKLY_STATUS_WAIT);
 		order.setG7NewPerformanceStatus(G7_STATUS_WAIT);
 		order.setG7ExpirePerformanceStatus(G7_STATUS_WAIT);
 		order.setCreateDay(createDay);
@@ -585,45 +639,45 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 				return userInfo;
 			}
 		}
-		throw new ServiceException("用户不存在");
+		throw new ServiceException("User not found");
 	}
 
 	private UserInfo getUserInfo(Long userId) {
 		if (userId == null) {
-			throw new ServiceException("用户ID不能为空");
+			throw new ServiceException("User id is required");
 		}
 		UserInfo userInfo = userInfoService.lambdaQuery()
 			.eq(UserInfo::getUserId, userId)
 			.one();
 		if (userInfo == null) {
-			throw new ServiceException("用户不存在");
+			throw new ServiceException("User not found");
 		}
 		return userInfo;
 	}
 
 	private StakeHostingPackage getEnabledPackage(Long packageId) {
 		if (packageId == null) {
-			throw new ServiceException("托管套餐不能为空");
+			throw new ServiceException("Package id is required");
 		}
 		StakeHostingPackage hostingPackage = stakeHostingPackageService.lambdaQuery()
 			.eq(StakeHostingPackage::getId, packageId)
 			.eq(StakeHostingPackage::getStatus, 1)
 			.one();
 		if (hostingPackage == null) {
-			throw new ServiceException("托管套餐不存在或未上架");
+			throw new ServiceException("Package not found or disabled");
 		}
 		return hostingPackage;
 	}
 
 	private void validateAmount(BigDecimal amount, StakeHostingPackage hostingPackage) {
 		if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("托管金额必须大于0");
+			throw new ServiceException("Stake amount must be greater than zero");
 		}
 		if (amount.stripTrailingZeros().scale() > 0) {
-			throw new ServiceException("托管金额必须为整数");
+			throw new ServiceException("Stake amount must be an integer");
 		}
 		if (amount.compareTo(hostingPackage.getMinAmount()) < 0) {
-			throw new ServiceException("托管金额不能小于起购金额");
+			throw new ServiceException("Stake amount is below package minimum");
 		}
 	}
 }

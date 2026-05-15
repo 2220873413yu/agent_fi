@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+﻿<?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
@@ -30,14 +30,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="isReturnPrincipal" column="is_return_principal" />
         <result property="afiAccelerated" column="afi_accelerated" />
         <result property="lastRewardDay" column="last_reward_day" />
-        <result property="performanceStartTime" column="performance_start_time" />
-        <result property="performanceEndTime" column="performance_end_time" />
-        <result property="weeklyPerformanceStatus" column="weekly_performance_status" />
-        <result property="weeklyPerformanceSkipReason" column="weekly_performance_skip_reason" />
-        <result property="weeklyPerformanceTime" column="weekly_performance_time" />
-        <result property="weeklyExpirePerformanceStatus" column="weekly_expire_performance_status" />
-        <result property="weeklyExpirePerformanceSkipReason" column="weekly_expire_performance_skip_reason" />
-        <result property="weeklyExpirePerformanceTime" column="weekly_expire_performance_time" />
         <result property="createDay" column="create_day" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
@@ -75,14 +67,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="isReturnPrincipal" column="is_return_principal" />
         <result property="afiAccelerated" column="afi_accelerated" />
         <result property="lastRewardDay" column="last_reward_day" />
-        <result property="performanceStartTime" column="performance_start_time" />
-        <result property="performanceEndTime" column="performance_end_time" />
-        <result property="weeklyPerformanceStatus" column="weekly_performance_status" />
-        <result property="weeklyPerformanceSkipReason" column="weekly_performance_skip_reason" />
-        <result property="weeklyPerformanceTime" column="weekly_performance_time" />
-        <result property="weeklyExpirePerformanceStatus" column="weekly_expire_performance_status" />
-        <result property="weeklyExpirePerformanceSkipReason" column="weekly_expire_performance_skip_reason" />
-        <result property="weeklyExpirePerformanceTime" column="weekly_expire_performance_time" />
         <result property="createDay" column="create_day" />
         <result property="createTime" column="create_time" />
         <result property="updateTime" column="update_time" />
@@ -93,10 +77,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select id, order_no, user_id, account, package_id, package_name, package_days, stake_usdt_amount, service_fee_ratio,
                performance_coefficient, performance_points,
                source_type, pay_status, status, pay_hash, pay_amount, pay_time, effective_time, finish_time,
-               run_days, today_reward, total_static_reward, is_return_principal, afi_accelerated, last_reward_day, create_day,
-               performance_start_time, performance_end_time, weekly_performance_status, weekly_performance_skip_reason,
-               weekly_performance_time, weekly_expire_performance_status, weekly_expire_performance_skip_reason,
-               weekly_expire_performance_time, create_by, create_time, update_by, update_time, remark, deleted
+               run_days, today_reward, total_static_reward, is_return_principal, afi_accelerated, last_reward_day, create_day
         from t_stake_hosting_order
     </sql>
 
@@ -106,10 +87,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                afi.pledge_ratio as afi_pledge_ratio,
                afi.accelerate_rate as afi_accelerate_rate,
                o.source_type, o.pay_status, o.status, o.pay_hash, o.pay_amount, o.pay_time, o.effective_time, o.finish_time,
-               o.run_days, o.today_reward, o.total_static_reward, o.is_return_principal, o.afi_accelerated, o.last_reward_day, o.create_day,
-               o.performance_start_time, o.performance_end_time, o.weekly_performance_status, o.weekly_performance_skip_reason,
-               o.weekly_performance_time, o.weekly_expire_performance_status, o.weekly_expire_performance_skip_reason,
-               o.weekly_expire_performance_time, o.create_by, o.create_time, o.update_by, o.update_time, o.remark, o.deleted
+               o.run_days, o.today_reward, o.total_static_reward, o.is_return_principal, o.afi_accelerated, o.last_reward_day, o.create_day
         from t_stake_hosting_order o
         left join t_stake_hosting_afi_pledge afi
                on afi.deleted = 0
@@ -130,9 +108,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="payHash != null and payHash != ''"> and pay_hash = #{payHash}</if>
             <if test="isReturnPrincipal != null"> and is_return_principal = #{isReturnPrincipal}</if>
             <if test="afiAccelerated != null"> and afi_accelerated = #{afiAccelerated}</if>
-            <if test="weeklyPerformanceStatus != null"> and weekly_performance_status = #{weeklyPerformanceStatus}</if>
-            <if test="weeklyExpirePerformanceStatus != null"> and weekly_expire_performance_status = #{weeklyExpirePerformanceStatus}</if>
-            <if test="performanceStartTime != null"> and performance_start_time = #{performanceStartTime}</if>
             <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
             and deleted = 0
         </where>
@@ -153,9 +128,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="payHash != null and payHash != ''"> and o.pay_hash = #{payHash}</if>
             <if test="isReturnPrincipal != null"> and o.is_return_principal = #{isReturnPrincipal}</if>
             <if test="afiAccelerated != null"> and o.afi_accelerated = #{afiAccelerated}</if>
-            <if test="weeklyPerformanceStatus != null"> and o.weekly_performance_status = #{weeklyPerformanceStatus}</if>
-            <if test="weeklyExpirePerformanceStatus != null"> and o.weekly_expire_performance_status = #{weeklyExpirePerformanceStatus}</if>
-            <if test="performanceStartTime != null"> and o.performance_start_time = #{performanceStartTime}</if>
             <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and o.create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
             and o.deleted = 0
         </where>

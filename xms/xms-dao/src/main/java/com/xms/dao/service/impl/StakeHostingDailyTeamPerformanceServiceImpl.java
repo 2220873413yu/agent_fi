@@ -1,6 +1,7 @@
 package com.xms.dao.service.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.date.DateUtil;
 import com.xms.common.constant.ConstantStatic;
 import com.xms.common.constant.ConstantSys;
 import com.xms.common.exception.ServiceException;
@@ -74,7 +75,7 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 	@Transactional(rollbackFor = Exception.class)
 	public void recordOrderTeamNewAmount(Long orderId) {
 		StakeHostingOrder order = getOrder(orderId);
-		if (order.getPerformanceStartTime() == null) {
+		if (order.getEffectiveTime() == null) {
 			throw new ServiceException("G7团队新增统计失败，订单生效时间为空");
 		}
 		boolean locked = stakeHostingOrderMapper.update(null, new LambdaUpdateWrapper<StakeHostingOrder>()
@@ -87,7 +88,7 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 			log.info("G7团队新增统计跳过，订单已处理 orderId={}", orderId);
 			return;
 		}
-		recordParentAmount(order.getUserId(), statDay(order.getPerformanceStartTime()), order.getStakeUsdtAmount(), true);
+		recordParentAmount(order.getUserId(), statDay(order.getEffectiveTime()), order.getStakeUsdtAmount(), true);
 	}
 
 	@Override
@@ -428,6 +429,10 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 
 	private Integer statDay(Long time) {
 		return Integer.valueOf(String.valueOf(time).substring(0, 8));
+	}
+
+	private Integer statDay(Date time) {
+		return Integer.valueOf(DateUtil.format(time, "yyyyMMdd"));
 	}
 
 	private Integer nextDay(Integer day) {

@@ -155,9 +155,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             and r.active_flag = 1
         where o.deleted = 0
           and o.pay_status = 1
-          and o.performance_start_time is not null
-          and o.performance_end_time is not null
-          and o.performance_start_time &lt;= #{snapshotTime}
-          and o.performance_end_time &gt; #{snapshotTime}
+          and o.effective_time is not null
+          and cast(date_format(o.effective_time, '%Y%m%d%H%i%s') as unsigned) &lt;= #{snapshotTime}
+          and (o.finish_time is null or cast(date_format(o.finish_time, '%Y%m%d%H%i%s') as unsigned) &gt; #{snapshotTime})
     </select>
 </mapper>

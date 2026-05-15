@@ -62,8 +62,8 @@
       </el-table-column>
       <el-table-column label="等级分红比例(%)" align="center" prop="levelDividendRatio" />
       <el-table-column label="等级奖池金额" align="center" prop="levelPoolAmount" />
-      <el-table-column label="用户小区业绩" align="center" prop="userCommunityPerformance" />
-      <el-table-column label="等级小区业绩总和" align="center" prop="levelCommunityPerformance" />
+      <el-table-column label="用户分红权重" align="center" prop="userCommunityPerformance" />
+      <el-table-column label="等级分红权重总和" align="center" prop="levelCommunityPerformance" />
       <el-table-column label="分红金额" align="center" prop="rewardAmount" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template slot-scope="scope">

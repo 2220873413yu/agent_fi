@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeHostingGlobalDividendWeightSnapshotMapper">
+
+    <resultMap type="StakeHostingGlobalDividendWeightSnapshot" id="StakeHostingGlobalDividendWeightSnapshotResult">
+        <result property="id" column="id" />
+        <result property="userId" column="user_id" />
+        <result property="account" column="account" />
+        <result property="weekStartTime" column="week_start_time" />
+        <result property="weekEndTime" column="week_end_time" />
+        <result property="selfWeight" column="self_weight" />
+        <result property="umbrellaWeight" column="umbrella_weight" />
+        <result property="communityWeight" column="community_weight" />
+        <result property="previousCommunityWeight" column="previous_community_weight" />
+        <result property="dividendWeight" column="dividend_weight" />
+        <result property="settleStatus" column="settle_status" />
+        <result property="batchNo" column="batch_no" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <sql id="selectStakeHostingGlobalDividendWeightSnapshotVo">
+        select id, user_id, account, week_start_time, week_end_time, self_weight, umbrella_weight,
+               community_weight, previous_community_weight, dividend_weight, settle_status, batch_no,
+               create_by, create_time, update_by, update_time, remark, deleted
+        from t_stake_hosting_global_dividend_weight_snapshot
+    </sql>
+
+    <select id="selectStakeHostingGlobalDividendWeightSnapshotList" parameterType="StakeHostingGlobalDividendWeightSnapshot" resultMap="StakeHostingGlobalDividendWeightSnapshotResult">
+        <include refid="selectStakeHostingGlobalDividendWeightSnapshotVo"/>
+        <where>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="account != null and account != ''"> and account = #{account}</if>
+            <if test="weekStartTime != null"> and week_start_time = #{weekStartTime}</if>
+            <if test="settleStatus != null"> and settle_status = #{settleStatus}</if>
+            <if test="batchNo != null and batchNo != ''"> and batch_no = #{batchNo}</if>
+            and deleted = 0
+        </where>
+        order by week_start_time desc, id desc
+    </select>
+
+    <select id="selectLatestBeforeWeek" resultMap="StakeHostingGlobalDividendWeightSnapshotResult">
+        select s.id, s.user_id, s.account, s.week_start_time, s.week_end_time, s.self_weight, s.umbrella_weight,
+               s.community_weight, s.previous_community_weight, s.dividend_weight, s.settle_status, s.batch_no,
+               s.create_by, s.create_time, s.update_by, s.update_time, s.remark, s.deleted
+        from t_stake_hosting_global_dividend_weight_snapshot s
+        inner join (
+            select user_id, max(week_start_time) max_week_start_time
+            from t_stake_hosting_global_dividend_weight_snapshot
+            where week_start_time &lt; #{weekStartTime}
+              and deleted = 0
+            group by user_id
+        ) latest on latest.user_id = s.user_id
+                and latest.max_week_start_time = s.week_start_time
+        where s.deleted = 0
+    </select>
+
+    <insert id="batchUpsert">
+        insert into t_stake_hosting_global_dividend_weight_snapshot (
+            user_id, account, week_start_time, week_end_time, self_weight, umbrella_weight,
+            community_weight, previous_community_weight, dividend_weight, settle_status,
+            batch_no, create_time, update_time, deleted
+        )
+        values
+        <foreach collection="snapshots" item="item" separator=",">
+            (
+                #{item.userId}, #{item.account}, #{item.weekStartTime}, #{item.weekEndTime},
+                #{item.selfWeight}, #{item.umbrellaWeight}, #{item.communityWeight},
+                #{item.previousCommunityWeight}, #{item.dividendWeight}, #{item.settleStatus},
+                #{item.batchNo}, #{item.createTime}, #{item.updateTime}, 0
+            )
+        </foreach>
+        on duplicate key update
+            account = values(account),
+            week_end_time = values(week_end_time),
+            self_weight = values(self_weight),
+            umbrella_weight = values(umbrella_weight),
+            community_weight = values(community_weight),
+            previous_community_weight = values(previous_community_weight),
+            dividend_weight = values(dividend_weight),
+            settle_status = values(settle_status),
+            batch_no = values(batch_no),
+            update_time = values(update_time),
+            deleted = 0
+    </insert>
+</mapper>

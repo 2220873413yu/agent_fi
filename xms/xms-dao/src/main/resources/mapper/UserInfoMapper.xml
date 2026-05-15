@@ -26,6 +26,9 @@
         <result column="sub_performance" property="subPerformance" />
         <result column="community_performance" property="communityPerformance" />
         <result column="umbrella_performance" property="umbrellaPerformance" />
+        <result column="global_dividend_weight" property="globalDividendWeight" />
+        <result column="global_dividend_umbrella_weight" property="globalDividendUmbrellaWeight" />
+        <result column="global_dividend_community_weight" property="globalDividendCommunityWeight" />
         <result column="stake_hosting_static_rate" property="stakeHostingStaticRate" />
 
         <result column="parent_chain" property="parentChain" />

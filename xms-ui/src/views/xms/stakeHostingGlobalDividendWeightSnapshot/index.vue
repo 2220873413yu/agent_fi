@@ -13,12 +13,15 @@
       <el-form-item label="状态" prop="settleStatus">
         <el-select v-model="queryParams.settleStatus" placeholder="请选择状态" clearable>
           <el-option
-            v-for="dict in dict.type.t_stake_hosting_weekly_community_performance_settle_status"
+            v-for="dict in dict.type.t_stake_hosting_global_dividend_weight_snapshot_settle_status"
             :key="dict.value"
             :label="dict.label"
             :value="parseInt(dict.value)"
           />
         </el-select>
+      </el-form-item>
+      <el-form-item label="批次号" prop="batchNo">
+        <el-input v-model="queryParams.batchNo" placeholder="请输入批次号" clearable @keyup.enter.native="handleQuery" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
@@ -29,7 +32,7 @@
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
         <el-button
-          v-hasPermi="['xms:stakeHostingWeeklyCommunityPerformance:export']"
+          v-hasPermi="['xms:stakeHostingGlobalDividendWeightSnapshot:export']"
           type="warning"
           plain
           icon="el-icon-download"
@@ -40,39 +43,27 @@
       <right-toolbar :show-search.sync="showSearch" @queryTable="getList" />
     </el-row>
 
-    <el-table v-loading="loading" :data="performanceList">
+    <el-table v-loading="loading" :data="snapshotList">
       <el-table-column label="用户ID" align="center" prop="userId" width="110" />
       <el-table-column label="钱包地址" align="center" prop="account" min-width="180" show-overflow-tooltip />
       <el-table-column label="周开始" align="center" prop="weekStartTime" width="150" />
       <el-table-column label="周结束" align="center" prop="weekEndTime" width="150" />
-      <el-table-column label="个人新增积分" align="center" prop="selfIncreasePoints" width="120" />
-      <el-table-column label="个人到期积分" align="center" prop="selfExpirePoints" width="120" />
-      <el-table-column label="个人净新增" align="center" prop="selfNewPerformance" width="120" />
-      <el-table-column label="团队新增积分" align="center" prop="teamIncreasePoints" width="120" />
-      <el-table-column label="团队到期积分" align="center" prop="teamExpirePoints" width="120" />
-      <el-table-column label="团队净新增" align="center" prop="teamNewPerformance" width="120" />
-      <el-table-column label="直推区有效合计" align="center" prop="totalLinePerformance" width="130" />
-      <el-table-column label="最大区有效积分" align="center" prop="maxLinePerformance" width="130" />
-      <el-table-column label="上周末小区" align="center" prop="previousCommunityPerformance" width="120" />
-      <el-table-column label="本周末小区" align="center" prop="currentCommunityPerformance" width="120" />
-      <el-table-column label="小区分红权重" align="center" prop="communityNewPerformance" width="120" />
-      <el-table-column label="个人新增业绩" align="center" prop="selfIncreaseAmount" width="120" />
-      <el-table-column label="个人到期业绩" align="center" prop="selfExpireAmount" width="120" />
-      <el-table-column label="个人净业绩" align="center" prop="selfNetAmount" width="120" />
-      <el-table-column label="团队新增业绩" align="center" prop="teamIncreaseAmount" width="120" />
-      <el-table-column label="团队到期业绩" align="center" prop="teamExpireAmount" width="120" />
-      <el-table-column label="团队净业绩" align="center" prop="teamNetAmount" width="120" />
-      <el-table-column label="直推区业绩合计" align="center" prop="totalLineAmount" width="130" />
-      <el-table-column label="最大区业绩" align="center" prop="maxLineAmount" width="120" />
-      <el-table-column label="上周末小区业绩" align="center" prop="previousCommunityAmount" width="130" />
-      <el-table-column label="本周末小区业绩" align="center" prop="currentCommunityAmount" width="130" />
-      <el-table-column label="小区净新增业绩" align="center" prop="communityNewAmount" width="130" />
-      <el-table-column label="状态" align="center" prop="settleStatus" width="100">
+      <el-table-column label="个人权重" align="center" prop="selfWeight" width="120" />
+      <el-table-column label="团队权重" align="center" prop="umbrellaWeight" width="120" />
+      <el-table-column label="本期小区权重" align="center" prop="communityWeight" width="130" />
+      <el-table-column label="上期小区权重" align="center" prop="previousCommunityWeight" width="130" />
+      <el-table-column label="本期分红权重" align="center" prop="dividendWeight" width="130" />
+      <el-table-column label="状态" align="center" prop="settleStatus" width="110">
         <template slot-scope="scope">
-          <dict-tag :options="dict.type.t_stake_hosting_weekly_community_performance_settle_status" :value="scope.row.settleStatus" />
+          <dict-tag :options="dict.type.t_stake_hosting_global_dividend_weight_snapshot_settle_status" :value="scope.row.settleStatus" />
         </template>
       </el-table-column>
       <el-table-column label="分红批次" align="center" prop="batchNo" width="180" show-overflow-tooltip />
+      <el-table-column label="创建时间" align="center" prop="createTime" width="180">
+        <template slot-scope="scope">
+          <span>{{ parseTime(scope.row.createTime) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="更新时间" align="center" prop="updateTime" width="180">
         <template slot-scope="scope">
           <span>{{ parseTime(scope.row.updateTime) }}</span>
@@ -85,24 +76,25 @@
 </template>
 
 <script>
-import { listStakeHostingWeeklyCommunityPerformance } from '@/api/xms/stakeHostingWeeklyCommunityPerformance'
+import { listStakeHostingGlobalDividendWeightSnapshot } from '@/api/xms/stakeHostingGlobalDividendWeightSnapshot'
 
 export default {
-  name: 'StakeHostingWeeklyCommunityPerformance',
-  dicts: ['t_stake_hosting_weekly_community_performance_settle_status'],
+  name: 'StakeHostingGlobalDividendWeightSnapshot',
+  dicts: ['t_stake_hosting_global_dividend_weight_snapshot_settle_status'],
   data() {
     return {
       loading: true,
       showSearch: true,
       total: 0,
-      performanceList: [],
+      snapshotList: [],
       queryParams: {
         pageNum: 1,
         pageSize: 10,
         userId: null,
         account: null,
         weekStartTime: null,
-        settleStatus: null
+        settleStatus: null,
+        batchNo: null
       }
     }
   },
@@ -112,8 +104,8 @@ export default {
   methods: {
     getList() {
       this.loading = true
-      listStakeHostingWeeklyCommunityPerformance(this.queryParams).then(response => {
-        this.performanceList = response.rows
+      listStakeHostingGlobalDividendWeightSnapshot(this.queryParams).then(response => {
+        this.snapshotList = response.rows
         this.total = response.total
         this.loading = false
       })
@@ -127,9 +119,9 @@ export default {
       this.handleQuery()
     },
     handleExport() {
-      this.download('xms/stakeHostingWeeklyCommunityPerformance/export', {
+      this.download('xms/stakeHostingGlobalDividendWeightSnapshot/export', {
         ...this.queryParams
-      }, `stakeHostingWeeklyCommunityPerformance_${new Date().getTime()}.xlsx`)
+      }, `stakeHostingGlobalDividendWeightSnapshot_${new Date().getTime()}.xlsx`)
     }
   }
 }

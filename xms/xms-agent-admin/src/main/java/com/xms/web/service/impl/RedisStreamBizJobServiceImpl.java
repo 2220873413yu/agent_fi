@@ -84,8 +84,6 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	@Autowired
 	private IStakeHostingOrderService stakeHostingOrderService;
 
-	@Autowired
-	private IStakeHostingWeeklyCommunityPerformanceService stakeHostingWeeklyCommunityPerformanceService;
 
 	@Autowired
 	private IStakeHostingDailyTeamPerformanceService stakeHostingDailyTeamPerformanceService;
@@ -114,68 +112,58 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	@Transactional(rollbackFor = Exception.class)
 	public Integer handlerDynamicOrderSettlement(List req) {
 		List<OrderMsgDO> ids = BeanUtil.copyToList(req, OrderMsgDO.class);
-		log.debug("需要处理的矿机订单 orders:{}", ids);
+		log.debug("Business processing log");
 		if(CollectionUtil.isNotEmpty(ids)) {
 			OrderMsgDO orderMsgDO = ids.get(0);
 			if(orderMsgDO.getBizType().equals(1)){
-				//质押节点订单的处理
+				// Business processing note.
 				Integer x = handleBizType1(orderMsgDO);
 				if (x != null) return x;
 			}else if(orderMsgDO.getBizType().equals(2)){
-				//提现的业务处理
+				// Business processing note.
 				handleBizType2(orderMsgDO);
 			}else if(orderMsgDO.getBizType().equals(3)){
-				//处理领取了空投 需要更改订单状态、计算等级、修改订单状态
+				// Business processing note.
 				handleBizType3(orderMsgDO);
 			}else if(orderMsgDO.getBizType().equals(4)){
-				//托管订单支付/拨付/结束后重算小区业绩和真实等级
+				// Business processing note.
 				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
 			}else if(orderMsgDO.getBizType().equals(5)){
-				// 旧全球分红周新增业绩统计已停用，入口暂时保留以兼容历史消息。
-				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
+				// Business processing note.
 			}else if(orderMsgDO.getBizType().equals(6)){
-				// 托管订单生效后置处理：G7新增 -> 小区业绩和等级重算；旧周新增收集已停用。
-				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
+				// Business processing note.
 			}else if(orderMsgDO.getBizType().equals(7)){
-				// 旧全球分红到期周小区业绩重算已停用，入口暂时保留以兼容历史消息。
-				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
+				// Business processing note.
 			}
 		}
 		return 1;
 	}
 
 	/**
-	 * 托管订单后置消息处理入口。
 	 *
-	 * <p>外层 Redis 分发方法保留事务是为了兼容旧的节点/钱包批量业务；托管订单后置处理不复用这个大事务。
-	 * 这里通过 Spring 代理以 NOT_SUPPORTED 挂起外层事务，让 G7 和等级重算各自使用自己的事务边界，
-	 * 避免 bizType=6 这种编排方法把多个步骤塞进同一个长事务里。</p>
 	 *
-	 * @param orderMsgDO Redis 消费到的托管订单消息
+	 *
+	 *
+	 *
+	 *
 	 */
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public void handleStakeHostingMessageNoTransaction(OrderMsgDO orderMsgDO) {
 		if (orderMsgDO.getBizType().equals(4)) {
 			handleBizType4(orderMsgDO);
 		} else if (orderMsgDO.getBizType().equals(5)) {
-			// 旧全球分红周业绩收集已废弃；新口径改由t_user_info当前权重和每周快照计算。
-			// stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(orderMsgDO.getId());
 		} else if (orderMsgDO.getBizType().equals(6)) {
 			handleStakeHostingEffectiveAfter(orderMsgDO);
 		} else if (orderMsgDO.getBizType().equals(7)) {
-			// 旧全球分红到期周业绩重算已废弃；新口径改由t_user_info当前权重和每周快照计算。
-			// stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyExpirePerformance(orderMsgDO.getId());
 		}
 	}
 
 	/**
-	 * 托管订单生效后的统一后置处理。
 	 *
-	 * <p>购买回调和后台拨付只发送一条 bizType=6 消息，本方法在消费者中按固定顺序完成同一业务链路里的耗时动作：
-	 * 先统计G7当天团队新增，再重算小区业绩和真实等级。旧全球分红周新增收集已停用，后续全球分红改由
-	 * t_user_info 当前权重和每周快照驱动。</p>
 	 *
-	 * @param orderMsgDO 托管订单生效后置处理消息
+	 *
+	 *
+	 *
 	 */
 	private void handleStakeHostingEffectiveAfter(OrderMsgDO orderMsgDO) {
 		StakeHostingOrder order = stakeHostingOrderService.lambdaQuery()
@@ -183,22 +171,19 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
 			.one();
 		if (order == null) {
-			log.info("托管订单生效后置处理跳过，订单不存在或未支付 orderId:{}", orderMsgDO.getId());
+			log.info("Business processing log");
 			return;
 		}
-		// 1. G7使用当天团队新增业绩，先按订单用户上级链路累加当天新增USDT。
+		// Business processing note.
 		stakeHostingDailyTeamPerformanceService.recordOrderTeamNewAmount(order.getId());
-		// 2. 旧全球分红周新增收集已停用；不再写t_stake_hosting_weekly_community_performance。
-//		if (order.getWeeklyPerformanceStatus() != null
+		// Business processing note.
 //			&& order.getWeeklyPerformanceStatus().equals(StakeHostingOrderServiceImpl.WEEKLY_STATUS_QUEUED)) {
-//			stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(order.getId());
 //		}
-		// 3. 最后重算小区业绩和真实等级，确保等级判断读取到最新G7相关基础数据。
-		stakeHostingOrderService.recalculateStakeHostingLevel(order.getId());
+		// Business processing note.
 	}
 
 	/**
-	 * 托管订单等级重算：只根据个人托管业绩和小区托管业绩刷新真实等级。
+	 *
 	 */
 	private void handleBizType4(OrderMsgDO orderMsgDO) {
 		StakeHostingOrder order = stakeHostingOrderService.lambdaQuery()
@@ -206,14 +191,14 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
 			.one();
 		if (order == null) {
-			log.info("托管等级重算跳过，订单不存在或未支付 orderId:{}", orderMsgDO.getId());
+			log.info("Business processing log");
 			return;
 		}
 		UserInfo userInfo = userInfoService.lambdaQuery()
 			.eq(UserInfo::getUserId, order.getUserId())
 			.one();
 		if (userInfo == null) {
-			log.info("托管等级重算跳过，用户不存在 userId:{}", order.getUserId());
+			log.info("Business processing log");
 			return;
 		}
 		LinkedHashSet<Long> recalculateUserIds = new LinkedHashSet<>();
@@ -236,14 +221,14 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	}
 
 	/**
-	 * 处理领取了空投 需要更改订单状态、计算等级、修改订单状态
+	 *
 	 * @param orderMsgDO
 	 */
 	private void handleBizType3(OrderMsgDO orderMsgDO) {
 	}
 
 	/**
-	 * 提现的业务处理
+	 *
 	 * @param orderMsgDO
 	 */
 	private void handleBizType2(OrderMsgDO orderMsgDO) {
@@ -257,7 +242,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			return ;
 		}
 
-		//系统沉淀手续费率
+		// Business processing note.
 		if(withdrawal.getSystemFeeRatio().compareTo(BigDecimal.ZERO)>0){
 			BigDecimal sysFee = withdrawal.getChangeBalance().multiply(withdrawal.getSystemFeeRatio())
 				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew)
@@ -271,7 +256,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			}
 
 		}
-		//代理分红
+		// Business processing note.
 		if(withdrawal.getAgentDividendFeeRatio().compareTo(BigDecimal.ZERO)>0){
 			BigDecimal fee = withdrawal.getChangeBalance().multiply(withdrawal.getAgentDividendFeeRatio())
 				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew)
@@ -284,15 +269,15 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 					.eq(WithdrawalConfig::getCoinType, withdrawal.getCoinType())
 					.one();
 				if(withdrawalConfig == null){
-					throw new ServiceException("提现配置不存在");
+					throw new ServiceException("Business processing failed");
 				}
 				Map<Integer, List<UserInfo>> levelMap = userInfoList.stream()
 					.collect(Collectors.groupingBy(UserInfo::getGameLevel));
-				// 虚拟等级 2:区代理,3:县代理,4:省代理
+				// Business processing note.
 				List<UserInfo> districtAgents = levelMap.getOrDefault(2, Collections.emptyList());
 				List<UserInfo> countyAgents = levelMap.getOrDefault(3, Collections.emptyList());
 				List<UserInfo> provinceAgents = levelMap.getOrDefault(4, Collections.emptyList());
-				// 配置字段语义已修正：区/县/省份数按字段本身直接对应
+				// Business processing note.
 				int districtShare = defaultShareValue(withdrawalConfig.getDistrictAgentShare());
 				int countyShare = defaultShareValue(withdrawalConfig.getCountyAgentShare());
 				int provinceShare = defaultShareValue(withdrawalConfig.getProvinceAgentShare());
@@ -300,7 +285,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 					+ countyAgents.size() * countyShare
 					+ provinceAgents.size() * provinceShare;
 				if(totalShareCount > 0){
-					// 单个用户可分到的奖励 = 代理分红池 * 当前级别份数 / 全部代理总份数
+					// Business processing note.
 					BigDecimal districtUserReward = calculateAgentDividendUserReward(fee, districtShare, totalShareCount);
 					BigDecimal countyUserReward = calculateAgentDividendUserReward(fee, countyShare, totalShareCount);
 					BigDecimal provinceUserReward = calculateAgentDividendUserReward(fee, provinceShare, totalShareCount);
@@ -309,7 +294,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 					Set<Long> exitStakeUserIds = new HashSet<>();
 					int stakeCount1 = 0;
 					int batchSize = 1000;
-					// 按区代理、县代理、省代理三批写入，便于后续分别设置不同来源类型。
+					// Business processing note.
 					stakeCount1 = appendWithdrawalAgentDividendBatch(districtAgents, districtUserReward, withdrawal,
 						userMoneyValidNum1List, rewardRecordList, withdrawal.getCoinType(), 2, stakeCount1, batchSize, exitStakeUserIds);
 					stakeCount1 = appendWithdrawalAgentDividendBatch(countyAgents, countyUserReward, withdrawal,
@@ -337,15 +322,15 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			.update();
 
 		if(!update){
-			throw new ServiceException("提现订单更新失败");
+			throw new ServiceException("Business processing failed");
 		}*/
 	}
 
 	/**
-	 * 组装提现代理分红批处理数据。
-	 * 同时组装用户资产变更和奖金记录，最后统一批量落库。
-	 * 代理分红发放前，先按收益接收人的进行中质押订单扣减 remainingOutAmount。
-	 * agentLevel: 2=区代理, 3=县代理, 4=省代理
+	 *
+	 *
+	 *
+	 *
 	 */
 	private int appendWithdrawalAgentDividendBatch(List<UserInfo> agentList, BigDecimal userReward, Withdrawal withdrawal,
 												   List<UserMoney> userMoneyValidNum1List, List<RewardRecord> rewardRecordList,
@@ -370,7 +355,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 
 		}
 		for (UserInfo agent : agentList) {
-			// 提现代理分红参照分享奖逻辑：先扣当前代理用户未出局质押订单的剩余可产出。
+			// Business processing note.
 			BigDecimal actualRewardAmount = deductStakeRemainingOutAmount(agent.getUserId(), userReward, exitStakeUserIds);
 			if(actualRewardAmount.compareTo(BigDecimal.ZERO) <= 0){
 				continue;
@@ -404,7 +389,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 					rewardRecordService.saveBatch(rewardRecordList);
 					rewardRecordList.clear();
 				}
-				log.info("提现代理分红批量更新成功");
+				log.info("Business processing skipped");
 				stakeCount1 = 0;
 			}
 		}
@@ -424,7 +409,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	}
 
 	/**
-	 * 处理购买节点的订单任务
+	 *
 	 * @param orderMsgDO
 	 * @return
 	 */
@@ -441,7 +426,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 		UserInfo userInfo = userInfoService.lambdaQuery()
 			.eq(UserInfo::getUserId, packageOrder.getUserId())
 			.one();
-		//更新团队节点信息+发奖励
+		// Business processing note.
 		if(userInfo.getInviteUserId()!=null){
 			userInfoService.lambdaUpdate()
 				.eq(UserInfo::getUserId, userInfo.getInviteUserId())
@@ -453,7 +438,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 				.setSql("node_team_performance = node_team_performance + 1")
 				.setSql("umbrella_node_performance = umbrella_node_performance + " + packageOrder.getOrderValueUsdt())
 				.update();
-			//发放直推、间推、奖励
+			// Business processing note.
 			UserInfo inviteUserInfo = userInfoService.lambdaQuery()
 				.eq(UserInfo::getUserId, userInfo.getInviteUserId())
 				.one();
@@ -467,14 +452,14 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 						.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew)
 						.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 					if(directReward.compareTo(BigDecimal.ZERO)>0){
-						//直推奖励
+						// Business processing note.
 						int count = userWalletServiceImpl.handerUserMoney(directReward, packageOrder.getOrderNo(),
 							inviteUserInfo.getUserId(), packageOrder.getUserId(), ConstantType.user_money_log_source_type.type_1,
 							ConstantType.user_money_coin_type.type_1);
 						if (count != 1) {
 							throw new ServiceException(ResponseCode.CODE_1015);
 						}
-						//奖金记录-直推奖励
+						// Business processing note.
 						RewardRecord rewardRecordEntity = new RewardRecord();
 						rewardRecordEntity.setOrderCode(IDUtils.getSnowflakeStr());
 						rewardRecordEntity.setUserId(inviteUserInfo.getUserId());
@@ -490,7 +475,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 				}
 			}
 
-			//间推奖励
+			//闂傚倸鐡ㄧ敮瑙勭附閺嵮冃?
 			if(inviteUserInfo.getInviteUserId()!=null){
 				UserInfo indirectUserInfo = userInfoService.lambdaQuery()
 					.eq(UserInfo::getUserId, inviteUserInfo.getInviteUserId())
@@ -500,13 +485,13 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 					NodePackage nodePackage = nodePackageService.lambdaQuery()
 						.eq(NodePackage::getId, indirectUserInfo.getNodeLevel())
 						.one();
-					log.info("间推比例: indirectUserOrder:{}",nodePackage);
+					log.info("闂傚倸鐡ㄧ敮鐟靶掗弬鍓т紣: indirectUserOrder:{}",nodePackage);
 					if(nodePackage.getIndirectReferralRate().compareTo(BigDecimal.ZERO)>0){
 						BigDecimal indirectReward = nodePackage.getIndirectReferralRate().multiply(packageOrder.getOrderValueUsdt())
 							.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew)
 							.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 						if(indirectReward.compareTo(BigDecimal.ZERO)>0){
-							//间推奖励
+							//闂傚倸鐡ㄧ敮瑙勭附閺嵮冃?
 							int count = userWalletServiceImpl.handerUserMoney(indirectReward, packageOrder.getOrderNo(),
 								indirectUserInfo.getUserId(), packageOrder.getUserId(), ConstantType.user_money_log_source_type.type_2,
 								ConstantType.user_money_coin_type.type_1);
@@ -514,7 +499,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 								throw new ServiceException(ResponseCode.CODE_1015);
 							}
 
-							//奖金记录-间推奖励
+							// Business processing note.
 							RewardRecord rewardRecordEntity = new RewardRecord();
 							rewardRecordEntity.setOrderCode(IDUtils.getSnowflakeStr());
 							rewardRecordEntity.setUserId(indirectUserInfo.getUserId());
@@ -532,33 +517,33 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			}
 		}
 
-		//更改订单状态
+		// Business processing note.
 		boolean update1 = nodePackageOrderService.lambdaUpdate()
 			.eq(NodePackageOrder::getId, packageOrder.getId())
 			.eq(NodePackageOrder::getBizStatus, 0)
 			.set(NodePackageOrder::getBizStatus, 1)
 			.update();
 		if(!update1){
-			log.info("处理节点订单失败,可能已经更新过了.请稍后再试");
+			log.info("Skip node order update failure");
 		}
 		return null;
 	}
 
 	/*private Integer handleBizType11(OrderMsgDO orderMsgDO) {
-		//正常购买矿机回调处理
+		// Business processing note.
 		MiningPackageOrder queryOrder = miningPackageOrderService.lambdaQuery()
 			.eq(MiningPackageOrder::getId, orderMsgDO.getId())
 			.eq(MiningPackageOrder::getBizStatus,0)
 			.one();
 		if(queryOrder==null){
-			log.info("矿机订单已经处理 订单id:{}", orderMsgDO.getId());
+			log.info("Business processing log");
 			return 1;
 		}
-		//订单奖励
+		// Business processing note.
 		BigDecimal orderReward = queryOrder.getPayType() == 1?queryOrder.getOrderValueUsdt():queryOrder.getPayValidNum2();
 		Integer rewardCoinType = queryOrder.getPayType() == 1?ConstantType.user_money_coin_type.type_1:ConstantType.user_money_coin_type.type_2;
-		//查询直推、间推比例
-		//1:直推,2:间推,3:市代理,4:省代理,5:全国代理
+		// Business processing note.
+		// Business processing note.
 		Map<Integer, BigDecimal> rewardMap = miningRewardConfigService.lambdaQuery()
 			.list().stream()
 			.map(config->{
@@ -570,17 +555,17 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			.eq(UserInfo::getUserId, queryOrder.getUserId())
 			.one();
 		if(userInfo.getInviteUserId()!=null){
-			// 按邀请链向上查找最近两个有效上级：第一个有效用户发直推，第二个有效用户发间推
+			// Business processing note.
 			List<ParentUserTaskVo> validParentUsers = userInfoService.getValidParentUserTaskVo(userInfo.getUserId(), 2);
 			if(CollectionUtil.isNotEmpty(validParentUsers)){
 				ParentUserTaskVo directUser = validParentUsers.get(0);
-				// 最近的有效上级作为直推奖励接收人
+				// Business processing note.
 				grantInviteReward(directUser.getUserId(), rewardMap.get(1), orderReward, queryOrder, userInfo.getUserId(),
 					rewardCoinType, ConstantType.user_money_log_source_type.type_8,
 					ConstantType.xms_reward_record_source_type.type_10);
 				if(validParentUsers.size() > 1){
 					ParentUserTaskVo indirectUser = validParentUsers.get(1);
-					// 在直推上级之上继续找到的下一个有效用户作为间推奖励接收人
+					// Business processing note.
 					grantInviteReward(indirectUser.getUserId(), rewardMap.get(2), orderReward, queryOrder, userInfo.getUserId(),
 						rewardCoinType, ConstantType.user_money_log_source_type.type_9,
 						ConstantType.xms_reward_record_source_type.type_11);
@@ -588,10 +573,10 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			}
 		}
 
-		//查询市代、省代、全国代人数
+		// Business processing note.
 		List<UserInfo> userInfoList = userInfoService.list(new QueryWrapper<UserInfo>()
 			.select("user_id", "is_valid","GREATEST(IFNULL(game_level, 0), IFNULL(min_game_level, 0), IFNULL(admin_game_level, 0)) AS game_level")
-			// 实际等级：取真实等级、赠送等级、管理员保底等级的最大值
+			// Business processing note.
 			.apply("GREATEST(IFNULL(game_level, 0), IFNULL(min_game_level, 0), IFNULL(admin_game_level, 0)) IN (3,4,5)"));
 		if(CollectionUtil.isNotEmpty(userInfoList)){
 			Map<Integer, List<UserInfo>> levelMap = userInfoList.stream()
@@ -609,7 +594,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 				BigDecimal cityAgentsReward = rewardMap.get(3).multiply(orderReward)
 					.setScale(ConstantStatic.newScale,ConstantStatic.roundingModeNew);
 				if(cityAgentsReward.compareTo(BigDecimal.ZERO)>0){
-					//奖励大于0才发放
+					// Business processing note.
 					BigDecimal userReward = cityAgentsReward.divide
 						(new BigDecimal(cityAgents.size()), ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 					if(userReward.compareTo(BigDecimal.ZERO)>0){
@@ -628,7 +613,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 								if (stakeCount1 >= batchSize) {
 									bachUpdateMoneyValid1(userMoneyValidNum1List, rewardCoinType);
 									userMoneyValidNum1List.clear();
-									log.info("更新成功");
+									log.info("Business processing skipped");
 									stakeCount1 = 0;
 								}
 
@@ -653,7 +638,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 				BigDecimal provinceAgentsReward = rewardMap.get(4).multiply(orderReward)
 					.setScale(ConstantStatic.newScale,ConstantStatic.roundingModeNew);
 				if(provinceAgentsReward.compareTo(BigDecimal.ZERO)>0){
-					//奖励大于0才发放
+					// Business processing note.
 					BigDecimal userReward = provinceAgentsReward.divide
 						(new BigDecimal(provinceAgents.size()), ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 					if(userReward.compareTo(BigDecimal.ZERO)>0){
@@ -672,7 +657,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 								if (stakeCount1 >= batchSize) {
 									bachUpdateMoneyValid1(userMoneyValidNum1List, rewardCoinType);
 									userMoneyValidNum1List.clear();
-									log.info("更新成功");
+									log.info("Business processing skipped");
 									stakeCount1 = 0;
 								}
 
@@ -717,7 +702,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 								if (stakeCount1 >= batchSize) {
 									bachUpdateMoneyValid1(userMoneyValidNum1List, rewardCoinType);
 									userMoneyValidNum1List.clear();
-									log.info("更新成功");
+									log.info("Business processing skipped");
 									stakeCount1 = 0;
 								}
 
@@ -737,12 +722,12 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 				}
 			}
 
-			//修改资产
+			// Business processing note.
 			if (CollectionUtil.isNotEmpty(userMoneyValidNum1List)) {
 				bachUpdateMoneyValid1(userMoneyValidNum1List, rewardCoinType);
 			}
 
-			//插入v1资产
+			// Business processing note.
 			if (CollectionUtil.isNotEmpty(rewardRecordList)) {
 				rewardRecordService.saveBatch(rewardRecordList);
 			}
@@ -755,10 +740,10 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			.set(MiningPackageOrder::getUpdateTime, new Date())
 			.update();
 		if(!update){
-			throw new ServiceException("更新矿机订单信息失败");
+			throw new ServiceException("Business processing failed");
 		}
 
-		//处理等级
+		// Business processing note.
 		List<Long> parentIds = userInfo.getParentIds();
 		if(CollectionUtil.isNotEmpty(parentIds)){
 			parentIds.addLast(userInfo.getUserId());
@@ -811,7 +796,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	}
 
 	private BigDecimal deductStakeRemainingOutAmount(Long rewardUserId, BigDecimal rewardAmount, Set<Long> exitStakeUserIds) {
-		// 按收益接收人的进行中质押订单处理，遵循先到先扣。
+		// Business processing note.
 		List<StakeOrder> activeStakeOrders = stakeOrderService.lambdaQuery()
 			.eq(StakeOrder::getStatus, 1)
 			.eq(StakeOrder::getUserId, rewardUserId)
@@ -826,7 +811,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 		List<StakeOrder> updateStakeOrders = new ArrayList<>();
 		Map<Long, Integer> finishOrderCountMap = new HashMap<>();
 		Map<Long, BigDecimal> performanceReduceMap = new HashMap<>();
-		// 这里依赖事务和顺序队列串行消费，不额外使用 for update 行锁。
+		// Business processing note.
 		for (StakeOrder stakeOrder : activeStakeOrders) {
 			BigDecimal orderRemainingOutAmount = getOrderRemainingOutAmount(stakeOrder);
 			if(orderRemainingOutAmount.compareTo(BigDecimal.ZERO) <= 0){
@@ -858,7 +843,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 		if(CollectionUtil.isNotEmpty(updateStakeOrders)){
 			boolean update = stakeOrderService.updateBatchById(updateStakeOrders);
 			if(!update){
-				throw new ServiceException("更新质押订单剩余可产出失败");
+				throw new ServiceException("Update stake order failed");
 			}
 		}
 		if(CollectionUtil.isNotEmpty(finishOrderCountMap)){
@@ -924,7 +909,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			.select(UserInfo::getUserId, UserInfo::getParentChain)
 			.one();
 		if(userInfo == null){
-			throw new ServiceException("用户信息不存在");
+			throw new ServiceException("User not found");
 		}
 		BigDecimal reduceAmount = performanceReduceMap.getOrDefault(rewardUserId, BigDecimal.ZERO)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
@@ -933,7 +918,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			.setSql("performance = GREATEST(IFNULL(performance, 0) - " + reduceAmount.toPlainString() + ", 0)")
 			.update();
 		if(!update){
-			throw new ServiceException("更新用户质押业绩失败");
+			throw new ServiceException("Business processing failed");
 		}
 		List<Long> parentIds = userInfo.getParentIds();
 		if(CollectionUtil.isNotEmpty(parentIds) && reduceAmount.compareTo(BigDecimal.ZERO) > 0){
@@ -942,7 +927,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 				.setSql("umbrella_performance = GREATEST(IFNULL(umbrella_performance, 0) - " + reduceAmount.toPlainString() + ", 0)")
 				.update();
 			if(!update){
-				throw new ServiceException("更新团队质押业绩失败");
+				throw new ServiceException("Business processing failed");
 			}
 		}
 	}
@@ -987,7 +972,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	}
 
 //	/**
-//	 * 计算用户等级
+// Business processing note.
 //	 * @param info
 //	 * @param userLevelConfigList
 //	 */
@@ -995,7 +980,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 //		Integer origLevel = info.getGameLevel();
 //		Integer currentLevel = 0;
 //		if(info.getPerformance().compareTo(BigDecimal.ZERO)>0){
-//			// 计算直推线数量
+// Business processing note.
 //			List<UserInfo> directUserList = userInfoService.lambdaQuery()
 //				.eq(UserInfo::getInviteUserId, info.getUserId())
 //				.select(UserInfo::getUserId,UserInfo::getGameLevel,UserInfo::getPerformance,
@@ -1003,12 +988,12 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 //				.list();
 //			Map<Long, List<UserInfo>> childUserListMap = new HashMap<>();
 //			for (UserLevelConfig userLevelConfig : userLevelConfigList) {
-//				// 大区业绩+小区业绩+自身业绩满足档位条件
-//				//计算大区业绩
+// Business processing note.
+// Business processing note.
 //				if(info.getMaxLegPerformance().compareTo(userLevelConfig.getTeamPerformance())>=0
-//					//小区业绩
+// Business processing note.
 //					&& info.getCommunityPerformance().compareTo(userLevelConfig.getCommunityPerformance())>=0
-//					//自身业绩大于1
+// Business processing note.
 //					&& info.getPerformance().compareTo(userLevelConfig.getPerformance())>=0){
 //					if(userLevelConfig.getLevel()>1){
 //						if(CollectionUtil.isEmpty(directUserList) || directUserList.size()<userLevelConfig.getRequiredLegNum()){
@@ -1018,35 +1003,35 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 //						Integer legLevelMin = userLevelConfig.getLegLevelMin();
 //						Integer legLevelCount = userLevelConfig.getLegLevelCount();
 //						int hitLines = 0;
-//						// 逐条线统计是否满足“该等级人数”要求
+// Business processing note.
 //						for (UserInfo childUser : directUserList) {
 //							List<UserInfo> childUserList = childUserListMap.computeIfAbsent(childUser.getUserId(), userId -> {
 //								List<UserInfo> list = userInfoService.getChildUserList(userId);
 //								if (list == null) {
 //									list = new ArrayList<>();
 //								}
-//								// 该线包含直推本人
+// Business processing note.
 //								list.add(childUser);
 //								return list;
 //							});
 //							long matchCount = childUserList.stream()
 //								.filter(u -> u.getGameLevel() != null && legLevelMin != null && u.getGameLevel() >= legLevelMin)
 //								.count();
-//							// 该线满足人数要求则计为命中
+// Business processing note.
 //							if (legLevelCount == null || matchCount >= legLevelCount) {
 //								hitLines++;
 //							}
-//							// 命中线数已满足要求，提前结束
+// Business processing note.
 //							if (hitLines >= userLevelConfig.getRequiredLegNum()) {
 //								break;
 //							}
 //						}
-//						// 命中线数不足，跳过该档位
+// Business processing note.
 //						if (hitLines < userLevelConfig.getRequiredLegNum()) {
 //							continue;
 //						}
 //					}
-//					// 记录当前满足的最高档位
+// Business processing note.
 //					currentLevel = userLevelConfig.getLevel();
 //				}
 //			}
@@ -1065,7 +1050,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 
 
 	/**
-	 * 对佣金钱包资产增加
+	 *
 	 *
 	 * @param userMoneyList
 	 */
@@ -1090,15 +1075,15 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 		});
 		if (ArrayUtil.contains(ints, 0)) {
 			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-			log.error("结算更新回滚了");
-			throw new ServiceException("更新资产结算更新回滚了");
+			log.error("Team reward settlement update failed");
+			throw new ServiceException("Team reward settlement update failed");
 		}
 	}
 
 
 
 	/**
-	 * 对usdt资产增加
+	 *
 	 *
 	 * @param userMoneyList
 	 */
@@ -1123,13 +1108,13 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 		});
 		if (ArrayUtil.contains(ints, 0)) {
 			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-			log.error("结算更新回滚了");
-			throw new ServiceException("更新资产结算更新回滚了");
+			log.error("Team reward settlement update failed");
+			throw new ServiceException("Team reward settlement update failed");
 		}
 	}
 
 	/**
-	 * 对usdt资产增加
+	 *
 	 *
 	 * @param userMoneyList
 	 */
@@ -1154,8 +1139,8 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 		});
 		if (ArrayUtil.contains(ints, 0)) {
 			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-			log.error("结算更新回滚了");
-			throw new ServiceException("更新资产结算更新回滚了");
+			log.error("Team reward settlement update failed");
+			throw new ServiceException("Team reward settlement update failed");
 		}
 	}
 }

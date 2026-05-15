@@ -100,7 +100,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from t_stake_hosting_daily_team_performance
         where user_id = #{userId}
           and stat_day &lt; #{statDay}
+          and stat_day &gt;= #{beginStatDay}
           and calc_status = 1
+          and rate_source = #{rateSource}
           and deleted = 0
         order by stat_day desc
         limit 6
@@ -120,7 +122,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 #{userId}
             </foreach>
               and p.stat_day &lt; #{statDay}
+              and p.stat_day &gt;= #{beginStatDay}
               and p.calc_status = 1
+              and p.rate_source = #{rateSource}
               and p.deleted = 0
         ) t
         where t.rn &lt;= 6

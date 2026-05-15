@@ -221,9 +221,9 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 		BigDecimal gDay = calculateGDay(previousTvl, currentTvl);
 		BigDecimal gSmooth = calculateGSmooth(previousGDays, gDay);
-		boolean hasG7NewPerformance = hasG7NewPerformance(previousTvl, currentTvl);
-		BigDecimal staticRate = hasG7NewPerformance ? staticRateConfigService.matchStaticRate(gSmooth) : PURE_STATIC_RATE_BEFORE_RETURN_PERCENT;
-		Integer rateSource = hasG7NewPerformance ? RATE_SOURCE_G7 : RATE_SOURCE_PURE_STATIC;
+		boolean hasG7Window = hasG7Window(previousTvl, currentTvl, previousGDays);
+		BigDecimal staticRate = hasG7Window ? staticRateConfigService.matchStaticRate(gSmooth) : PURE_STATIC_RATE_BEFORE_RETURN_PERCENT;
+		Integer rateSource = hasG7Window ? RATE_SOURCE_G7 : RATE_SOURCE_PURE_STATIC;
 		lambdaUpdate()
 			.eq(StakeHostingDailyTeamPerformance::getId, snapshot.getId())
 			.set(StakeHostingDailyTeamPerformance::getPreviousTeamTvl, previousTvl)
@@ -271,7 +271,7 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		if (CollectionUtil.isEmpty(userIds)) {
 			return java.util.Collections.emptyMap();
 		}
-		return baseMapper.selectRecentGDayBeforeBatch(userIds, rewardDay).stream()
+		return baseMapper.selectRecentGDayBeforeBatch(userIds, rewardDay, beforeDays(rewardDay, 6), RATE_SOURCE_G7).stream()
 			.collect(Collectors.groupingBy(StakeHostingDailyTeamPerformance::getUserId,
 				Collectors.mapping(item -> nvl(item.getGDay()), Collectors.toList())));
 	}
@@ -336,6 +336,21 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 	}
 
 	/**
+	 * 判断用户是否仍处于最近最多7天G7平滑收益率窗口。
+	 *
+	 * <p>当天或昨日存在团队新增时，当前快照自然按G7区间计算；当天为0->0时，只要前6条历史G_day仍存在，
+	 * 也继续使用当天G_day加历史G_day计算出的Gsmooth匹配区间，避免负增长尚未滚出窗口就回退到未推广0.5%。</p>
+	 *
+	 * @param previousTvl 昨日团队新增托管USDT金额
+	 * @param currentTvl 今日团队新增托管USDT金额
+	 * @param previousGDays 收益日前最近最多6条已计算G_day，单位%
+	 * @return true表示按Gsmooth命中G7区间，false表示最近窗口无G7记录，按未推广规则处理
+	 */
+	private boolean hasG7Window(BigDecimal previousTvl, BigDecimal currentTvl, List<BigDecimal> previousGDays) {
+		return hasG7NewPerformance(previousTvl, currentTvl) || CollectionUtil.isNotEmpty(previousGDays);
+	}
+
+	/**
 	 * 使用当天G_day和前6个已计算G_day计算最近最多7天滚动平均。
 	 *
 	 * <p>Gsmooth用于平滑单日G值波动。当天G_day一定参与平均，再向前查询最多6条已经计算完成的历史G_day。
@@ -386,5 +401,9 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 
 	private Integer previousDay(Integer day) {
 		return Integer.valueOf(LocalDate.parse(String.valueOf(day), DAY_FORMATTER).minusDays(1).format(DAY_FORMATTER));
+	}
+
+	private Integer beforeDays(Integer day, int days) {
+		return Integer.valueOf(LocalDate.parse(String.valueOf(day), DAY_FORMATTER).minusDays(days).format(DAY_FORMATTER));
 	}
 }

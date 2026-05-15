@@ -82,7 +82,9 @@ public interface StakeHostingDailyTeamPerformanceMapper extends XmsMapper<StakeH
 	 * @return G_day列表，按日期倒序
 	 */
 	List<BigDecimal> selectRecentGDayBefore(@Param("userId") Long userId,
-											@Param("statDay") Integer statDay);
+											@Param("statDay") Integer statDay,
+											@Param("beginStatDay") Integer beginStatDay,
+											@Param("rateSource") Integer rateSource);
 
 	/**
 	 * 批量查询多个用户在指定日期之前最近最多6天的G_day。
@@ -94,7 +96,9 @@ public interface StakeHostingDailyTeamPerformanceMapper extends XmsMapper<StakeH
 	 * @return G7快照列表，每个用户最多6条，按用户和日期倒序返回
 	 */
 	List<StakeHostingDailyTeamPerformance> selectRecentGDayBeforeBatch(@Param("userIds") Collection<Long> userIds,
-																	   @Param("statDay") Integer statDay);
+																	   @Param("statDay") Integer statDay,
+																	   @Param("beginStatDay") Integer beginStatDay,
+																	   @Param("rateSource") Integer rateSource);
 
 	/**
 	 * 批量查询多个用户某一天的团队新增业绩。

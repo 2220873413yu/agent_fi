@@ -78,6 +78,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	private static final BigDecimal PURE_STATIC_RATE_BEFORE_RETURN_PERCENT = new BigDecimal("0.5");
 	private static final BigDecimal PURE_STATIC_RATE_AFTER_RETURN_PERCENT = new BigDecimal("0.2");
 	private static final BigDecimal PERCENT_DIVISOR = new BigDecimal("100");
+	private static final BigDecimal TWO = new BigDecimal("2");
 	private static final String SQL_VALID_NUM1 = "UPDATE t_user_money SET update_time=?,gt_id=?,valid_num1=valid_num1+?,source_code=?,source_type=?,source_id=? WHERE id=? ";
 
 	private final IStakeHostingOrderService stakeHostingOrderService;
@@ -1131,6 +1132,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 												  BigDecimal netReward, int rewardDay, Date now,
 												  TeamRewardCollectContext context) {
 		// 读取F等级对应的团队奖励比例；本轮101任务内复用同一份配置，避免每笔订单重复查等级配置表。
+		// Same-level rule: later same-level users cause the first user to yield half of this diff pool.
 		Map<Integer, BigDecimal> levelRatioMap = getCachedLevelRatioMap(context);
 		// 已覆盖比例只由“实际到账”的上级推进；未持有未出局托管订单的上级在进入本方法前已被过滤。
 		BigDecimal coveredRatio = BigDecimal.ZERO;
@@ -1151,16 +1153,23 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 				BigDecimal diffRewardAmount = calculateReward(netReward, diffRatio);
 				if (CollectionUtil.isNotEmpty(sameLevelGroup.sameIndexes)) {
 					ParentUserTaskVo diffUser = parentUsers.get(sameLevelGroup.sameIndexes.get(0));
-					// 当前等级组的第一个同级用户只拿完整极差，不参与本组平级池拆分。
+					List<Integer> rewardSameIndexes = sameLevelGroup.rewardSameIndexes();
+					boolean hasLaterSameLevel = CollectionUtil.isNotEmpty(rewardSameIndexes);
+					// When later same-level users exist, the first user keeps half of this diff pool and yields the other half.
+					BigDecimal firstDiffRewardAmount = hasLaterSameLevel
+						? diffRewardAmount.divide(TWO, ConstantStatic.newScale, ConstantStatic.roundingModeNew)
+						: diffRewardAmount;
+					// 当前等级组的第一个同级用户在存在后续同级时只拿一半极差，否则仍拿完整极差。
 					collectTeamReward(context, order, diffUser.getUserId(), REWARD_TYPE_DIFF, level, netReward, diffRatio,
-						diffRewardAmount, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
+						firstDiffRewardAmount, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 						serviceFeeRatio, serviceFee, netReward, rewardDay, now);
 					// 只有用户实际拿到极差后，当前等级比例才算被覆盖，后续更高等级只拿补差。
 					coveredRatio = levelRatio;
-					if (level >= 5) {
-						// F5及以上：以第一个同级拿到的极差金额作为平级池，只让后续同级按实际人数重新拆分。
-						collectSameLevelReward(order, parentUsers, sameLevelGroup.rewardSameIndexes(),
-							level, netReward, diffRatio, diffRewardAmount, grossReward, baseStaticRate,
+					if (level >= 5 && hasLaterSameLevel) {
+						BigDecimal sameLevelPool = diffRewardAmount.subtract(firstDiffRewardAmount);
+						// F5及以上：以后续同级让出的另一半极差金额作为平级池，按实际人数重新拆分。
+						collectSameLevelReward(order, parentUsers, rewardSameIndexes,
+							level, netReward, diffRatio, sameLevelPool, grossReward, baseStaticRate,
 							afiAccelerateRate, actualStaticRate, serviceFeeRatio, serviceFee, rewardDay, now, context);
 					}
 				}

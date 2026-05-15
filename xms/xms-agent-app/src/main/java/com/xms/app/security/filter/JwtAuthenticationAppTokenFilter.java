@@ -124,10 +124,10 @@ public class JwtAuthenticationAppTokenFilter extends OncePerRequestFilter {
 				|| requestURI.contains(URL_WITHDRAWAL_CALLBACK)
 				|| requestURI.contains("/api/afiOrder/callback")
 				|| requestURI.contains("/api/pledgeOrder/callback")
-				|| requestURI.contains("/open/ai/chat/sse")
-				|| requestURI.contains("/open/ai/chat")
-				|| requestURI.contains("/open/ai/chat/image")
-				|| requestURI.contains("/open/ai/chat/sse/image")
+//				|| requestURI.contains("/open/ai/chat/sse")
+//				|| requestURI.contains("/open/ai/chat")
+//				|| requestURI.contains("/open/ai/chat/image")
+//				|| requestURI.contains("/open/ai/chat/sse/image")
 			) {
 				LoginAppUser loginAppUser = appTokenService.getLoginUser(request);
 				if (StringUtils.isNotNull(loginAppUser) && StringUtils.isNull(SecurityUtils.getAuthentication())) {

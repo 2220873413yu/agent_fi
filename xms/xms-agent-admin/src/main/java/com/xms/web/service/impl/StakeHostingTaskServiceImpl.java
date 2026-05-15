@@ -75,8 +75,6 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	private static final BigDecimal PLACEHOLDER_STATIC_RATE = new BigDecimal("0.005");
 	private static final boolean FORCE_TEST_STATIC_RATE = Boolean.parseBoolean("true");
 	private static final BigDecimal TEST_STATIC_RATE_PERCENT = new BigDecimal("1");
-	private static final BigDecimal PURE_STATIC_RATE_BEFORE_RETURN_PERCENT = new BigDecimal("0.5");
-	private static final BigDecimal PURE_STATIC_RATE_AFTER_RETURN_PERCENT = new BigDecimal("0.2");
 	private static final BigDecimal PERCENT_DIVISOR = new BigDecimal("100");
 	private static final BigDecimal TWO = new BigDecimal("2");
 	private static final String SQL_VALID_NUM1 = "UPDATE t_user_money SET update_time=?,gt_id=?,valid_num1=valid_num1+?,source_code=?,source_type=?,source_id=? WHERE id=? ";
@@ -712,7 +710,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * 构建本轮101静态收益计算上下文。
 	 *
 	 * <p>静态收益发放是订单循环热路径，同一个用户可能有多笔产出中订单。这里提前批量加载用户指定收益率、
-	 * 当天G7快照和当天可生效AFI质押记录，避免在每笔订单里重复查询用户、快照和AFI质押表。</p>
+	 * 当天G7快照、纯静态收益率参数和当天可生效AFI质押记录，避免在每笔订单里重复查询数据库。</p>
 	 *
 	 * @param orderList 本轮101待发放的产出中托管订单
 	 * @param rewardDay 收益日期，格式yyyyMMdd
@@ -731,6 +729,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.map(StakeHostingOrder::getId)
 			.distinct()
 			.collect(Collectors.toList());
+
+		// 纯静态收益率是本轮任务固定参数，在订单循环外读取一次即可。
+		context.pureStaticRateBeforeReturnPercent = new BigDecimal(sysParaServiceImpl.getValue(ConstantSys.PURE_STATIC_RATE_BEFORE_RETURN_PERCENT));
+		context.pureStaticRateAfterReturnPercent = new BigDecimal(sysParaServiceImpl.getValue(ConstantSys.PURE_STATIC_RATE_AFTER_RETURN_PERCENT));
 
 		// 用户指定静态收益率按用户批量读取，同用户多订单直接复用。
 		List<UserInfo> users = userInfoService.lambdaQuery()
@@ -769,12 +771,14 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	/**
 	 * 本轮101静态收益计算上下文。
 	 *
-	 * <p>用于缓存订单循环热路径中会重复使用的数据：用户指定收益率、G7收益率快照和AFI质押加速记录。</p>
+	 * <p>用于缓存订单循环热路径中会重复使用的数据：用户指定收益率、G7收益率快照、纯静态参数和AFI质押加速记录。</p>
 	 */
 	private static class StaticRewardCalculateContext {
 		private Map<Long, UserInfo> userMap = new HashMap<>();
 		private Map<Long, StakeHostingDailyTeamPerformance> snapshotMap = new HashMap<>();
 		private Map<Long, StakeHostingAfiPledge> afiPledgeMap = new HashMap<>();
+		private BigDecimal pureStaticRateBeforeReturnPercent = BigDecimal.ZERO;
+		private BigDecimal pureStaticRateAfterReturnPercent = BigDecimal.ZERO;
 	}
 
 	/**
@@ -890,9 +894,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			return percentToRate(user.getStakeHostingStaticRate());
 		}
 		StakeHostingDailyTeamPerformance snapshot = context.snapshotMap.get(order.getUserId());
-		if (!hasG7NewPerformanceSnapshot(snapshot)) {
-			BigDecimal pureStaticRate = order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1
-				? PURE_STATIC_RATE_AFTER_RETURN_PERCENT : PURE_STATIC_RATE_BEFORE_RETURN_PERCENT;
+		if (snapshot == null) {
+			BigDecimal pureStaticRate = loadPureStaticRatePercent(context, order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1);
 			return percentToRate(pureStaticRate);
 		}
 		if (snapshot.getBaseStaticRate() == null) {
@@ -924,9 +927,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			finalStaticRate = user.getStakeHostingStaticRate();
 			rateSource = "指定收益率";
 			remark = "用户 stake_hosting_static_rate > 0，优先使用后台指定收益率";
-		} else if (!hasG7NewPerformanceSnapshot(snapshot)) {
-			finalStaticRate = order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1
-				? PURE_STATIC_RATE_AFTER_RETURN_PERCENT : PURE_STATIC_RATE_BEFORE_RETURN_PERCENT;
+		} else if (snapshot == null) {
+			finalStaticRate = loadPureStaticRatePercent(context, order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1);
 			rateSource = "未推广规则";
 			remark = order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1
 				? "昨日和今日团队新增均为0，订单已回本，使用回本后纯静态收益率"
@@ -960,28 +962,22 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
-	 * 判断快照是否存在可用于G7计算的团队新增业绩。
+	 * Reads the pure static rate percent used when no G7 snapshot exists.
 	 *
-	 * <p>G7静态日利率按“今日团队新增 vs 昨日团队新增”计算；
-	 * 今日新增为0但昨日新增大于0时会产生负增长，仍必须走G7档位，不能落入未推广纯静态规则。</p>
-	 *
-	 * @param snapshot G7每日团队新增快照
-	 * @return true表示应按G7快照收益率计算
+	 * @param returnedPrincipal true when the stake hosting order has returned principal
+	 * @return percent value from t_sys_para, e.g. 0.5 means 0.5%
 	 */
-	private boolean hasG7NewPerformanceSnapshot(StakeHostingDailyTeamPerformance snapshot) {
-		if (snapshot == null) {
-			return false;
-		}
-		BigDecimal previousTeamNewAmount = snapshot.getPreviousTeamTvl() == null ? BigDecimal.ZERO : snapshot.getPreviousTeamTvl();
-		BigDecimal currentTeamNewAmount = snapshot.getCurrentTeamTvl() == null ? BigDecimal.ZERO : snapshot.getCurrentTeamTvl();
-		return previousTeamNewAmount.compareTo(BigDecimal.ZERO) > 0 || currentTeamNewAmount.compareTo(BigDecimal.ZERO) > 0;
+	private BigDecimal loadPureStaticRatePercent(StaticRewardCalculateContext context, boolean returnedPrincipal) {
+		return returnedPrincipal
+			? context.pureStaticRateAfterReturnPercent
+			: context.pureStaticRateBeforeReturnPercent;
 	}
 
 	/**
-	 * 将百分比收益率换算成实际乘数。
+	 * Converts a percent rate to a multiplier used for reward calculation.
 	 *
-	 * @param percentRate 百分比收益率，例如0.5表示0.5%
-	 * @return 实际乘数，例如0.005
+	 * @param percentRate percent value, e.g. 0.5 means 0.5%
+	 * @return multiplier value, e.g. 0.005
 	 */
 	private BigDecimal percentToRate(BigDecimal percentRate) {
 		return percentRate.divide(PERCENT_DIVISOR, 8, ConstantStatic.roundingModeNew);

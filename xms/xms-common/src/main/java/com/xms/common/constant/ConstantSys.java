@@ -140,4 +140,15 @@ public class ConstantSys {
 
 	// 调用open ai请求支付多少钱 例如:1就是支付1AFI
 	public static final String biz_pay_afi_amount = "biz_pay_afi_amount";
+
+	/**
+	 * 未触发G7区间时，未回本订单使用的纯静态基础收益率，单位%。
+	 */
+	public static final String PURE_STATIC_RATE_BEFORE_RETURN_PERCENT = "PURE_STATIC_RATE_BEFORE_RETURN_PERCENT";
+
+	/**
+	 * 未触发G7区间时，已回本订单使用的纯静态基础收益率，单位%。
+	 */
+	public static final String PURE_STATIC_RATE_AFTER_RETURN_PERCENT = "PURE_STATIC_RATE_AFTER_RETURN_PERCENT";
+
 }

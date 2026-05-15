@@ -98,7 +98,7 @@ public class OpenAiChatController {
 	@PostMapping(value = "/chat/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	@Anonymous
 	public SseEmitter chatSSe(@RequestBody Message message) {
-		requireAiAgent();
+		//requireAiAgent();
 		Long logUserId = getCurrentUserIdForLog("OpenAI SSE");
 		log.info("OpenAI SSE开始请求，userId={}, message={}", logUserId, message);
 		return SseEmitterHelper.createEmitter(5 * 60 * 1000L, (emitter, stopped) ->

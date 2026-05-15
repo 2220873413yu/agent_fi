@@ -262,7 +262,7 @@ public class BizRechargeServiceImpl implements BizRechargeService {
 			//充值加钱
 			int count = userWalletServiceImpl.handerUserMoney(rechargeOrder.getRechargeAmount(),
 				rechargeOrder.getOrderNo(), rechargeOrder.getUserId(),
-				rechargeOrder.getUserId(), ConstantType.user_money_log_source_type.type_1,
+				rechargeOrder.getUserId(), ConstantType.user_money_log_source_type.type_3,
 				ConstantType.user_money_coin_type.type_2);
 			if (count != 1) {
 				throw new ServiceException(ResponseCode.CODE_1002);

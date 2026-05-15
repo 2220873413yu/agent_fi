@@ -2,6 +2,7 @@ package com.xms.dao.service.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
 import com.xms.common.constant.ConstantStatic;
+import com.xms.common.constant.ConstantSys;
 import com.xms.common.exception.ServiceException;
 import com.xms.dao.domain.StakeHostingDailyTeamPerformance;
 import com.xms.dao.domain.StakeHostingOrder;
@@ -9,10 +10,7 @@ import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.entity.domain.UserRelation;
 import com.xms.dao.mapper.StakeHostingDailyTeamPerformanceMapper;
 import com.xms.dao.mapper.StakeHostingOrderMapper;
-import com.xms.dao.service.IStakeHostingDailyTeamPerformanceService;
-import com.xms.dao.service.IStakeHostingStaticRateConfigService;
-import com.xms.dao.service.UserInfoService;
-import com.xms.dao.service.UserRelationService;
+import com.xms.dao.service.*;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +45,6 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 	private static final int CALC_STATUS_DONE = 1;
 	private static final int RATE_SOURCE_G7 = 1;
 	private static final int RATE_SOURCE_PURE_STATIC = 3;
-	private static final BigDecimal PURE_STATIC_RATE_BEFORE_RETURN_PERCENT = new BigDecimal("0.5000");
 	private static final BigDecimal LOW_BASE = new BigDecimal("100");
 	private static final BigDecimal MAX_G_DAY = new BigDecimal("200");
 	private static final DateTimeFormatter DAY_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -57,6 +54,7 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 	private final UserInfoService userInfoService;
 	private final UserRelationService userRelationService;
 	private final IStakeHostingStaticRateConfigService staticRateConfigService;
+	private final ISysParaService iSysParaService;
 
 	/**
 	 * 查询后台G7每日快照列表。
@@ -124,10 +122,12 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		if (CollectionUtil.isNotEmpty(rewardUserIds)) {
 			userIds.addAll(rewardUserIds);
 		}
+		// When the G7 window is not triggered, the daily snapshot stores the before-return pure static percent.
+		BigDecimal pureStaticRateBeforeReturnPercent = new BigDecimal(iSysParaService.getValue(ConstantSys.PURE_STATIC_RATE_BEFORE_RETURN_PERCENT));
 		Map<Long, BigDecimal> yesterdayTeamNewMap = loadYesterdayTeamNewAmountMap(userIds, rewardDay);
-		Map<Long, List<BigDecimal>> recentGDayMap = loadRecentGDayMap(userIds, rewardDay);
+		Map<Long, List<StakeHostingDailyTeamPerformance>> recentSnapshotMap = loadRecentSnapshotMap(userIds, rewardDay);
 		for (Long userId : userIds) {
-			prepareOneSnapshot(userId, rewardDay, yesterdayTeamNewMap.get(userId), recentGDayMap.get(userId));
+			prepareOneSnapshot(userId, rewardDay, yesterdayTeamNewMap.get(userId), recentSnapshotMap.get(userId), pureStaticRateBeforeReturnPercent);
 		}
 	}
 
@@ -199,7 +199,8 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 	 * @param rewardDay 收益日，格式yyyyMMdd
 	 */
 	private void prepareOneSnapshot(Long userId, Integer rewardDay, BigDecimal yesterdayTeamNewAmount,
-									List<BigDecimal> previousGDays) {
+									List<StakeHostingDailyTeamPerformance> previousSnapshots,
+									BigDecimal pureStaticRateBeforeReturnPercent) {
 		UserInfo user = userInfoService.lambdaQuery()
 			.eq(UserInfo::getUserId, userId)
 			.one();
@@ -220,9 +221,10 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		BigDecimal currentTvl = nvl(snapshot.getTeamNewAmount())
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 		BigDecimal gDay = calculateGDay(previousTvl, currentTvl);
+		List<BigDecimal> previousGDays = extractGDays(previousSnapshots);
 		BigDecimal gSmooth = calculateGSmooth(previousGDays, gDay);
-		boolean hasG7Window = hasG7Window(previousTvl, currentTvl, previousGDays);
-		BigDecimal staticRate = hasG7Window ? staticRateConfigService.matchStaticRate(gSmooth) : PURE_STATIC_RATE_BEFORE_RETURN_PERCENT;
+		boolean hasG7Window = hasG7Window(previousTvl, currentTvl, previousSnapshots);
+		BigDecimal staticRate = hasG7Window ? staticRateConfigService.matchStaticRate(gSmooth) : pureStaticRateBeforeReturnPercent;
 		Integer rateSource = hasG7Window ? RATE_SOURCE_G7 : RATE_SOURCE_PURE_STATIC;
 		lambdaUpdate()
 			.eq(StakeHostingDailyTeamPerformance::getId, snapshot.getId())
@@ -267,13 +269,12 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 	 * @param rewardDay 收益日，格式yyyyMMdd
 	 * @return key为用户ID，value为该用户收益日前最近最多6条G_day，按日期倒序
 	 */
-	private Map<Long, List<BigDecimal>> loadRecentGDayMap(Set<Long> userIds, Integer rewardDay) {
+	private Map<Long, List<StakeHostingDailyTeamPerformance>> loadRecentSnapshotMap(Set<Long> userIds, Integer rewardDay) {
 		if (CollectionUtil.isEmpty(userIds)) {
 			return java.util.Collections.emptyMap();
 		}
-		return baseMapper.selectRecentGDayBeforeBatch(userIds, rewardDay, beforeDays(rewardDay, 6), RATE_SOURCE_G7).stream()
-			.collect(Collectors.groupingBy(StakeHostingDailyTeamPerformance::getUserId,
-				Collectors.mapping(item -> nvl(item.getGDay()), Collectors.toList())));
+		return baseMapper.selectRecentGDayBeforeBatch(userIds, rewardDay, beforeDays(rewardDay, 6)).stream()
+			.collect(Collectors.groupingBy(StakeHostingDailyTeamPerformance::getUserId));
 	}
 
 	/**
@@ -343,11 +344,45 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 	 *
 	 * @param previousTvl 昨日团队新增托管USDT金额
 	 * @param currentTvl 今日团队新增托管USDT金额
-	 * @param previousGDays 收益日前最近最多6条已计算G_day，单位%
+	 * @param previousSnapshots 收益日前最近6个自然日内最多6条已计算快照
 	 * @return true表示按Gsmooth命中G7区间，false表示最近窗口无G7记录，按未推广规则处理
 	 */
-	private boolean hasG7Window(BigDecimal previousTvl, BigDecimal currentTvl, List<BigDecimal> previousGDays) {
-		return hasG7NewPerformance(previousTvl, currentTvl) || CollectionUtil.isNotEmpty(previousGDays);
+	private boolean hasG7Window(BigDecimal previousTvl, BigDecimal currentTvl, List<StakeHostingDailyTeamPerformance> previousSnapshots) {
+		return hasG7NewPerformance(previousTvl, currentTvl) || hasG7NewPerformanceHistory(previousSnapshots);
+	}
+
+	/**
+	 * 判断最近6个自然日历史快照中是否出现过真实团队新增。
+	 *
+	 * <p>未推广空白快照的G_day默认为0，可以参与Gsmooth均值，但不能单独触发G7区间。
+	 * 因此这里只看历史快照中的昨日团队新增或今日团队新增是否大于0。</p>
+	 *
+	 * @param previousSnapshots 收益日前最近6个自然日内最多6条已计算快照
+	 * @return true表示最近窗口内有真实团队新增
+	 */
+	private boolean hasG7NewPerformanceHistory(List<StakeHostingDailyTeamPerformance> previousSnapshots) {
+		if (CollectionUtil.isEmpty(previousSnapshots)) {
+			return false;
+		}
+		return previousSnapshots.stream()
+			.anyMatch(item -> hasG7NewPerformance(item.getPreviousTeamTvl(), item.getCurrentTeamTvl()));
+	}
+
+	/**
+	 * 从最近6个自然日历史快照中提取G_day用于Gsmooth均值。
+	 *
+	 * <p>这里不按收益率来源过滤；未推广规则当天的G_day默认为0，也参与最近最多7天均值。</p>
+	 *
+	 * @param previousSnapshots 收益日前最近6个自然日内最多6条已计算快照
+	 * @return 历史G_day列表，单位%
+	 */
+	private List<BigDecimal> extractGDays(List<StakeHostingDailyTeamPerformance> previousSnapshots) {
+		if (CollectionUtil.isEmpty(previousSnapshots)) {
+			return java.util.Collections.emptyList();
+		}
+		return previousSnapshots.stream()
+			.map(item -> nvl(item.getGDay()))
+			.collect(Collectors.toList());
 	}
 
 	/**

@@ -88,8 +88,6 @@ public class BizUserServiceImpl implements BizUserService {
 	private static final String SECRET_KEY = "01acd6bad44c551dd72e3fad285275586c060dd32ef483d8f9958d3eae5ede46"; // 需要替换为真实密钥
 	private static final String ADMIN_IDENTIFIER = "administrator"; // App管理员账号
 	private static final BigDecimal PLACEHOLDER_STATIC_RATE_PERCENT = new BigDecimal("0.5000");
-	private static final BigDecimal PURE_STATIC_RATE_BEFORE_RETURN_PERCENT = new BigDecimal("0.5000");
-	private static final BigDecimal PURE_STATIC_RATE_AFTER_RETURN_PERCENT = new BigDecimal("0.2000");
 
 
 	@Autowired
@@ -719,7 +717,7 @@ public class BizUserServiceImpl implements BizUserService {
 			.eq(StakeHostingOrder::getDeleted, 0)
 			.count();
 		if (runningCount <= 0) {
-			return PURE_STATIC_RATE_BEFORE_RETURN_PERCENT;
+			return loadPureStaticRatePercent(false);
 		}
 		long unreturnedCount = stakeHostingOrderService.lambdaQuery()
 			.eq(StakeHostingOrder::getUserId, userId)
@@ -730,14 +728,27 @@ public class BizUserServiceImpl implements BizUserService {
 				.or()
 				.ne(StakeHostingOrder::getIsReturnPrincipal, 1))
 			.count();
-		return unreturnedCount > 0 ? PURE_STATIC_RATE_BEFORE_RETURN_PERCENT : PURE_STATIC_RATE_AFTER_RETURN_PERCENT;
+		return loadPureStaticRatePercent(unreturnedCount <= 0);
 	}
 
 	/**
-	 * 统一格式化收益率百分比。
+	 * Reads the pure static display rate from system parameters.
 	 *
-	 * @param ratePercent 收益率，单位%
-	 * @return 保留4位小数的收益率；空值返回0
+	 * @param returnedPrincipal true when all running stake hosting orders have returned principal
+	 * @return percent value from t_sys_para, e.g. 0.5 means 0.5%
+	 */
+	private BigDecimal loadPureStaticRatePercent(boolean returnedPrincipal) {
+		String paraCode = returnedPrincipal
+			? ConstantSys.PURE_STATIC_RATE_AFTER_RETURN_PERCENT
+			: ConstantSys.PURE_STATIC_RATE_BEFORE_RETURN_PERCENT;
+		return new BigDecimal(sysParaServiceImpl.getValue(paraCode));
+	}
+
+	/**
+	 * Formats a percent rate for App display.
+	 *
+	 * @param ratePercent percent value, e.g. 0.5 means 0.5%
+	 * @return percent value rounded to 4 decimals
 	 */
 	private BigDecimal scaleRate(BigDecimal ratePercent) {
 		return defaultAmount(ratePercent).setScale(4, RoundingMode.HALF_UP);

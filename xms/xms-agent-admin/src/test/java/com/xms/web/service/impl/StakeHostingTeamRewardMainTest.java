@@ -12,23 +12,21 @@ import java.util.Map;
  * 托管极差奖/平级奖本地计算测试工具。
  *
  * <p>该类只用于本地右键运行 main 验证奖励算法，不连接数据库、不写钱包、不写结算明细。
- * 调整 main 中的等级比例、奖励基数、上级链路即可快速验证不同业务场景。</p>
+ * 修改等级比例、奖励基数或上级链路即可快速验证不同业务场景。</p>
  */
 public class StakeHostingTeamRewardMainTest {
 
 	private static final String REWARD_TYPE_DIFF = "DIFF";
 	private static final String REWARD_TYPE_SAME_LEVEL = "SAME_LEVEL";
-	private static final String REWARD_TYPE_SKIPPED = "SKIPPED";
 	private static final String REWARD_TYPE_NO_DIFF = "NO_DIFF";
-	private static final String SKIP_NO_UNEXITED_ORDER = "无未出局托管订单";
-	private static final String SKIP_NO_DIFF_RATIO = "等级比例未超过已覆盖比例";
 	private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 	private static final int SCALE = 6;
 
 	/**
 	 * 本地运行入口。
 	 *
-	 * <p>默认内置多个案例。你可以直接修改 levelRatioMap、netReward 或 parents 来验证新的极差/平级组合。</p>
+	 * <p>parentUsers 必须按真实查询顺序配置：直属上级在前，上级的上级在后，
+	 * 即 t_user_relation.distance ASC。</p>
 	 *
 	 * @param args 未使用
 	 */
@@ -36,31 +34,23 @@ public class StakeHostingTeamRewardMainTest {
 		Map<Integer, BigDecimal> levelRatioMap = defaultLevelRatioMap();
 		BigDecimal netReward = new BigDecimal("100");
 
-		// parentUsers 必须按真实查询顺序配置：直属上级在前，上级的上级在后，即 t_user_relation.distance ASC。
-		// 下面示例使用“大ID在前、小ID在后”只是为了看起来更像链路层级，算法本身不按ID判断上下级。
-		runCase("案例1",
+		runCase("案例1：穿透低等级找F5平级，遇F6终止",
 			levelRatioMap,
 			netReward,
 			Arrays.asList(
-				parent(1004L, 3, true),
-				parent(1003L, 4, true),
-				parent(1002L, 5, true),
-				parent(1001L, 5, false),
-				parent(1000L, 5, true),
-				parent(999L, 5, true)
-			));
-/*
-		runCase("案例2：F5 -> F5 -> F5 -> F6，F5先完成极差和平级，F6再拿补差",
-			levelRatioMap,
-			netReward,
-			Arrays.asList(
-				parent(2004L, 5, true),
-				parent(2003L, 5, true),
-				parent(2002L, 5, true),
-				parent(2001L, 6, true)
+				parent(1027L, 3, true),
+				parent(1026L, 5, true),
+				parent(1025L, 2, true),
+				parent(1024L, 5, true),
+				parent(1023L, 3, true),
+				parent(1015L, 5, true),
+				parent(1014L, 5, true),
+				parent(1013L, 6, true),
+				parent(1009L, 5, true),
+				parent(1006L, 6, true)
 			));
 
-		runCase("案例3：F5 -> F6 -> F5，后面的F5不再参与前面F5的平级",
+		runCase("案例2：F5 -> F6 -> F5，后面的F5不参与前面F5平级",
 			levelRatioMap,
 			netReward,
 			Arrays.asList(
@@ -69,34 +59,25 @@ public class StakeHostingTeamRewardMainTest {
 				parent(3001L, 5, true)
 			));
 
-		runCase("案例4：五个F5同级，观察平级池按 1/2、1/4、1/8、1/16、1/16 拆分",
+		runCase("案例3：F4 -> F2 -> F4，F5以下不触发平级",
 			levelRatioMap,
 			netReward,
 			Arrays.asList(
-				parent(4005L, 5, true),
-				parent(4004L, 5, true),
-				parent(4003L, 5, true),
-				parent(4002L, 5, true),
-				parent(4001L, 5, true)
+				parent(4003L, 4, true),
+				parent(4002L, 2, true),
+				parent(4001L, 4, true)
 			));
 
-		runCase("案例5：第一个F5无未出局托管订单，同级下一个F5拿极差并作为平级池起点",
+		runCase("案例4：无未出局订单用户过滤，不占平级份额",
 			levelRatioMap,
 			netReward,
 			Arrays.asList(
+				parent(5005L, 5, true),
+				parent(5004L, 2, true),
 				parent(5003L, 5, false),
 				parent(5002L, 5, true),
-				parent(5001L, 5, true),
-				parent(5000L, 6, true)
+				parent(5001L, 6, true)
 			));
-
-		runCase("案例6：前面F5无未出局托管订单，后续F6按完整未覆盖比例拿奖",
-			levelRatioMap,
-			netReward,
-			Arrays.asList(
-				parent(6002L, 5, false),
-				parent(6001L, 6, true)
-			));*/
 	}
 
 	/**
@@ -105,7 +86,7 @@ public class StakeHostingTeamRewardMainTest {
 	 * @param caseName 案例名称
 	 * @param levelRatioMap F等级团队奖励比例配置，单位%
 	 * @param netReward 用户到账静态净收益，单位USDT，也是极差/平级奖励计算基数
-	 * @param parentUsers 源用户上级链路，必须按近到远排序，对应真实SQL中的 t_user_relation.distance ASC
+	 * @param parentUsers 源用户上级链路，必须按近到远排序
 	 */
 	private static void runCase(String caseName, Map<Integer, BigDecimal> levelRatioMap, BigDecimal netReward,
 								List<ParentUser> parentUsers) {
@@ -122,20 +103,19 @@ public class StakeHostingTeamRewardMainTest {
 		}
 		System.out.println("------------------------------------------------------------");
 		System.out.println("arrivedTotal = " + money(context.arrivedTotal) + " USDT");
-		System.out.println("skippedTotal = " + money(context.skippedTotal) + " USDT");
 		System.out.println("finalCoveredRatio = " + percent(context.coveredRatio) + "%");
 	}
 
 	/**
 	 * 按上级链路模拟发放极差奖和平级奖。
 	 *
-	 * <p>该方法复制当前业务核心口径：无未出局托管订单的上级先过滤，等同上级链路里查询不到；
-	 * 第一个有效同级用户先拿完整极差，F5及以上再以这笔极差金额作为平级池，让连续同级按平级公式拆分。</p>
+	 * <p>无未出局托管订单的上级先过滤，等同查询不到。F5及以上拿到极差后，以该极差金额作为平级池，
+	 * 向上穿透低等级继续找同级；第一个同级只拿极差，后续同级重新按人数拆完整个平级池。</p>
 	 *
 	 * @param levelRatioMap F等级团队奖励比例配置，单位%
 	 * @param netReward 用户到账静态净收益，单位USDT
-	 * @param parentUsers 源用户上级链路，按近到远排序，对应真实SQL中的 t_user_relation.distance ASC
-	 * @return 本案例的计算上下文，包含明细、汇总和最终覆盖比例
+	 * @param parentUsers 源用户上级链路，按近到远排序
+	 * @return 本案例计算上下文，包含明细、汇总和最终覆盖比例
 	 */
 	private static RewardContext distributeDiffAndSameLevelReward(Map<Integer, BigDecimal> levelRatioMap,
 																  BigDecimal netReward,
@@ -150,45 +130,31 @@ public class StakeHostingTeamRewardMainTest {
 				continue;
 			}
 
-			// 当前等级比例减去已覆盖比例，就是当前上级段可发放的极差比例。
 			BigDecimal diffRatio = levelRatio.subtract(coveredRatio);
 			if (diffRatio.compareTo(BigDecimal.ZERO) <= 0) {
-				// 没有新增差额时不发奖励；测试工具保留一行输出，方便看清楚为什么后续上级没拿到极差/平级。
 				context.lines.add(RewardLine.noDiff(parent, coveredRatio, levelRatio, diffRatio));
 				continue;
 			}
 
-			// 先识别当前连续同级段。F5以下只会处理当前用户，F5及以上才可能额外触发平级奖。
-			int sameCount = parent.level >= 5 ? countSameLevelRun(rewardParentUsers, i, parent.level) : 1;
+			// F5及以上收集穿透式同级组；F5以下只让当前用户拿极差。
+			SameLevelGroup sameLevelGroup = parent.level >= 5
+				? collectSameLevelGroupUntilHigher(rewardParentUsers, i, parent.level)
+				: SameLevelGroup.single(i);
 			BigDecimal beforeCoveredRatio = coveredRatio;
 			BigDecimal diffRewardAmount = calculateReward(netReward, diffRatio);
-			boolean hasCoveredUser = false;
-			int firstCoveredSameIndex = -1;
 
-			for (int sameIndex = 0; sameIndex < sameCount; sameIndex++) {
-				ParentUser rewardUser = rewardParentUsers.get(i + sameIndex);
+			ParentUser diffUser = rewardParentUsers.get(sameLevelGroup.sameIndexes.get(0));
+			context.arrivedTotal = context.arrivedTotal.add(diffRewardAmount);
+			context.lines.add(RewardLine.arrived(diffUser, REWARD_TYPE_DIFF, beforeCoveredRatio, levelRatio, diffRatio, diffRewardAmount));
 
-				// 当前同级段中，第一个有效用户拿完整极差；无未出局订单的用户已被过滤，不占平级位置。
-				if (!hasCoveredUser) {
-					hasCoveredUser = true;
-					firstCoveredSameIndex = sameIndex;
-					context.arrivedTotal = context.arrivedTotal.add(diffRewardAmount);
-					context.lines.add(RewardLine.arrived(rewardUser, REWARD_TYPE_DIFF, beforeCoveredRatio, levelRatio, diffRatio, diffRewardAmount));
-				}
+			coveredRatio = levelRatio;
+			if (parent.level >= 5) {
+				collectSameLevelReward(context, rewardParentUsers, sameLevelGroup.rewardSameIndexes(),
+					beforeCoveredRatio, levelRatio, diffRatio, diffRewardAmount);
 			}
 
-			if (hasCoveredUser) {
-				// 只有用户实际拿到极差后，当前等级比例才会成为后续上级的已覆盖比例。
-				coveredRatio = levelRatio;
-				if (parent.level >= 5) {
-					// F5及以上：以第一个到账同级用户拿到的极差金额作为平级池，从该用户开始连续同级一起拆分。
-					collectSameLevelReward(context, rewardParentUsers, i + firstCoveredSameIndex,
-						sameCount - firstCoveredSameIndex, beforeCoveredRatio, levelRatio, diffRatio, diffRewardAmount);
-				}
-			}
-
-			// 连续同级已经作为一组处理完，外层循环跳过这一组剩余用户。
-			i += sameCount - 1;
+			// 低等级已被当前平级组穿透跳过；遇到更高等级时下一轮从更高等级继续。
+			i = sameLevelGroup.nextIndex - 1;
 		}
 		context.coveredRatio = coveredRatio;
 		return context;
@@ -213,29 +179,49 @@ public class StakeHostingTeamRewardMainTest {
 	}
 
 	/**
-	 * 收集并打印连续同级段的平级奖。
+	 * 收集穿透低等级后的同级平级组。
 	 *
-	 * <p>平级池等于第一个到账同级用户已经拿到的极差金额；从这个用户开始，连续同级按
-	 * 1/2、1/4、1/4 等公式拆分。无未出局托管订单的用户已在进入本方法前过滤。</p>
+	 * @param parentUsers 有效上级链路，按近到远排序
+	 * @param startIndex 起始下标
+	 * @param level 当前F等级
+	 * @return 同级用户下标和下一轮应处理的位置
+	 */
+	private static SameLevelGroup collectSameLevelGroupUntilHigher(List<ParentUser> parentUsers, int startIndex, Integer level) {
+		List<Integer> sameIndexes = new ArrayList<>();
+		int nextIndex = parentUsers.size();
+		for (int i = startIndex; i < parentUsers.size(); i++) {
+			Integer currentLevel = parentUsers.get(i).level;
+			if (currentLevel > level) {
+				nextIndex = i;
+				break;
+			}
+			if (level.equals(currentLevel)) {
+				sameIndexes.add(i);
+			}
+		}
+		return new SameLevelGroup(sameIndexes, nextIndex);
+	}
+
+	/**
+	 * 收集并打印同级组的平级奖。
 	 *
 	 * @param context 当前测试案例上下文
 	 * @param parentUsers 源用户上级链路，按近到远排序
-	 * @param startSameIndex 第一个到账极差用户在完整上级链路中的下标
-	 * @param sameCount 从第一个到账极差用户开始的连续同级人数
+	 * @param sameIndexes 本次平级组中参与平级的后续同级用户下标，不包含第一个拿极差的同级
 	 * @param beforeCoveredRatio 发放本段极差前的已覆盖比例，单位%
 	 * @param levelRatio 当前F等级团队奖励比例，单位%
 	 * @param diffRatio 本段极差比例，单位%
 	 * @param sameLevelPool 平级池金额，单位USDT
 	 */
 	private static void collectSameLevelReward(RewardContext context, List<ParentUser> parentUsers,
-											   int startSameIndex, int sameCount, BigDecimal beforeCoveredRatio,
+											   List<Integer> sameIndexes, BigDecimal beforeCoveredRatio,
 											   BigDecimal levelRatio, BigDecimal diffRatio, BigDecimal sameLevelPool) {
-		if (sameCount <= 1 || sameLevelPool.compareTo(BigDecimal.ZERO) <= 0) {
+		if (sameIndexes.isEmpty() || sameLevelPool.compareTo(BigDecimal.ZERO) <= 0) {
 			return;
 		}
-		for (int sameIndex = 0; sameIndex < sameCount; sameIndex++) {
-			ParentUser rewardUser = parentUsers.get(startSameIndex + sameIndex);
-			BigDecimal sameLevelReward = calculateSameLevelReward(sameLevelPool, sameIndex + 1, sameCount);
+		for (int sameIndex = 0; sameIndex < sameIndexes.size(); sameIndex++) {
+			ParentUser rewardUser = parentUsers.get(sameIndexes.get(sameIndex));
+			BigDecimal sameLevelReward = calculateSameLevelReward(sameLevelPool, sameIndex + 1, sameIndexes.size());
 			context.arrivedTotal = context.arrivedTotal.add(sameLevelReward);
 			context.lines.add(RewardLine.arrived(rewardUser, REWARD_TYPE_SAME_LEVEL,
 				beforeCoveredRatio, levelRatio, diffRatio, sameLevelReward));
@@ -243,38 +229,22 @@ public class StakeHostingTeamRewardMainTest {
 	}
 
 	/**
-	 * 统计从指定位置开始连续相同F等级的上级数量。
+	 * 按当前业务代码的平级公式拆分平级池。
 	 *
-	 * @param parentUsers 上级链路
-	 * @param startIndex 起始下标
-	 * @param level 当前F等级
-	 * @return 连续同级数量
-	 */
-	private static int countSameLevelRun(List<ParentUser> parentUsers, int startIndex, Integer level) {
-		int count = 0;
-		for (int i = startIndex; i < parentUsers.size(); i++) {
-			if (!level.equals(parentUsers.get(i).level)) {
-				break;
-			}
-			count++;
-		}
-		return count;
-	}
-
-	/**
-	 * 按当前业务代码的平级公式拆分差额池。
-	 *
-	 * <p>两个同级：1/2 + 1/2；三个同级：1/2 + 1/4 + 1/4；
+	 * <p>一个后续同级：拿完整平级池；两个同级：1/2 + 1/2；三个同级：1/2 + 1/4 + 1/4；
 	 * 四个同级：1/2 + 1/4 + 1/8 + 1/8；五个同级：1/2 + 1/4 + 1/8 + 1/16 + 1/16。</p>
 	 *
-	 * @param pool 当前等级差额池，单位USDT
-	 * @param sameIndex 同级组内第几个，1开始
+	 * @param pool 当前平级池，单位USDT
+	 * @param sameIndex 同级组内第几个，从1开始
 	 * @param sameCount 同级组总人数
 	 * @return 当前同级用户分得的奖励金额，单位USDT
 	 */
 	private static BigDecimal calculateSameLevelReward(BigDecimal pool, int sameIndex, int sameCount) {
-		if (sameCount <= 1 || pool.compareTo(BigDecimal.ZERO) <= 0) {
+		if (sameCount <= 0 || pool.compareTo(BigDecimal.ZERO) <= 0) {
 			return BigDecimal.ZERO;
+		}
+		if (sameCount == 1) {
+			return pool;
 		}
 		int power = sameIndex == sameCount ? sameCount - 1 : sameIndex;
 		BigDecimal divisor = new BigDecimal(2).pow(power);
@@ -294,21 +264,6 @@ public class StakeHostingTeamRewardMainTest {
 			return BigDecimal.ZERO;
 		}
 		return baseAmount.multiply(ratioPercent).divide(ONE_HUNDRED, SCALE, RoundingMode.HALF_UP);
-	}
-
-	/**
-	 * 判断模拟上级是否具备团队奖励到账资格。
-	 *
-	 * <p>当前统一口径：持有未出局托管订单才算有效用户，不再单独模拟账号 is_valid。</p>
-	 *
-	 * @param user 模拟上级用户
-	 * @return null表示可到账；非null表示跳过原因
-	 */
-	private static String getRewardSkipReason(ParentUser user) {
-		if (!user.hasUnexitedOrder) {
-			return SKIP_NO_UNEXITED_ORDER;
-		}
-		return null;
 	}
 
 	/**
@@ -374,12 +329,37 @@ public class StakeHostingTeamRewardMainTest {
 	}
 
 	/**
+	 * 穿透式平级组扫描结果。
+	 */
+	private static class SameLevelGroup {
+		private final List<Integer> sameIndexes;
+		private final int nextIndex;
+
+		private SameLevelGroup(List<Integer> sameIndexes, int nextIndex) {
+			this.sameIndexes = sameIndexes;
+			this.nextIndex = nextIndex;
+		}
+
+		private List<Integer> rewardSameIndexes() {
+			if (sameIndexes.size() <= 1) {
+				return new ArrayList<>();
+			}
+			return new ArrayList<>(sameIndexes.subList(1, sameIndexes.size()));
+		}
+
+		private static SameLevelGroup single(int index) {
+			List<Integer> indexes = new ArrayList<>();
+			indexes.add(index);
+			return new SameLevelGroup(indexes, index + 1);
+		}
+	}
+
+	/**
 	 * 单个测试案例的计算上下文。
 	 */
 	private static class RewardContext {
 		private final List<RewardLine> lines = new ArrayList<>();
 		private BigDecimal arrivedTotal = BigDecimal.ZERO;
-		private BigDecimal skippedTotal = BigDecimal.ZERO;
 		private BigDecimal coveredRatio = BigDecimal.ZERO;
 	}
 
@@ -395,11 +375,10 @@ public class StakeHostingTeamRewardMainTest {
 		private final BigDecimal levelRatio;
 		private final BigDecimal diffRatio;
 		private final BigDecimal rewardAmount;
-		private final String skipReason;
 
 		private RewardLine(Long userId, Integer level, String rewardType, boolean arrived,
-						   BigDecimal beforeCoveredRatio, BigDecimal levelRatio,
-						   BigDecimal diffRatio, BigDecimal rewardAmount, String skipReason) {
+						   BigDecimal beforeCoveredRatio, BigDecimal levelRatio, BigDecimal diffRatio,
+						   BigDecimal rewardAmount) {
 			this.userId = userId;
 			this.level = level;
 			this.rewardType = rewardType;
@@ -408,24 +387,17 @@ public class StakeHostingTeamRewardMainTest {
 			this.levelRatio = levelRatio;
 			this.diffRatio = diffRatio;
 			this.rewardAmount = rewardAmount;
-			this.skipReason = skipReason;
 		}
 
 		private static RewardLine arrived(ParentUser user, String rewardType, BigDecimal beforeCoveredRatio,
 										  BigDecimal levelRatio, BigDecimal diffRatio, BigDecimal rewardAmount) {
-			return new RewardLine(user.userId, user.level, rewardType, true, beforeCoveredRatio, levelRatio, diffRatio, rewardAmount, null);
+			return new RewardLine(user.userId, user.level, rewardType, true, beforeCoveredRatio, levelRatio, diffRatio, rewardAmount);
 		}
 
-		private static RewardLine skipped(ParentUser user, BigDecimal beforeCoveredRatio, BigDecimal levelRatio,
-										  BigDecimal diffRatio, BigDecimal rewardAmount, String skipReason) {
-			return new RewardLine(user.userId, user.level, REWARD_TYPE_SKIPPED, false, beforeCoveredRatio,
-				levelRatio, diffRatio, rewardAmount, skipReason);
-		}
-
-		private static RewardLine noDiff(ParentUser user, BigDecimal beforeCoveredRatio, BigDecimal levelRatio,
-										 BigDecimal diffRatio) {
-			return new RewardLine(user.userId, user.level, REWARD_TYPE_NO_DIFF, false, beforeCoveredRatio,
-				levelRatio, diffRatio, BigDecimal.ZERO, SKIP_NO_DIFF_RATIO);
+		private static RewardLine noDiff(ParentUser user, BigDecimal beforeCoveredRatio,
+										 BigDecimal levelRatio, BigDecimal diffRatio) {
+			return new RewardLine(user.userId, user.level, REWARD_TYPE_NO_DIFF, false, beforeCoveredRatio, levelRatio,
+				diffRatio, BigDecimal.ZERO);
 		}
 
 		@Override
@@ -437,8 +409,7 @@ public class StakeHostingTeamRewardMainTest {
 				+ ", beforeCovered=" + percent(beforeCoveredRatio) + "%"
 				+ ", levelRatio=" + percent(levelRatio) + "%"
 				+ ", diffRatio=" + percent(diffRatio) + "%"
-				+ ", reward=" + money(rewardAmount) + " USDT"
-				+ (skipReason == null ? "" : ", skipReason=" + skipReason);
+				+ ", reward=" + money(rewardAmount) + " USDT";
 		}
 	}
 }

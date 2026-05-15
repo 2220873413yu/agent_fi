@@ -1107,8 +1107,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	/**
 	 * 按上级链路发放极差奖和平级奖。
 	 *
-	 * <p>极差和平级拆开计算：第一个有效同级用户先按“当前等级比例 - 已覆盖比例”拿完整极差；
-	 * 若该等级为F5及以上，再以这笔极差金额作为平级池，让连续同级按 1/2、1/4、1/4 等公式分配平级奖。
+	 * <p>极差和平级拆开计算：当前等级第一个有效用户先按“当前等级比例 - 已覆盖比例”拿完整极差；
+	 * 若该等级为F5及以上，再以这笔极差金额作为平级池，向上穿透低等级寻找同级，遇到更高等级时结束本组。
 	 * 调用方传入的上级链路已经过滤掉未持有未出局托管订单的用户，因此这类用户不占极差/平级份额。</p>
 	 *
 	 * @param order 源托管订单
@@ -1144,48 +1144,42 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			// 当前等级比例减去已覆盖比例，就是本轮可发放的极差比例；没有差额则继续向上找更高等级。
 			BigDecimal diffRatio = levelRatio.subtract(coveredRatio);
 			if (diffRatio.compareTo(BigDecimal.ZERO) > 0) {
-				// 先识别当前连续同级段。F5以下只会处理当前用户，F5及以上才可能额外触发平级奖。
-				int sameCount = level >= 5 ? countSameLevelRun(parentUsers, i, level) : 1;
+				// F5及以上先收集“穿透低等级、遇高等级终止”的同级组；F5以下只处理当前用户的极差。
+				SameLevelGroup sameLevelGroup = level >= 5
+					? collectSameLevelGroupUntilHigher(parentUsers, i, level)
+					: SameLevelGroup.single(i);
 				BigDecimal diffRewardAmount = calculateReward(netReward, diffRatio);
-				boolean hasCoveredUser = false;
-				int firstCoveredSameIndex = -1;
-				for (int sameIndex = 0; sameIndex < sameCount; sameIndex++) {
-					ParentUserTaskVo rewardUser = parentUsers.get(i + sameIndex);
-					// 当前同级段中，第一个有效用户拿完整极差；无效用户已在查询链路时过滤，不占平级位置。
-					if (!hasCoveredUser) {
-						hasCoveredUser = true;
-						firstCoveredSameIndex = sameIndex;
-						collectTeamReward(context, order, rewardUser.getUserId(), REWARD_TYPE_DIFF, level, netReward, diffRatio,
-							diffRewardAmount, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
-							serviceFeeRatio, serviceFee, netReward, rewardDay, now);
-					}
-				}
-				if (hasCoveredUser) {
+				if (CollectionUtil.isNotEmpty(sameLevelGroup.sameIndexes)) {
+					ParentUserTaskVo diffUser = parentUsers.get(sameLevelGroup.sameIndexes.get(0));
+					// 当前等级组的第一个同级用户只拿完整极差，不参与本组平级池拆分。
+					collectTeamReward(context, order, diffUser.getUserId(), REWARD_TYPE_DIFF, level, netReward, diffRatio,
+						diffRewardAmount, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
+						serviceFeeRatio, serviceFee, netReward, rewardDay, now);
 					// 只有用户实际拿到极差后，当前等级比例才算被覆盖，后续更高等级只拿补差。
 					coveredRatio = levelRatio;
 					if (level >= 5) {
-						// F5及以上：以第一个到账同级用户拿到的极差金额作为平级池，从该用户开始连续同级一起拆分。
-						collectSameLevelReward(order, parentUsers, i + firstCoveredSameIndex, sameCount - firstCoveredSameIndex,
+						// F5及以上：以第一个同级拿到的极差金额作为平级池，只让后续同级按实际人数重新拆分。
+						collectSameLevelReward(order, parentUsers, sameLevelGroup.rewardSameIndexes(),
 							level, netReward, diffRatio, diffRewardAmount, grossReward, baseStaticRate,
 							afiAccelerateRate, actualStaticRate, serviceFeeRatio, serviceFee, rewardDay, now, context);
 					}
 				}
-				// 连续同级已经作为一个平级组处理完，外层循环直接跳到下一段不同等级。
-				i += sameCount - 1;
+				// 本组已处理完：低等级已被穿透跳过；若遇到更高等级，则下一轮从更高等级继续拿补差。
+				i = sameLevelGroup.nextIndex - 1;
 			}
 		}
 	}
 
 	/**
-	 * 收集连续同级段的平级奖。
+	 * 收集同级组的平级奖。
 	 *
 	 * <p>平级奖只在F5及以上触发，且以本段第一个到账同级用户已经拿到的极差金额作为平级池。
-	 * 平级池按 1/2、1/4、1/4 等旧公式拆分；没有未出局托管订单的用户已在进入本方法前过滤，不占份额。</p>
+	 * 第一个同级用户只拿极差，不参与本组平级；后续同级按实际参与人数重新用 1/2、1/4、1/4 等公式拆完整个平级池。
+	 * 没有未出局托管订单的用户已在进入本方法前过滤，不占份额。</p>
 	 *
 	 * @param order 源托管订单
 	 * @param parentUsers 源用户上级链路，按近到远排序
-	 * @param startIndex 第一个到账极差用户在上级链路中的下标
-	 * @param sameCount 从第一个到账极差用户开始的连续同级人数
+	 * @param sameIndexes 本次平级组中参与平级的后续同级用户下标，顺序按近到远，不包含第一个拿极差的同级
 	 * @param level 当前F等级
 	 * @param netReward 用户到账静态净收益，单位USDT
 	 * @param diffRatio 本段极差比例，单位%
@@ -1201,19 +1195,19 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * @param context 团队奖励批量收集上下文
 	 */
 	private void collectSameLevelReward(StakeHostingOrder order, List<ParentUserTaskVo> parentUsers,
-										int startIndex, int sameCount, Integer level, BigDecimal netReward,
+										List<Integer> sameIndexes, Integer level, BigDecimal netReward,
 										BigDecimal diffRatio, BigDecimal sameLevelPool,
 										BigDecimal grossReward, BigDecimal baseStaticRate,
 										BigDecimal afiAccelerateRate, BigDecimal actualStaticRate,
 										BigDecimal serviceFeeRatio, BigDecimal serviceFee,
 										int rewardDay, Date now, TeamRewardCollectContext context) {
-		if (sameCount <= 1 || sameLevelPool.compareTo(BigDecimal.ZERO) <= 0) {
+		if (CollectionUtil.isEmpty(sameIndexes) || sameLevelPool.compareTo(BigDecimal.ZERO) <= 0) {
 			return;
 		}
-		for (int sameIndex = 0; sameIndex < sameCount; sameIndex++) {
-			ParentUserTaskVo rewardUser = parentUsers.get(startIndex + sameIndex);
-			BigDecimal sameLevelReward = calculateSameLevelReward(sameLevelPool, sameIndex + 1, sameCount);
-			// 当前链路只包含持有未出局托管订单的同级用户，直接收集平级奖入账数据。
+		for (int sameIndex = 0; sameIndex < sameIndexes.size(); sameIndex++) {
+			ParentUserTaskVo rewardUser = parentUsers.get(sameIndexes.get(sameIndex));
+			BigDecimal sameLevelReward = calculateSameLevelReward(sameLevelPool, sameIndex + 1, sameIndexes.size());
+			// 当前平级组只包含后续有效同级用户；第一个拿极差的同级和被穿透的低等级用户都不参与、不占份额。
 			collectTeamReward(context, order, rewardUser.getUserId(), REWARD_TYPE_SAME_LEVEL, level, netReward, diffRatio,
 				sameLevelReward, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 				serviceFeeRatio, serviceFee, netReward, rewardDay, now);
@@ -1221,22 +1215,30 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
-	 * 统计从指定位置开始连续相同F等级的上级数量。
+	 * 收集从指定位置开始的穿透式平级组。
+	 *
+	 * <p>本方法只用于F5及以上等级：从第一个拿极差的同级开始向上扫描，同等级加入平级组；
+	 * 低等级跳过且不占份额；遇到更高等级立即停止，让外层循环继续按更高等级补差。</p>
 	 *
 	 * @param parentUsers 源用户上级链路，按近到远排序
 	 * @param startIndex 起始下标
 	 * @param level 当前F等级
-	 * @return 连续同级数量
+	 * @return 平级组下标和下一轮外层循环应处理的位置
 	 */
-	private int countSameLevelRun(List<ParentUserTaskVo> parentUsers, int startIndex, Integer level) {
-		int count = 0;
+	private SameLevelGroup collectSameLevelGroupUntilHigher(List<ParentUserTaskVo> parentUsers, int startIndex, Integer level) {
+		List<Integer> sameIndexes = new ArrayList<>();
+		int nextIndex = parentUsers.size();
 		for (int i = startIndex; i < parentUsers.size(); i++) {
-			if (!level.equals(effectiveLevel(parentUsers.get(i)))) {
+			Integer currentLevel = effectiveLevel(parentUsers.get(i));
+			if (currentLevel > level) {
+				nextIndex = i;
 				break;
 			}
-			count++;
+			if (level.equals(currentLevel)) {
+				sameIndexes.add(i);
+			}
 		}
-		return count;
+		return new SameLevelGroup(sameIndexes, nextIndex);
 	}
 
 	/**
@@ -1251,8 +1253,11 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * @return 当前用户分得的平级奖励金额，单位USDT
 	 */
 	private BigDecimal calculateSameLevelReward(BigDecimal pool, int sameIndex, int sameCount) {
-		if (sameCount <= 1 || pool.compareTo(BigDecimal.ZERO) <= 0) {
+		if (sameCount <= 0 || pool.compareTo(BigDecimal.ZERO) <= 0) {
 			return BigDecimal.ZERO;
+		}
+		if (sameCount == 1) {
+			return pool;
 		}
 		int power = sameIndex == sameCount ? sameCount - 1 : sameIndex;
 		BigDecimal divisor = new BigDecimal(2).pow(power);
@@ -1613,6 +1618,48 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		 */
 		private boolean isEmpty() {
 			return userMoneyList.isEmpty() && rewardRecordList.isEmpty() && settlementList.isEmpty() && summaryMap.isEmpty();
+		}
+	}
+
+	/**
+	 * 穿透式平级组扫描结果。
+	 *
+	 * <p>sameIndexes 只保存当前等级的有效同级用户下标；中间低等级用户会被跳过但不进入列表。
+	 * nextIndex 表示扫描停止位置：如果遇到更高等级，则指向该更高等级下标；如果未遇到，则等于链路长度。</p>
+	 */
+	private static class SameLevelGroup {
+		private final List<Integer> sameIndexes;
+		private final int nextIndex;
+
+		private SameLevelGroup(List<Integer> sameIndexes, int nextIndex) {
+			this.sameIndexes = sameIndexes;
+			this.nextIndex = nextIndex;
+		}
+
+		/**
+		 * 返回真正参与平级池拆分的后续同级用户下标。
+		 *
+		 * <p>sameIndexes 的第一个用户已经拿到本等级极差，只作为平级池来源，不再参与本组平级分配。</p>
+		 *
+		 * @return 去掉第一个拿极差用户后的同级下标列表
+		 */
+		private List<Integer> rewardSameIndexes() {
+			if (sameIndexes.size() <= 1) {
+				return new ArrayList<>();
+			}
+			return new ArrayList<>(sameIndexes.subList(1, sameIndexes.size()));
+		}
+
+		/**
+		 * 构造只包含当前用户的非平级组，用于F5以下只发极差的场景。
+		 *
+		 * @param index 当前处理用户在上级链路中的下标
+		 * @return 单用户扫描结果，下一轮从当前用户后一位继续
+		 */
+		private static SameLevelGroup single(int index) {
+			List<Integer> indexes = new ArrayList<>();
+			indexes.add(index);
+			return new SameLevelGroup(indexes, index + 1);
 		}
 	}
 

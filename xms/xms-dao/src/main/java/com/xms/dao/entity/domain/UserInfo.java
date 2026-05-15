@@ -133,7 +133,11 @@ public class UserInfo extends BaseXmsEntity {
 	 */
 	//@Excel(name = "我的业绩(质押量)", sort = 12)
 	private BigDecimal performance;
-
+	/**
+	 * 小区业绩
+	 */
+	//@Excel(name = "小区业绩", sort = 14)
+	private BigDecimal communityPerformance;
 	/**
 	 * 团队业绩(质押量)
 	 */
@@ -202,11 +206,7 @@ public class UserInfo extends BaseXmsEntity {
 	//@Excel(name = "直推业绩(废弃)", sort = 13)
 	private BigDecimal subPerformance;
 
-	/**
-	 * 小区业绩
-	 */
-	//@Excel(name = "小区业绩", sort = 14)
-	private BigDecimal communityPerformance;
+
 
 	@TableField(exist = false)
 	private BigDecimal maxLegPerformance;

@@ -131,13 +131,13 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 				//托管订单支付/拨付/结束后重算小区业绩和真实等级
 				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
 			}else if(orderMsgDO.getBizType().equals(5)){
-				//托管订单周新增业绩统计
+				// 旧全球分红周新增业绩统计已停用，入口暂时保留以兼容历史消息。
 				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
 			}else if(orderMsgDO.getBizType().equals(6)){
-				//托管订单生效后置处理：G7新增 -> 周新增 -> 小区业绩和等级重算
+				// 托管订单生效后置处理：G7新增 -> 小区业绩和等级重算；旧周新增收集已停用。
 				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
 			}else if(orderMsgDO.getBizType().equals(7)){
-				//托管订单到期周小区业绩重算
+				// 旧全球分红到期周小区业绩重算已停用，入口暂时保留以兼容历史消息。
 				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
 			}
 		}
@@ -148,7 +148,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	 * 托管订单后置消息处理入口。
 	 *
 	 * <p>外层 Redis 分发方法保留事务是为了兼容旧的节点/钱包批量业务；托管订单后置处理不复用这个大事务。
-	 * 这里通过 Spring 代理以 NOT_SUPPORTED 挂起外层事务，让 G7、周业绩、到期重算和等级重算各自使用自己的事务边界，
+	 * 这里通过 Spring 代理以 NOT_SUPPORTED 挂起外层事务，让 G7 和等级重算各自使用自己的事务边界，
 	 * 避免 bizType=6 这种编排方法把多个步骤塞进同一个长事务里。</p>
 	 *
 	 * @param orderMsgDO Redis 消费到的托管订单消息
@@ -158,11 +158,13 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 		if (orderMsgDO.getBizType().equals(4)) {
 			handleBizType4(orderMsgDO);
 		} else if (orderMsgDO.getBizType().equals(5)) {
-			stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(orderMsgDO.getId());
+			// 旧全球分红周业绩收集已废弃；新口径改由t_user_info当前权重和每周快照计算。
+			// stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(orderMsgDO.getId());
 		} else if (orderMsgDO.getBizType().equals(6)) {
 			handleStakeHostingEffectiveAfter(orderMsgDO);
 		} else if (orderMsgDO.getBizType().equals(7)) {
-			stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyExpirePerformance(orderMsgDO.getId());
+			// 旧全球分红到期周业绩重算已废弃；新口径改由t_user_info当前权重和每周快照计算。
+			// stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyExpirePerformance(orderMsgDO.getId());
 		}
 	}
 
@@ -170,7 +172,8 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	 * 托管订单生效后的统一后置处理。
 	 *
 	 * <p>购买回调和后台拨付只发送一条 bizType=6 消息，本方法在消费者中按固定顺序完成同一业务链路里的耗时动作：
-	 * 先统计G7当天团队新增，再按订单周业绩状态决定是否处理周新增，最后重算小区业绩和真实等级。</p>
+	 * 先统计G7当天团队新增，再重算小区业绩和真实等级。旧全球分红周新增收集已停用，后续全球分红改由
+	 * t_user_info 当前权重和每周快照驱动。</p>
 	 *
 	 * @param orderMsgDO 托管订单生效后置处理消息
 	 */
@@ -185,12 +188,12 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 		}
 		// 1. G7使用当天团队新增业绩，先按订单用户上级链路累加当天新增USDT。
 		stakeHostingDailyTeamPerformanceService.recordOrderTeamNewAmount(order.getId());
-		// 2. 只有周新增状态为队列中时才处理；本周内到期或已处理的订单不重复初始化周业绩。
-		if (order.getWeeklyPerformanceStatus() != null
-			&& order.getWeeklyPerformanceStatus().equals(StakeHostingOrderServiceImpl.WEEKLY_STATUS_QUEUED)) {
-			stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(order.getId());
-		}
-		// 3. 最后重算小区业绩和真实等级，确保等级判断读取到最新G7/周业绩相关基础数据。
+		// 2. 旧全球分红周新增收集已停用；不再写t_stake_hosting_weekly_community_performance。
+//		if (order.getWeeklyPerformanceStatus() != null
+//			&& order.getWeeklyPerformanceStatus().equals(StakeHostingOrderServiceImpl.WEEKLY_STATUS_QUEUED)) {
+//			stakeHostingWeeklyCommunityPerformanceService.processOrderWeeklyPerformance(order.getId());
+//		}
+		// 3. 最后重算小区业绩和真实等级，确保等级判断读取到最新G7相关基础数据。
 		stakeHostingOrderService.recalculateStakeHostingLevel(order.getId());
 	}
 

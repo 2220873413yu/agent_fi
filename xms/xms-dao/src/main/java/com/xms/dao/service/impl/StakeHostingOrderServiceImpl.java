@@ -177,7 +177,8 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		}
 		// 7. 订单生效后增加用户个人和上级团队托管业绩，并维护用户is_valid有效状态。
 		addHostingPerformance(order.getUserId(), order.getStakeUsdtAmount());
-		// 8. 订单生效后的G7新增、周新增、小区业绩和等级重算统一发一条队列消息，消费者内按固定顺序处理。
+		// 8. 订单生效后的G7新增、小区业绩和等级重算统一发一条队列消息，消费者内按固定顺序处理。
+		// 旧全球分红周业绩收集已停用；全球分红后续改由t_user_info当前权重和每周快照驱动。
 		sendStakeHostingEffectiveAfterCommit(order.getId());
 		return 1;
 	}
@@ -314,8 +315,9 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 				.one();
 			recalculateOrderId = order == null ? null : order.getId();
 		}
-		markWeeklyExpirePerformanceQueued(recalculateOrderId);
-		sendStakeHostingWeeklyExpirePerformanceAfterCommit(recalculateOrderId);
+		// 旧全球分红到期周业绩重算链路已停用；订单到期只保留现有托管业绩扣减、有效状态刷新和等级重算。
+		// markWeeklyExpirePerformanceQueued(recalculateOrderId);
+		// sendStakeHostingWeeklyExpirePerformanceAfterCommit(recalculateOrderId);
 	}
 
 	/**
@@ -417,53 +419,44 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	/**
 	 * 事务提交后发送周新增业绩顺序消费消息。
 	 *
-	 * <p>周新增业绩需要顺序消费，这里只负责发送明确的 bizType=5 消息。</p>
+	 * <p>旧全球分红周业绩收集链路已废弃，后续全球分红改由 t_user_info 当前权重和每周快照计算。
+	 * 本方法保留待后续删除，不再发送 bizType=5 消息。</p>
 	 *
 	 * @param orderId 托管订单ID
 	 */
 	private void sendStakeHostingWeeklyPerformanceAfterCommit(Long orderId) {
-		sendStakeHostingOrderMessageAfterCommit(orderId, 5);
+		// sendStakeHostingOrderMessageAfterCommit(orderId, 5);
 	}
 
 	/**
 	 * 将订单到期周业绩重算状态标记为队列中。
 	 *
-	 * <p>101任务把订单更新为已完成并扣减托管业绩后调用。该状态只表示“到期导致的小区快照重算”，
-	 * 不影响订单生效时的 `weekly_performance_status` 新增处理状态。</p>
+	 * <p>旧全球分红周业绩收集链路已废弃，后续全球分红改由 t_user_info 当前权重和每周快照计算。
+	 * 本方法保留待后续删除，不再标记旧周到期业绩队列状态。</p>
 	 *
 	 * @param orderId 已完成的托管订单ID
 	 */
 	private void markWeeklyExpirePerformanceQueued(Long orderId) {
-		if (orderId == null) {
-			return;
-		}
-		lambdaUpdate()
-			.eq(StakeHostingOrder::getId, orderId)
-			.and(wrapper -> wrapper.isNull(StakeHostingOrder::getWeeklyExpirePerformanceStatus)
-				.or()
-				.ne(StakeHostingOrder::getWeeklyExpirePerformanceStatus, WEEKLY_STATUS_DONE))
-			.set(StakeHostingOrder::getWeeklyExpirePerformanceStatus, WEEKLY_STATUS_QUEUED)
-			.set(StakeHostingOrder::getWeeklyExpirePerformanceSkipReason, null)
-			.set(StakeHostingOrder::getWeeklyExpirePerformanceTime, null)
-			.set(StakeHostingOrder::getUpdateTime, new Date())
-			.update();
+		// 旧 weekly_expire_performance_* 状态字段暂时保留，后续随旧周业绩链路统一删除。
+		return;
 	}
 
 	/**
 	 * 事务提交后发送托管订单到期周业绩重算消息。
 	 *
-	 * <p>bizType=7 专门用于订单到期完成后的周小区业绩快照重算，和订单生效时的 bizType=5 新增处理分开。</p>
+	 * <p>旧全球分红周业绩收集链路已废弃，后续全球分红改由 t_user_info 当前权重和每周快照计算。
+	 * 本方法保留待后续删除，不再发送 bizType=7 消息。</p>
 	 *
 	 * @param orderId 托管订单ID
 	 */
 	private void sendStakeHostingWeeklyExpirePerformanceAfterCommit(Long orderId) {
-		sendStakeHostingOrderMessageAfterCommit(orderId, 7);
+		// sendStakeHostingOrderMessageAfterCommit(orderId, 7);
 	}
 
 	/**
 	 * 事务提交后发送托管订单生效后置处理消息。
 	 *
-	 * <p>订单生效后的G7团队新增、周新增、小区业绩和等级重算属于同一条业务链路，只发送一条 bizType=6 消息，
+	 * <p>订单生效后的G7团队新增、小区业绩和等级重算属于同一条业务链路，只发送一条 bizType=6 消息，
 	 * 由消费者按固定顺序处理，避免同一订单连续入队多条后置任务。</p>
 	 *
 	 * @param orderId 托管订单ID

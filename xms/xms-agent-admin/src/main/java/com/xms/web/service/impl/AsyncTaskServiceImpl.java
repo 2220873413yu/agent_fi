@@ -69,6 +69,9 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 
 	private static final String SQL_VALID_NUM5 = "UPDATE t_user_money SET update_time=?,gt_id=?,valid_num5=valid_num5+?,source_code=?,source_type=?,source_id=? WHERE id=? ";
 	private static final String SQL_UPDATE_AWAITING_AMOUNT = "UPDATE t_mining_package_order SET awaiting_amount = awaiting_amount + ? WHERE id = ?";
+	private static final String SQL_RESET_USER_GLOBAL_DIVIDEND_WEIGHT = "UPDATE t_user_info SET global_dividend_weight = 0, global_dividend_umbrella_weight = 0, global_dividend_community_weight = 0, update_time = ?";
+	private static final String SQL_UPDATE_USER_GLOBAL_DIVIDEND_WEIGHT = "UPDATE t_user_info SET global_dividend_weight = ?, global_dividend_umbrella_weight = ?, global_dividend_community_weight = ?, update_time = ? WHERE user_id = ?";
+	private static final String SQL_UPDATE_STAKE_HOSTING_ORDER_PERFORMANCE_SNAPSHOT = "UPDATE t_stake_hosting_order SET performance_coefficient = ?, performance_points = ?, update_time = ? WHERE id = ?";
 	private final AsyncTaskMapper asyncTaskMapper;
 	private final JdbcTemplate jdbcTemplate;
 	private final RenegadeStreamTemplate redisTemplate;
@@ -90,6 +93,8 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	private final IStakeProductService stakeProductService;
 	private final IUserLevelConfigService userLevelConfigService;
 	private final INodePackageOrderService nodePackageOrderService;
+	private final IStakeHostingOrderService stakeHostingOrderService;
+	private final IStakeHostingPackageService stakeHostingPackageService;
 	/**
 	 * 批量更新订单可领取金额
 	 *
@@ -268,6 +273,275 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	public void task102Handler() {
 	}
 
+	/**
+	 * 补偿历史托管订单的全球分红权重。
+	 *
+	 * <p>早期托管订单生效时没有维护全球分红权重字段，本方法按当前仍在产出中的托管订单重算用户表里的
+	 * 个人权重、团队权重和小区权重。方法会先清零再按订单重建，因此可以重复执行，不会把权重越加越大。</p>
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	@Override
+	public void getIdoOrder1() {
+		List<StakeHostingOrder> runningOrders = stakeHostingOrderService.lambdaQuery()
+			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
+			.eq(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_RUNNING)
+			.eq(StakeHostingOrder::getDeleted, 0)
+			.list();
+
+		// 步骤1：先清空当前权重字段，后面按生效订单全量重建，保证补偿任务具备幂等性。
+		Date now = new Date();
+		jdbcTemplate.update(SQL_RESET_USER_GLOBAL_DIVIDEND_WEIGHT, new java.sql.Timestamp(now.getTime()));
+		if (CollectionUtil.isEmpty(runningOrders)) {
+			log.info("托管全球分红权重补偿：当前无生效订单，已清空历史权重");
+			return;
+		}
+
+		// 步骤2：批量读取套餐系数和下单用户，避免每笔订单循环查询数据库。
+		List<Long> packageIds = runningOrders.stream()
+			.map(StakeHostingOrder::getPackageId)
+			.filter(Objects::nonNull)
+			.distinct()
+			.collect(Collectors.toList());
+		Map<Long, StakeHostingPackage> packageMap = CollectionUtil.isEmpty(packageIds) ? new HashMap<>() :
+			stakeHostingPackageService.lambdaQuery()
+				.in(StakeHostingPackage::getId, packageIds)
+				.list()
+				.stream()
+				.collect(Collectors.toMap(StakeHostingPackage::getId, Function.identity(), (left, right) -> left));
+		List<Long> orderUserIds = runningOrders.stream()
+			.map(StakeHostingOrder::getUserId)
+			.filter(Objects::nonNull)
+			.distinct()
+			.collect(Collectors.toList());
+		Map<Long, UserInfo> userInfoMap = CollectionUtil.isEmpty(orderUserIds) ? new HashMap<>() :
+			userInfoService.lambdaQuery()
+				.in(UserInfo::getUserId, orderUserIds)
+				.eq(UserInfo::getDeleted, 0)
+				.list()
+				.stream()
+				.collect(Collectors.toMap(UserInfo::getUserId, Function.identity(), (left, right) -> left));
+
+		Map<Long, BigDecimal> selfWeightMap = new HashMap<>();
+		Map<Long, BigDecimal> umbrellaWeightMap = new HashMap<>();
+		List<StakeHostingOrder> snapshotPatchOrders = new ArrayList<>();
+		Set<Long> affectedParentIds = new LinkedHashSet<>();
+
+		for (StakeHostingOrder order : runningOrders) {
+			UserInfo userInfo = userInfoMap.get(order.getUserId());
+			if (userInfo == null) {
+				log.warn("托管全球分红权重补偿：订单{}找不到用户{}，跳过", order.getId(), order.getUserId());
+				continue;
+			}
+			BigDecimal weight = resolveHostingOrderWeight(order, packageMap.get(order.getPackageId()), snapshotPatchOrders);
+			if (weight.compareTo(BigDecimal.ZERO) <= 0) {
+				log.warn("托管全球分红权重补偿：订单{}无法计算权重，跳过", order.getId());
+				continue;
+			}
+
+			// 步骤3：订单本人累计个人权重；所有上级累计团队权重。
+			selfWeightMap.merge(order.getUserId(), weight, BigDecimal::add);
+			List<Long> parentIds = userInfo.getParentIds();
+			if (CollectionUtil.isNotEmpty(parentIds)) {
+				for (Long parentId : parentIds) {
+					umbrellaWeightMap.merge(parentId, weight, BigDecimal::add);
+					affectedParentIds.add(parentId);
+				}
+			}
+		}
+
+		// 步骤4：历史订单缺少权重快照时，同步反写订单快照，后续订单到期扣减才能读取到同一口径。
+		if (CollectionUtil.isNotEmpty(snapshotPatchOrders)) {
+			batchUpdateStakeHostingOrderPerformanceSnapshot(snapshotPatchOrders, now);
+		}
+
+		// 步骤5：按直推区重算小区权重，小区权重 = 所有直推区权重合计 - 最大直推区权重。
+		Map<Long, BigDecimal> communityWeightMap = calculateCommunityWeightMap(affectedParentIds, selfWeightMap, umbrellaWeightMap);
+		batchUpdateUserGlobalDividendWeight(selfWeightMap, umbrellaWeightMap, communityWeightMap, now);
+		log.info("托管全球分红权重补偿完成：订单数={}，反写订单快照={}，更新用户={}",
+			runningOrders.size(), snapshotPatchOrders.size(),
+			mergeAffectedUserIds(selfWeightMap, umbrellaWeightMap, communityWeightMap).size());
+	}
+
+	/**
+	 * 读取或补齐托管订单的全球分红权重。
+	 *
+	 * <p>优先使用订单上的performancePoints快照；历史订单缺少快照时，用订单金额乘以订单/套餐上的业绩系数兜底。
+	 * 当兜底成功时会把订单加入待反写列表，保证后续到期扣减仍能按同一份订单快照处理。</p>
+	 *
+	 * @param order 生效中的托管订单
+	 * @param hostingPackage 订单对应套餐，可为空
+	 * @param snapshotPatchOrders 需要反写快照的订单集合
+	 * @return 订单全球分红权重，无法计算时返回0
+	 */
+	private BigDecimal resolveHostingOrderWeight(StakeHostingOrder order, StakeHostingPackage hostingPackage,
+												 List<StakeHostingOrder> snapshotPatchOrders) {
+		if (order == null) {
+			return BigDecimal.ZERO;
+		}
+		BigDecimal coefficient = order.getPerformanceCoefficient();
+		if ((coefficient == null || coefficient.compareTo(BigDecimal.ZERO) <= 0)
+			&& hostingPackage != null && hostingPackage.getPerformanceCoefficient() != null
+			&& hostingPackage.getPerformanceCoefficient().compareTo(BigDecimal.ZERO) > 0) {
+			coefficient = hostingPackage.getPerformanceCoefficient();
+		}
+		BigDecimal weight = order.getPerformancePoints();
+		if ((weight == null || weight.compareTo(BigDecimal.ZERO) <= 0)
+			&& order.getStakeUsdtAmount() != null && order.getStakeUsdtAmount().compareTo(BigDecimal.ZERO) > 0
+			&& coefficient != null && coefficient.compareTo(BigDecimal.ZERO) > 0) {
+			weight = order.getStakeUsdtAmount().multiply(coefficient)
+				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		}
+		if (weight == null || weight.compareTo(BigDecimal.ZERO) <= 0) {
+			return BigDecimal.ZERO;
+		}
+		if (coefficient != null && coefficient.compareTo(BigDecimal.ZERO) > 0
+			&& (order.getPerformanceCoefficient() == null || order.getPerformanceCoefficient().compareTo(BigDecimal.ZERO) <= 0
+			|| order.getPerformancePoints() == null || order.getPerformancePoints().compareTo(BigDecimal.ZERO) <= 0)) {
+			order.setPerformanceCoefficient(coefficient.setScale(4, ConstantStatic.roundingModeNew));
+			order.setPerformancePoints(weight.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
+			snapshotPatchOrders.add(order);
+		}
+		return weight.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+	}
+
+	/**
+	 * 按直推区重新计算受影响上级的小区权重。
+	 *
+	 * <p>每个直推用户形成一个区，该区权重等于直推用户个人权重加团队权重；小区权重等于所有直推区权重之和减去最大区权重。</p>
+	 *
+	 * @param affectedParentIds 团队权重发生变化的上级用户ID
+	 * @param selfWeightMap 用户个人权重汇总
+	 * @param umbrellaWeightMap 用户团队权重汇总
+	 * @return 用户ID到小区权重的映射
+	 */
+	private Map<Long, BigDecimal> calculateCommunityWeightMap(Set<Long> affectedParentIds,
+															  Map<Long, BigDecimal> selfWeightMap,
+															  Map<Long, BigDecimal> umbrellaWeightMap) {
+		Map<Long, BigDecimal> communityWeightMap = new HashMap<>();
+		if (CollectionUtil.isEmpty(affectedParentIds)) {
+			return communityWeightMap;
+		}
+		List<UserInfo> directUsers = userInfoService.lambdaQuery()
+			.in(UserInfo::getInviteUserId, affectedParentIds)
+			.eq(UserInfo::getDeleted, 0)
+			.list();
+		Map<Long, List<UserInfo>> directUserMap = directUsers.stream()
+			.filter(user -> user.getInviteUserId() != null)
+			.collect(Collectors.groupingBy(UserInfo::getInviteUserId));
+		for (Long parentId : affectedParentIds) {
+			BigDecimal totalLineWeight = BigDecimal.ZERO;
+			BigDecimal maxLineWeight = BigDecimal.ZERO;
+			List<UserInfo> directUserList = directUserMap.get(parentId);
+			if (CollectionUtil.isNotEmpty(directUserList)) {
+				for (UserInfo directUser : directUserList) {
+					BigDecimal lineWeight = nvl(selfWeightMap.get(directUser.getUserId()))
+						.add(nvl(umbrellaWeightMap.get(directUser.getUserId())));
+					totalLineWeight = totalLineWeight.add(lineWeight);
+					if (lineWeight.compareTo(maxLineWeight) > 0) {
+						maxLineWeight = lineWeight;
+					}
+				}
+			}
+			BigDecimal communityWeight = totalLineWeight.subtract(maxLineWeight)
+				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			communityWeightMap.put(parentId, communityWeight.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : communityWeight);
+		}
+		return communityWeightMap;
+	}
+
+	/**
+	 * 批量更新用户当前全球分红权重字段。
+	 *
+	 * @param selfWeightMap 用户个人权重汇总
+	 * @param umbrellaWeightMap 用户团队权重汇总
+	 * @param communityWeightMap 用户小区权重汇总
+	 * @param now 本轮补偿更新时间
+	 */
+	private void batchUpdateUserGlobalDividendWeight(Map<Long, BigDecimal> selfWeightMap,
+													 Map<Long, BigDecimal> umbrellaWeightMap,
+													 Map<Long, BigDecimal> communityWeightMap,
+													 Date now) {
+		List<Long> userIds = new ArrayList<>(mergeAffectedUserIds(selfWeightMap, umbrellaWeightMap, communityWeightMap));
+		if (CollectionUtil.isEmpty(userIds)) {
+			return;
+		}
+		int[] results = jdbcTemplate.batchUpdate(SQL_UPDATE_USER_GLOBAL_DIVIDEND_WEIGHT, new BatchPreparedStatementSetter() {
+			@Override
+			public void setValues(PreparedStatement ps, int i) throws SQLException {
+				Long userId = userIds.get(i);
+				ps.setBigDecimal(1, nvl(selfWeightMap.get(userId)));
+				ps.setBigDecimal(2, nvl(umbrellaWeightMap.get(userId)));
+				ps.setBigDecimal(3, nvl(communityWeightMap.get(userId)));
+				ps.setTimestamp(4, new java.sql.Timestamp(now.getTime()));
+				ps.setLong(5, userId);
+			}
+
+			@Override
+			public int getBatchSize() {
+				return userIds.size();
+			}
+		});
+		if (ArrayUtil.contains(results, 0)) {
+			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+			throw new ServiceException("批量补偿用户全球分红权重失败");
+		}
+	}
+
+	/**
+	 * 批量反写历史托管订单缺失的业绩系数和业绩积分快照。
+	 *
+	 * @param orders 需要反写快照的托管订单
+	 * @param now 本轮补偿更新时间
+	 */
+	private void batchUpdateStakeHostingOrderPerformanceSnapshot(List<StakeHostingOrder> orders, Date now) {
+		int[] results = jdbcTemplate.batchUpdate(SQL_UPDATE_STAKE_HOSTING_ORDER_PERFORMANCE_SNAPSHOT, new BatchPreparedStatementSetter() {
+			@Override
+			public void setValues(PreparedStatement ps, int i) throws SQLException {
+				StakeHostingOrder order = orders.get(i);
+				ps.setBigDecimal(1, order.getPerformanceCoefficient());
+				ps.setBigDecimal(2, order.getPerformancePoints());
+				ps.setTimestamp(3, new java.sql.Timestamp(now.getTime()));
+				ps.setLong(4, order.getId());
+			}
+
+			@Override
+			public int getBatchSize() {
+				return orders.size();
+			}
+		});
+		if (ArrayUtil.contains(results, 0)) {
+			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+			throw new ServiceException("批量反写托管订单权重快照失败");
+		}
+	}
+
+	/**
+	 * 合并本轮需要写回权重的用户ID。
+	 *
+	 * @param selfWeightMap 用户个人权重汇总
+	 * @param umbrellaWeightMap 用户团队权重汇总
+	 * @param communityWeightMap 用户小区权重汇总
+	 * @return 去重后的用户ID集合
+	 */
+	private Set<Long> mergeAffectedUserIds(Map<Long, BigDecimal> selfWeightMap,
+										   Map<Long, BigDecimal> umbrellaWeightMap,
+										   Map<Long, BigDecimal> communityWeightMap) {
+		Set<Long> userIds = new LinkedHashSet<>();
+		userIds.addAll(selfWeightMap.keySet());
+		userIds.addAll(umbrellaWeightMap.keySet());
+		userIds.addAll(communityWeightMap.keySet());
+		return userIds;
+	}
+
+	/**
+	 * 将空金额转为0，便于权重汇总和批量写库。
+	 *
+	 * @param value 可为空的权重
+	 * @return 非空权重
+	 */
+	private BigDecimal nvl(BigDecimal value) {
+		return value == null ? BigDecimal.ZERO : value;
+	}
 	/**
 	 * 重新计算等级的补偿任务
 	 */

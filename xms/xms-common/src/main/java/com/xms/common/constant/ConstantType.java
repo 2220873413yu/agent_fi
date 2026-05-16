@@ -182,6 +182,10 @@ public class ConstantType {
 		public static final int type_38 = 38;
 		//质押退还
 		public static final int type_39 = 39;
+		//Polymarket下单扣减AFI
+		public static final int type_40 = 40;
+		//Polymarket猜中兑付USDT
+		public static final int type_41 = 41;
 		public static final int type_44 = 44;
 	}
 

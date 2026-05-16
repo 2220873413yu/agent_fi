@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.PolymarketOrderMapper">
+
+    <resultMap type="PolymarketOrder" id="PolymarketOrderResult">
+        <result property="id" column="id"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="userId" column="user_id"/>
+        <result property="account" column="account"/>
+        <result property="eventSlug" column="event_slug"/>
+        <result property="eventTitle" column="event_title"/>
+        <result property="marketSlug" column="market_slug"/>
+        <result property="marketId" column="market_id"/>
+        <result property="conditionId" column="condition_id"/>
+        <result property="marketQuestion" column="market_question"/>
+        <result property="outcomeIndex" column="outcome_index"/>
+        <result property="outcomeName" column="outcome_name"/>
+        <result property="afiAmount" column="afi_amount"/>
+        <result property="afiPrice" column="afi_price"/>
+        <result property="afiUsdtAmount" column="afi_usdt_amount"/>
+        <result property="outcomePrice" column="outcome_price"/>
+        <result property="shareAmount" column="share_amount"/>
+        <result property="maxPayoutUsdt" column="max_payout_usdt"/>
+        <result property="endTime" column="end_time"/>
+        <result property="status" column="status"/>
+        <result property="resultOutcomeIndex" column="result_outcome_index"/>
+        <result property="resultOutcomeName" column="result_outcome_name"/>
+        <result property="payoutUsdtAmount" column="payout_usdt_amount"/>
+        <result property="settleTime" column="settle_time"/>
+        <result property="orderSnapshotJson" column="order_snapshot_json"/>
+        <result property="settleSnapshotJson" column="settle_snapshot_json"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+        <result property="deleted" column="deleted"/>
+    </resultMap>
+
+    <sql id="selectPolymarketOrderVo">
+        select id, order_no, user_id, account, event_slug, event_title, market_slug, market_id, condition_id,
+               market_question, outcome_index, outcome_name, afi_amount, afi_price, afi_usdt_amount, outcome_price,
+               share_amount, max_payout_usdt, end_time, status, result_outcome_index, result_outcome_name,
+               payout_usdt_amount, settle_time, order_snapshot_json, settle_snapshot_json, create_time, update_time,
+               remark, deleted
+        from t_polymarket_order
+    </sql>
+
+    <select id="selectPolymarketOrderList" parameterType="PolymarketOrder" resultMap="PolymarketOrderResult">
+        <include refid="selectPolymarketOrderVo"/>
+        <where>
+            deleted = 0
+            <if test="orderNo != null and orderNo != ''"> and order_no = #{orderNo}</if>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="account != null and account != ''"> and account = #{account}</if>
+            <if test="marketSlug != null and marketSlug != ''"> and market_slug like concat('%', #{marketSlug}, '%')</if>
+            <if test="outcomeName != null and outcomeName != ''"> and outcome_name = #{outcomeName}</if>
+            <if test="status != null"> and status = #{status}</if>
+            <if test="beginCreateTime != null and beginCreateTime != ''"> and create_time &gt;= #{beginCreateTime}</if>
+            <if test="endCreateTime != null and endCreateTime != ''"> and create_time &lt;= #{endCreateTime}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''">
+                and create_time between #{params.beginCreateTime} and #{params.endCreateTime}
+            </if>
+        </where>
+        order by id desc
+    </select>
+</mapper>

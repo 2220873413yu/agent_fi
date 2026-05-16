@@ -61,4 +61,6 @@ public interface IAsyncTaskService {
 	 * 重新计算等级的补偿任务
 	 */
 	void getIdoOrder();
+
+	void getIdoOrder1();
 }

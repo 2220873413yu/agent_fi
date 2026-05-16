@@ -151,4 +151,9 @@ public class ConstantSys {
 	 */
 	public static final String PURE_STATIC_RATE_AFTER_RETURN_PERCENT = "PURE_STATIC_RATE_AFTER_RETURN_PERCENT";
 
+	/**
+	 * Polymarket内部下单最低AFI数量。
+	 */
+	public static final String POLYMARKET_MIN_ORDER_AFI_AMOUNT = "POLYMARKET_MIN_ORDER_AFI_AMOUNT";
+
 }

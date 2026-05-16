@@ -163,7 +163,8 @@ public class BizCommonServiceImpl implements BizCommonService {
 	 */
 	@Override
 	public BigDecimal getAfiPrice() {
-		BigDecimal cachedPrice = afiPriceCache.getIfPresent(AFI_USDT_PAIR);
+		return new BigDecimal("0.5");
+		/*BigDecimal cachedPrice = afiPriceCache.getIfPresent(AFI_USDT_PAIR);
 		if (cachedPrice != null) {
 			return cachedPrice;
 		}
@@ -201,6 +202,6 @@ public class BizCommonServiceImpl implements BizCommonService {
 				}
 				throw new ServiceException("get afi price error");
 			}
-		}
+		}*/
 	}
 }

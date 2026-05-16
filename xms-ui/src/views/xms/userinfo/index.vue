@@ -11,6 +11,17 @@
         />
       </el-form-item>
 
+
+      <el-form-item label="邀请用户ID" label-width="120px" prop="inviteUserId">
+        <el-input
+          v-model="queryParams.inviteUserId"
+          clearable
+          oninput="if(isNaN(value)) { value = null } else { value = value.replace('.', '') }"
+          placeholder="请输入用户ID"
+          @keyup.enter.native="handleQuery"
+        />
+      </el-form-item>
+
       <el-form-item label="用户编码" label-width="120px" prop="userCode">
         <el-input
           v-model="queryParams.userCode"
@@ -30,7 +41,7 @@
         />
       </el-form-item>
 
-<!--      <el-form-item label="结算等级" label-width="120px" prop="finaGameLevel">
+      <el-form-item label="结算等级" label-width="120px" prop="finaGameLevel">
         <el-select v-model="queryParams.finaGameLevel" clearable placeholder="请选择">
           <el-option
             v-for="dict in dict.type.t_user_info_game_level"
@@ -40,8 +51,6 @@
           />
         </el-select>
       </el-form-item>
-
- -->
 
       <el-form-item label="用户等级" label-width="120px" prop="gameLevel">
         <el-select v-model="queryParams.gameLevel" clearable placeholder="请选择">
@@ -98,7 +107,7 @@
         </el-select>
       </el-form-item>
 
-<!--      <el-form-item label="是否有效用户" prop="isValid" label-width="120px">
+      <el-form-item label="是否持有未出局的矿机" prop="isValid" label-width="150px">
         <el-select v-model="queryParams.isValid" placeholder="请选择" clearable>
           <el-option
             v-for="dict in dict.type.t_user_info_is_valid"
@@ -107,7 +116,7 @@
             :value="dict.value"
           />
         </el-select>
-      </el-form-item>   -->
+      </el-form-item>
 
 
 
@@ -715,6 +724,7 @@ export default {
         userId: null,
         autoMining: null,
         userCode: null,
+        inviteUserId: null,
         autoWithdrawal: null,
         finaGameLevel: null,
         autoTransfer: null,

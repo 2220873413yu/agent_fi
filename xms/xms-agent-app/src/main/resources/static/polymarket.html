@@ -1,0 +1,1243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Polymarket 调研与内部下单</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #fff;
+      --text: #182230;
+      --muted: #667085;
+      --line: #d9e0ea;
+      --brand: #0f766e;
+      --brand-dark: #0b5c56;
+      --brand-soft: #e7f6f4;
+      --danger: #b42318;
+      --danger-soft: #fee4e2;
+      --ok: #067647;
+      --ok-soft: #dcfae6;
+      --warn: #b54708;
+      --warn-soft: #fef0c7;
+      --shadow: 0 10px 28px rgba(16, 24, 40, .08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    }
+
+    button,
+    input,
+    select {
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0 12px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    button.primary {
+      border-color: var(--brand);
+      background: var(--brand);
+      color: #fff;
+    }
+
+    button.primary:hover {
+      background: var(--brand-dark);
+    }
+
+    button.ghost {
+      background: #fff;
+    }
+
+    button.active {
+      border-color: var(--brand);
+      background: var(--brand-soft);
+      color: var(--brand-dark);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .55;
+    }
+
+    input {
+      min-width: 0;
+    }
+
+    .shell {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 26px;
+      letter-spacing: 0;
+    }
+
+    .subtitle,
+    .muted {
+      color: var(--muted);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 380px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      padding: 14px;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .metric-value {
+      margin-top: 4px;
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .meta {
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      color: #344054;
+      font-family: Consolas, Monaco, monospace;
+      overflow-wrap: anywhere;
+      box-shadow: none;
+    }
+
+    .event-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .updown-board {
+      display: grid;
+      gap: 16px;
+    }
+
+    .coin-section {
+      display: grid;
+      gap: 10px;
+    }
+
+    .coin-title {
+      font-size: 18px;
+      font-weight: 850;
+    }
+
+    .updown-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 10px;
+    }
+
+    .updown-card {
+      padding: 14px;
+      box-shadow: none;
+    }
+
+    .updown-card.live {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 2px rgba(15, 118, 110, .12);
+    }
+
+    .updown-card.closed {
+      border-color: #fecdca;
+      background: #fff7f6;
+    }
+
+    .updown-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: start;
+      margin-bottom: 10px;
+    }
+
+    .updown-time {
+      font-weight: 850;
+      font-size: 16px;
+    }
+
+    .updown-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .event-card {
+      padding: 16px;
+      box-shadow: none;
+    }
+
+    .event-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: start;
+      margin-bottom: 12px;
+    }
+
+    .event-title {
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .slug {
+      color: var(--muted);
+      font-family: Consolas, Monaco, monospace;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .event-stats {
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: 18px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .stat-value {
+      font-weight: 800;
+    }
+
+    .market-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .market-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 310px);
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .market-row.blocked {
+      border-color: #fecdca;
+      background: #fff7f6;
+    }
+
+    .market-question {
+      font-weight: 760;
+    }
+
+    .market-state {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .outcomes {
+      display: grid;
+      gap: 8px;
+    }
+
+    .outcome-btn {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+      height: auto;
+      min-height: 38px;
+      padding: 8px 10px;
+      text-align: left;
+    }
+
+    .outcome-btn.selected {
+      border-color: var(--brand);
+      background: var(--brand-soft);
+    }
+
+    .outcome-btn.winner {
+      border-color: var(--ok);
+      background: var(--ok-soft);
+    }
+
+    .price {
+      font-weight: 800;
+      color: var(--brand-dark);
+    }
+
+    .side {
+      position: sticky;
+      top: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .side-card {
+      padding: 16px;
+      box-shadow: none;
+    }
+
+    .side-title {
+      margin-bottom: 12px;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .field {
+      display: grid;
+      gap: 5px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .field input {
+      width: 100%;
+    }
+
+    .action-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .selected-box,
+    .quote-box,
+    .orders-box {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 100px minmax(0, 1fr);
+      gap: 8px;
+      margin-top: 5px;
+    }
+
+    .kv span:first-child {
+      color: var(--muted);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: var(--brand-dark);
+      font-weight: 750;
+    }
+
+    .pill.warn {
+      background: var(--warn-soft);
+      color: var(--warn);
+    }
+
+    .pill.ok {
+      background: var(--ok-soft);
+      color: var(--ok);
+    }
+
+    .pill.danger {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .message {
+      min-height: 22px;
+      margin-top: 10px;
+      color: var(--muted);
+    }
+
+    .message.error {
+      color: var(--danger);
+    }
+
+    .message.success {
+      color: var(--ok);
+    }
+
+    .order-item {
+      padding: 10px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .order-item:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    pre {
+      max-height: 340px;
+      overflow: auto;
+      margin: 0;
+      padding: 12px;
+      border-radius: 8px;
+      background: #101828;
+      color: #f2f4f7;
+      font-size: 12px;
+    }
+
+    .empty,
+    .error {
+      padding: 18px;
+      box-shadow: none;
+    }
+
+    .error {
+      color: var(--danger);
+    }
+
+    @media (max-width: 1180px) {
+      .layout,
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar {
+        justify-content: flex-start;
+      }
+
+      .side {
+        position: static;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .shell {
+        padding: 14px;
+      }
+
+      .metrics,
+      .event-head,
+      .market-row {
+        grid-template-columns: 1fr;
+      }
+
+      .event-stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="topbar">
+    <div>
+      <h1>Polymarket 调研与内部下单</h1>
+      <div class="subtitle">浏览 Crypto / Sports 事件，选择某个结果后用 AFI 创建平台内部订单。</div>
+    </div>
+    <div class="toolbar">
+      <button id="cryptoBtn" class="active" type="button">Crypto</button>
+      <button id="updownBtn" type="button">Crypto Up/Down</button>
+      <button id="sportsBtn" type="button">Sports</button>
+      <label>Limit <input id="limitInput" type="number" min="1" max="100" value="20" style="width:86px"></label>
+      <label id="coinFilterWrap" style="display:none">Coins <input id="coinInput" value="btc,eth,sol" style="width:120px"></label>
+      <button id="refreshBtn" class="primary" type="button">刷新事件</button>
+    </div>
+  </header>
+
+  <section class="layout">
+    <div>
+      <section class="metrics">
+        <div class="panel metric">
+          <div class="metric-label">当前板块</div>
+          <div id="sectionMetric" class="metric-value">Crypto</div>
+        </div>
+        <div class="panel metric">
+          <div class="metric-label">事件数量</div>
+          <div id="countMetric" class="metric-value">-</div>
+        </div>
+        <div class="panel metric">
+          <div class="metric-label">24h 成交量合计</div>
+          <div id="volumeMetric" class="metric-value">-</div>
+        </div>
+        <div class="panel metric">
+          <div class="metric-label">状态</div>
+          <div id="statusMetric" class="metric-value">-</div>
+        </div>
+      </section>
+
+      <div id="meta" class="panel meta"></div>
+      <div id="eventList" class="event-list"></div>
+    </div>
+
+    <aside class="side">
+      <div class="panel side-card">
+        <div class="side-title">下单面板</div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="tokenInput">Authorization</label>
+            <input id="tokenInput" type="password" placeholder="粘贴 App token，裸 token 会自动补 App 前缀">
+          </div>
+          <div class="field">
+            <label for="afiAmountInput">下单 AFI 数量</label>
+            <input id="afiAmountInput" type="number" min="10" step="0.000001" value="10">
+            <div id="minAfiHint" class="muted">最低下单数量加载中...</div>
+          </div>
+        </div>
+
+        <div id="selectedBox" class="selected-box" style="margin-top:12px">
+          <div class="muted">还没有选择市场。请在左侧事件里点某个 Yes / No 结果。</div>
+        </div>
+
+        <div class="action-row">
+          <button id="quoteBtn" type="button" class="ghost" disabled>报价预览</button>
+          <button id="createBtn" type="button" class="primary" disabled>确认下单</button>
+        </div>
+        <div id="orderMessage" class="message"></div>
+      </div>
+
+      <div class="panel side-card">
+        <div class="side-title">报价结果</div>
+        <div id="quoteBox" class="quote-box">
+          <div class="muted">点击“报价预览”后显示 AFI 价格、成交价格、份额和最大兑付。</div>
+        </div>
+      </div>
+
+      <div class="panel side-card">
+        <div class="side-title">我的订单</div>
+        <div class="action-row" style="grid-template-columns:1fr auto;margin-top:0">
+          <select id="orderStatusFilter">
+            <option value="">全部状态</option>
+            <option value="0">待结算</option>
+            <option value="1">已猜中</option>
+            <option value="2">未猜中</option>
+            <option value="3">待人工复核</option>
+            <option value="4">已作废</option>
+          </select>
+          <button id="myOrdersBtn" type="button">刷新</button>
+        </div>
+        <div id="ordersBox" class="orders-box" style="margin-top:12px">
+          <div class="muted">需要 Authorization。创建订单后也会自动刷新这里。</div>
+        </div>
+      </div>
+
+      <div class="panel side-card">
+        <div class="side-title">按 market slug 查询</div>
+        <div class="action-row" style="grid-template-columns:minmax(0,1fr) auto;margin-top:0">
+          <input id="slugInput" value="btc-updown-5m-1778746200">
+          <button id="slugBtn" type="button">查询</button>
+        </div>
+        <pre id="detailJson" style="margin-top:12px;display:none"></pre>
+      </div>
+    </aside>
+  </section>
+</main>
+
+<script>
+  const state = {
+    section: 'crypto',
+    selected: null,
+    lastQuote: null,
+    minAfiAmount: 10,
+    minSecondsBeforeEnd: 5
+  };
+
+  const cryptoBtn = document.getElementById('cryptoBtn');
+  const updownBtn = document.getElementById('updownBtn');
+  const sportsBtn = document.getElementById('sportsBtn');
+  const refreshBtn = document.getElementById('refreshBtn');
+  const limitInput = document.getElementById('limitInput');
+  const coinFilterWrap = document.getElementById('coinFilterWrap');
+  const coinInput = document.getElementById('coinInput');
+  const eventList = document.getElementById('eventList');
+  const meta = document.getElementById('meta');
+  const sectionMetric = document.getElementById('sectionMetric');
+  const countMetric = document.getElementById('countMetric');
+  const volumeMetric = document.getElementById('volumeMetric');
+  const statusMetric = document.getElementById('statusMetric');
+  const tokenInput = document.getElementById('tokenInput');
+  const afiAmountInput = document.getElementById('afiAmountInput');
+  const minAfiHint = document.getElementById('minAfiHint');
+  const selectedBox = document.getElementById('selectedBox');
+  const quoteBtn = document.getElementById('quoteBtn');
+  const createBtn = document.getElementById('createBtn');
+  const orderMessage = document.getElementById('orderMessage');
+  const quoteBox = document.getElementById('quoteBox');
+  const myOrdersBtn = document.getElementById('myOrdersBtn');
+  const orderStatusFilter = document.getElementById('orderStatusFilter');
+  const ordersBox = document.getElementById('ordersBox');
+  const slugInput = document.getElementById('slugInput');
+  const slugBtn = document.getElementById('slugBtn');
+  const detailJson = document.getElementById('detailJson');
+
+  tokenInput.value = localStorage.getItem('polymarketAppAuthorization') || '';
+
+  function setStatus(text, error) {
+    statusMetric.textContent = text || '';
+    statusMetric.style.color = error ? 'var(--danger)' : 'var(--text)';
+  }
+
+  function setOrderMessage(text, type) {
+    orderMessage.textContent = text || '';
+    orderMessage.className = 'message' + (type ? ` ${type}` : '');
+  }
+
+  function authHeader() {
+    const value = tokenInput.value.trim();
+    if (!value) {
+      return null;
+    }
+    localStorage.setItem('polymarketAppAuthorization', value);
+    if (/^(App|Bearer)\s+/i.test(value)) {
+      return value;
+    }
+    return `App ${value}`;
+  }
+
+  async function requestJson(url, options = {}) {
+    const response = await fetch(url, options);
+    let body = {};
+    try {
+      body = await response.json();
+    } catch (error) {
+      body = { msg: await response.text().catch(() => '') };
+    }
+    if (!response.ok || body.code !== 200) {
+      throw new Error(body.msg || `请求失败：${response.status}`);
+    }
+    return body.data;
+  }
+
+  function authedOptions(method, payload) {
+    const authorization = authHeader();
+    if (!authorization) {
+      throw new Error('请先填写 App Authorization。');
+    }
+    const options = {
+      method,
+      headers: {
+        Authorization: authorization
+      }
+    };
+    if (payload) {
+      options.headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify(payload);
+    }
+    return options;
+  }
+
+  function toArray(value) {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  function numberValue(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+  }
+
+  function formatNumber(value, max = 6) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      return value === undefined || value === null || value === '' ? '-' : value;
+    }
+    return number.toLocaleString(undefined, { maximumFractionDigits: max });
+  }
+
+  function formatDate(value) {
+    if (!value) {
+      return '-';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+    return date.toLocaleString();
+  }
+
+  function statusLabel(status) {
+    const map = {
+      0: ['待结算', 'warn'],
+      1: ['已猜中', 'ok'],
+      2: ['未猜中', 'danger'],
+      3: ['待人工复核', 'warn'],
+      4: ['已作废', 'danger']
+    };
+    return map[status] || [`未知 ${status}`, 'warn'];
+  }
+
+  async function loadOrderConfig() {
+    try {
+      const config = await requestJson('/api/polymarket/orders/config');
+      const minAfiAmount = Number(config.minAfiAmount);
+      if (Number.isFinite(minAfiAmount) && minAfiAmount > 0) {
+        state.minAfiAmount = minAfiAmount;
+        afiAmountInput.min = String(minAfiAmount);
+        if (Number(afiAmountInput.value || 0) < minAfiAmount) {
+          afiAmountInput.value = String(minAfiAmount);
+        }
+      }
+      const minSecondsBeforeEnd = Number(config.minSecondsBeforeEnd);
+      if (Number.isFinite(minSecondsBeforeEnd) && minSecondsBeforeEnd >= 0) {
+        state.minSecondsBeforeEnd = minSecondsBeforeEnd;
+      }
+      minAfiHint.textContent = `最低下单数量：${formatNumber(state.minAfiAmount)} AFI`;
+    } catch (error) {
+      minAfiHint.textContent = `最低下单数量：${formatNumber(state.minAfiAmount)} AFI（配置读取失败，使用页面兜底）`;
+    }
+  }
+
+  function marketTradeState(event, market) {
+    const prices = toArray(market.outcomePrices);
+    const outcomes = toArray(market.outcomes);
+    const endTime = parseTime(market.endDate || market.endDateIso || event.endDate || event.endDateIso);
+    const winnerIndex = winnerOutcomeIndex(prices);
+    const resolved = String(market.umaResolutionStatus || '').toLowerCase() === 'resolved' || winnerIndex >= 0;
+    if (resolved) {
+      const winnerName = winnerIndex >= 0 && winnerIndex < outcomes.length ? outcomes[winnerIndex] : '结果已出';
+      return { disabled: true, tone: 'ok', label: '已开奖', result: `结果：${winnerName}`, winnerIndex };
+    }
+    if (isTrue(market.closed)) {
+      return { disabled: true, tone: 'danger', label: '已关闭', result: '等待结果或人工复核', winnerIndex: -1 };
+    }
+    if (isFalse(market.active)) {
+      return { disabled: true, tone: 'danger', label: '已下架', result: '不可下单', winnerIndex: -1 };
+    }
+    if (isFalse(market.acceptingOrders)) {
+      return { disabled: true, tone: 'warn', label: '停止下单', result: 'Polymarket 已停止接单', winnerIndex: -1 };
+    }
+    if (endTime && endTime.getTime() <= Date.now() + state.minSecondsBeforeEnd * 1000) {
+      return { disabled: true, tone: 'warn', label: '已结束', result: '等待结果', winnerIndex: -1 };
+    }
+    return { disabled: false, tone: 'ok', label: '可下单', result: '', winnerIndex: -1 };
+  }
+
+  function isTrue(value) {
+    return value === true || value === 1 || String(value).toLowerCase() === 'true';
+  }
+
+  function isFalse(value) {
+    return value === false || value === 0 || String(value).toLowerCase() === 'false';
+  }
+
+  function parseTime(value) {
+    if (!value) {
+      return null;
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function winnerOutcomeIndex(prices) {
+    let winnerIndex = -1;
+    for (let i = 0; i < prices.length; i += 1) {
+      const price = Number(prices[i]);
+      if (price === 1) {
+        if (winnerIndex >= 0) {
+          return -1;
+        }
+        winnerIndex = i;
+      } else if (price !== 0) {
+        return -1;
+      }
+    }
+    return winnerIndex;
+  }
+
+  function updateSelectedBox() {
+    if (!state.selected) {
+      selectedBox.innerHTML = '<div class="muted">还没有选择市场。请在左侧事件里点某个 Yes / No 结果。</div>';
+      quoteBtn.disabled = true;
+      createBtn.disabled = true;
+      return;
+    }
+    quoteBtn.disabled = false;
+    createBtn.disabled = false;
+    selectedBox.innerHTML = `
+      <div class="kv"><span>事件</span><strong>${escapeHtml(state.selected.eventTitle || '-')}</strong></div>
+      <div class="kv"><span>市场</span><strong>${escapeHtml(state.selected.question || '-')}</strong></div>
+      <div class="kv"><span>选择</span><span class="pill">${escapeHtml(state.selected.outcomeName)} @ ${formatNumber(state.selected.price)}</span></div>
+      <div class="kv"><span>slug</span><span class="slug">${escapeHtml(state.selected.marketSlug)}</span></div>
+    `;
+  }
+
+  function selectOutcome(eventSlug, eventTitle, market, outcomeIndex, outcomeName, price) {
+    state.selected = {
+      eventSlug,
+      eventTitle,
+      marketSlug: market.slug,
+      question: market.question,
+      outcomeIndex,
+      outcomeName,
+      price
+    };
+    state.lastQuote = null;
+    quoteBox.innerHTML = '<div class="muted">已选择结果，点击“报价预览”获取当前 AFI 价格和预计份额。</div>';
+    setOrderMessage('');
+    updateSelectedBox();
+    document.querySelectorAll('.outcome-btn').forEach((button) => {
+      const same = button.dataset.slug === market.slug && Number(button.dataset.index) === outcomeIndex;
+      button.classList.toggle('selected', same);
+    });
+  }
+
+  function renderOutcomeButton(event, market, outcome, index, price, tradeState) {
+    const disabled = tradeState.disabled || !market.slug || price === undefined || Number(price) <= 0;
+    const choiceId = `choice-${Object.keys(window.__choices).length}`;
+    window.__choices[choiceId] = {
+      eventSlug: event.slug || '',
+      eventTitle: event.title || event.slug || '',
+      market,
+      outcomeIndex: index,
+      outcomeName: outcome,
+      price
+    };
+    return `
+      <button
+        class="outcome-btn ${tradeState.winnerIndex === index ? 'winner' : ''}"
+        type="button"
+        data-slug="${escapeAttr(market.slug || '')}"
+        data-index="${index}"
+        data-choice="${choiceId}"
+        ${disabled ? 'disabled' : ''}
+      >
+        <span>${escapeHtml(outcome || `结果 ${index + 1}`)}</span>
+        <span class="price">${formatNumber(price)}</span>
+      </button>
+    `;
+  }
+
+  window.__markets = {};
+  window.__choices = {};
+
+  function renderMarket(event, market, index) {
+    const outcomes = toArray(market.outcomes);
+    const prices = toArray(market.outcomePrices);
+    const key = market.slug || market.id || `${event.slug}-${index}`;
+    const tradeState = marketTradeState(event, market);
+    window.__markets[key] = market;
+    const buttons = outcomes.length
+      ? outcomes.map((outcome, outcomeIndex) => renderOutcomeButton(event, market, outcome, outcomeIndex, prices[outcomeIndex], tradeState)).join('')
+      : '<div class="muted">这个市场没有 outcomePrices，暂不能内部下单。</div>';
+    return `
+      <div class="market-row ${tradeState.disabled ? 'blocked' : ''}">
+        <div>
+          <div class="market-question">${escapeHtml(market.question || market.slug || market.id || '-')}</div>
+          <div class="slug">${escapeHtml(market.slug || '')}</div>
+          <div class="muted">bid ${formatNumber(market.bestBid)} / ask ${formatNumber(market.bestAsk)} / last ${formatNumber(market.lastTradePrice)}</div>
+          <div class="market-state">
+            <span class="pill ${tradeState.tone}">${escapeHtml(tradeState.label)}</span>
+            ${tradeState.result ? `<span class="muted">${escapeHtml(tradeState.result)}</span>` : ''}
+          </div>
+        </div>
+        <div class="outcomes">${buttons}</div>
+      </div>
+    `;
+  }
+
+  function renderEvent(event) {
+    const markets = Array.isArray(event.markets) ? event.markets : [];
+    return `
+      <article class="panel event-card">
+        <div class="event-head">
+          <div>
+            <div class="event-title">${escapeHtml(event.title || event.slug || event.id)}</div>
+            <div class="slug">${escapeHtml(event.slug || '')}</div>
+          </div>
+          <div class="event-stats">
+            <div>
+              <div class="stat-label">24h成交量</div>
+              <div class="stat-value">${formatNumber(event.volume24hr || event.volume_24hr, 2)}</div>
+            </div>
+            <div>
+              <div class="stat-label">流动性</div>
+              <div class="stat-value">${formatNumber(event.liquidity, 2)}</div>
+            </div>
+            <div>
+              <div class="stat-label">结束时间</div>
+              <div class="stat-value">${formatDate(event.endDate)}</div>
+            </div>
+          </div>
+        </div>
+        <div class="market-grid">
+          ${markets.slice(0, 8).map((market, index) => renderMarket(event, market, index)).join('') || '<div class="muted">暂无市场数据</div>'}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderEvents(data) {
+    window.__markets = {};
+    window.__choices = {};
+    const events = data.events || [];
+    const totalVolume = events.reduce((sum, event) => sum + numberValue(event.volume24hr || event.volume_24hr), 0);
+    sectionMetric.textContent = data.section === 'sports' ? 'Sports' : 'Crypto';
+    countMetric.textContent = data.count;
+    volumeMetric.textContent = formatNumber(totalVolume, 2);
+    meta.innerHTML = `section=${escapeHtml(data.section)}<br>tagId=${escapeHtml(data.tagId)}<br>fetchedAt=${escapeHtml(data.fetchedAt)}<br><br>${escapeHtml(data.sourceUrl)}`;
+    eventList.innerHTML = events.length
+      ? events.map(renderEvent).join('')
+      : '<div class="panel empty">暂无事件</div>';
+    attachOutcomeHandlers();
+  }
+
+  function renderUpDownEvents(data) {
+    window.__markets = {};
+    window.__choices = {};
+    const events = data.events || [];
+    const grouped = events.reduce((map, event) => {
+      const coin = event.coin || 'OTHER';
+      if (!map[coin]) {
+        map[coin] = [];
+      }
+      map[coin].push(event);
+      return map;
+    }, {});
+    sectionMetric.textContent = 'Up/Down';
+    countMetric.textContent = data.count;
+    volumeMetric.textContent = formatNumber(events.reduce((sum, event) => sum + numberValue(event.volume24hr || event.volume), 0), 2);
+    meta.innerHTML = `section=crypto-updown<br>coins=${escapeHtml((data.coins || []).join(','))}<br>fetchedAt=${escapeHtml(data.fetchedAt)}<br><br>${escapeHtml(data.sourceUrl)}`;
+    eventList.innerHTML = events.length
+      ? `<div class="updown-board">${Object.keys(grouped).map((coin) => renderCoinSection(coin, grouped[coin])).join('')}</div>`
+      : '<div class="panel empty">暂无 Up/Down 短周期事件</div>';
+    attachOutcomeHandlers();
+  }
+
+  function renderCoinSection(coin, events) {
+    const sorted = events.slice().sort((a, b) => Number(a.windowStartUnix || 0) - Number(b.windowStartUnix || 0));
+    return `
+      <section class="coin-section">
+        <div class="coin-title">${escapeHtml(coin)} 5分钟涨跌</div>
+        <div class="updown-grid">
+          ${sorted.map(renderUpDownCard).join('')}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderUpDownCard(event) {
+    const market = Array.isArray(event.markets) && event.markets.length ? event.markets[0] : null;
+    if (!market) {
+      return '';
+    }
+    const tradeState = marketTradeState(event, market);
+    const start = parseTime(market.eventStartTime || event.startTime || event.startDate);
+    const end = parseTime(market.endDate || event.endDate);
+    const isLive = start && end && Date.now() >= start.getTime() && Date.now() < end.getTime();
+    const outcomes = toArray(market.outcomes);
+    const prices = toArray(market.outcomePrices);
+    const key = market.slug || event.slug;
+    window.__markets[key] = market;
+    const actionButtons = outcomes.map((outcome, outcomeIndex) => renderOutcomeButton(event, market, outcome, outcomeIndex, prices[outcomeIndex], tradeState)).join('');
+    return `
+      <article class="panel updown-card ${isLive ? 'live' : ''} ${tradeState.disabled ? 'closed' : ''}">
+        <div class="updown-head">
+          <div>
+            <div class="updown-time">${formatWindow(start, end)}</div>
+            <div class="slug">${escapeHtml(market.slug || event.slug || '')}</div>
+          </div>
+          <span class="pill ${tradeState.tone}">${escapeHtml(isLive && !tradeState.disabled ? '进行中' : tradeState.label)}</span>
+        </div>
+        <div class="muted">${escapeHtml(event.title || market.question || '')}</div>
+        <div class="kv"><span>倒计时</span><strong>${countdownText(start, end)}</strong></div>
+        <div class="kv"><span>成交量</span><span>${formatNumber(market.volume24hr || market.volume, 2)}</span></div>
+        <div class="kv"><span>流动性</span><span>${formatNumber(market.liquidity, 2)}</span></div>
+        ${tradeState.result ? `<div class="kv"><span>结果</span><strong>${escapeHtml(tradeState.result.replace('结果：', ''))}</strong></div>` : ''}
+        <div class="updown-actions">${actionButtons}</div>
+      </article>
+    `;
+  }
+
+  function formatWindow(start, end) {
+    if (!start || !end) {
+      return '时间未知';
+    }
+    return `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  function countdownText(start, end) {
+    if (!end) {
+      return '-';
+    }
+    const now = Date.now();
+    if (start && now < start.getTime()) {
+      return `未开始，${durationText(start.getTime() - now)} 后开始`;
+    }
+    if (now >= end.getTime()) {
+      return '已结束';
+    }
+    return `${durationText(end.getTime() - now)} 后结束`;
+  }
+
+  function durationText(ms) {
+    const seconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(seconds / 60);
+    const restSeconds = seconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(restSeconds).padStart(2, '0')}`;
+  }
+
+  function attachOutcomeHandlers() {
+    document.querySelectorAll('.outcome-btn[data-choice]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const choice = window.__choices[button.dataset.choice];
+        if (!choice) {
+          return;
+        }
+        selectOutcome(choice.eventSlug, choice.eventTitle, choice.market, choice.outcomeIndex, choice.outcomeName, choice.price);
+      });
+    });
+  }
+
+  async function loadEvents() {
+    const limit = Math.min(Math.max(Number(limitInput.value || 20), 1), 100);
+    setStatus('加载中');
+    try {
+      if (state.section === 'updown') {
+        const coins = encodeURIComponent(coinInput.value.trim() || 'btc,eth,sol');
+        const data = await requestJson(`/api/polymarket/crypto/updown?coins=${coins}&before=2&after=6`);
+        renderUpDownEvents(data);
+        setStatus('已刷新');
+        return;
+      }
+      const data = await requestJson(`/api/polymarket/events?section=${state.section}&limit=${limit}&offset=0`);
+      renderEvents(data);
+      setStatus('已刷新');
+    } catch (error) {
+      eventList.innerHTML = `<div class="panel error">${escapeHtml(error.message)}</div>`;
+      meta.textContent = '';
+      countMetric.textContent = '-';
+      volumeMetric.textContent = '-';
+      setStatus('失败', true);
+    }
+  }
+
+  function orderPayload() {
+    if (!state.selected) {
+      throw new Error('请先选择一个市场结果。');
+    }
+    const afiAmount = Number(afiAmountInput.value);
+    if (!Number.isFinite(afiAmount) || afiAmount <= 0) {
+      throw new Error('请输入大于 0 的 AFI 数量。');
+    }
+    if (afiAmount < state.minAfiAmount) {
+      throw new Error(`最低下单数量为 ${formatNumber(state.minAfiAmount)} AFI。`);
+    }
+    return {
+      marketSlug: state.selected.marketSlug,
+      outcomeIndex: state.selected.outcomeIndex,
+      afiAmount: afiAmountInput.value
+    };
+  }
+
+  async function quoteOrder() {
+    setOrderMessage('报价中...');
+    try {
+      const quote = await requestJson('/api/polymarket/orders/quote', authedOptions('POST', orderPayload()));
+      state.lastQuote = quote;
+      quoteBox.innerHTML = `
+        <div class="kv"><span>AFI价格</span><strong>${formatNumber(quote.afiPrice)} USDT</strong></div>
+        <div class="kv"><span>等值USDT</span><strong>${formatNumber(quote.afiUsdtAmount)} USDT</strong></div>
+        <div class="kv"><span>成交价格</span><strong>${formatNumber(quote.outcomePrice)}</strong></div>
+        <div class="kv"><span>预计份额</span><strong>${formatNumber(quote.shareAmount, 8)}</strong></div>
+        <div class="kv"><span>最大兑付</span><strong>${formatNumber(quote.maxPayoutUsdt)} USDT</strong></div>
+        <div class="kv"><span>结束时间</span><span>${formatDate(quote.endTime)}</span></div>
+      `;
+      setOrderMessage('报价完成。正式下单时后端会重新取一次实时价格。', 'success');
+    } catch (error) {
+      setOrderMessage(error.message, 'error');
+    }
+  }
+
+  async function createOrder() {
+    const ok = window.confirm('确认创建内部订单？创建后会扣减 AFI，不能撤销或卖出，只能等待结果。');
+    if (!ok) {
+      return;
+    }
+    setOrderMessage('创建订单中...');
+    try {
+      const order = await requestJson('/api/polymarket/orders/create', authedOptions('POST', orderPayload()));
+      setOrderMessage(`下单成功：${order.orderNo}`, 'success');
+      await loadMyOrders();
+    } catch (error) {
+      setOrderMessage(error.message, 'error');
+    }
+  }
+
+  async function loadMyOrders() {
+    ordersBox.innerHTML = '<div class="muted">加载中...</div>';
+    try {
+      const status = orderStatusFilter.value;
+      const url = status ? `/api/polymarket/orders/my?status=${encodeURIComponent(status)}` : '/api/polymarket/orders/my';
+      const orders = await requestJson(url, authedOptions('GET'));
+      renderOrders(orders || []);
+    } catch (error) {
+      ordersBox.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+    }
+  }
+
+  function renderOrders(orders) {
+    if (!orders.length) {
+      ordersBox.innerHTML = '<div class="muted">暂无订单。</div>';
+      return;
+    }
+    ordersBox.innerHTML = orders.map((order) => {
+      const [label, tone] = statusLabel(order.status);
+      return `
+        <div class="order-item">
+          <div><span class="pill ${tone}">${label}</span> <strong>${escapeHtml(order.outcomeName || '-')}</strong></div>
+          <div class="slug">${escapeHtml(order.orderNo || '')}</div>
+          <div class="muted">${escapeHtml(order.marketQuestion || order.marketSlug || '-')}</div>
+          <div class="kv"><span>AFI</span><strong>${formatNumber(order.afiAmount)} AFI</strong></div>
+          <div class="kv"><span>成交价</span><span>${formatNumber(order.outcomePrice)}</span></div>
+          <div class="kv"><span>份额</span><span>${formatNumber(order.shareAmount, 8)}</span></div>
+          <div class="kv"><span>兑付</span><span>${formatNumber(order.payoutUsdtAmount || 0)} USDT</span></div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function loadMarketBySlug() {
+    const slug = slugInput.value.trim();
+    if (!slug) {
+      setStatus('请输入 slug', true);
+      return;
+    }
+    setStatus('查询中');
+    try {
+      const data = await requestJson(`/api/polymarket/markets/slug/${encodeURIComponent(slug)}`);
+      detailJson.style.display = 'block';
+      detailJson.textContent = JSON.stringify(data, null, 2);
+      setStatus('已刷新');
+    } catch (error) {
+      setStatus('失败', true);
+      detailJson.style.display = 'block';
+      detailJson.textContent = error.message;
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeAttr(value) {
+    return escapeHtml(value);
+  }
+
+  function escapeJs(value) {
+    return String(value ?? '')
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r');
+  }
+
+  function setSection(section) {
+    state.section = section;
+    state.selected = null;
+    state.lastQuote = null;
+    updateSelectedBox();
+    cryptoBtn.classList.toggle('active', section === 'crypto');
+    updownBtn.classList.toggle('active', section === 'updown');
+    sportsBtn.classList.toggle('active', section === 'sports');
+    limitInput.parentElement.style.display = section === 'updown' ? 'none' : '';
+    coinFilterWrap.style.display = section === 'updown' ? '' : 'none';
+    loadEvents();
+  }
+
+  cryptoBtn.addEventListener('click', () => setSection('crypto'));
+  updownBtn.addEventListener('click', () => setSection('updown'));
+  sportsBtn.addEventListener('click', () => setSection('sports'));
+  refreshBtn.addEventListener('click', loadEvents);
+  quoteBtn.addEventListener('click', quoteOrder);
+  createBtn.addEventListener('click', createOrder);
+  myOrdersBtn.addEventListener('click', loadMyOrders);
+  orderStatusFilter.addEventListener('change', loadMyOrders);
+  slugBtn.addEventListener('click', loadMarketBySlug);
+  tokenInput.addEventListener('change', () => localStorage.setItem('polymarketAppAuthorization', tokenInput.value.trim()));
+  loadOrderConfig();
+  loadEvents();
+</script>
+</body>
+</html>

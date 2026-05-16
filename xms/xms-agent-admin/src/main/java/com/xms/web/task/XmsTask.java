@@ -22,6 +22,7 @@ public class XmsTask {
 	private final IAsyncUserUpgradeService asyncUserUpgradeServiceImpl;
 	private final ScheduleTaskService scheduleTaskServiceImpl;
 	private final com.xms.web.service.IStakeHostingTaskService stakeHostingTaskServiceImpl;
+	private final com.xms.dao.service.IPolymarketOrderService polymarketOrderService;
 	@Deprecated
 	public void ryMultipleParams(String s, Boolean b, Long l, Double d, Integer i) {
 		System.out.println(StringUtils.format("执行多参方法： 字符串类型{}，布尔类型{}，长整型{}，浮点型{}，整形{}", s, b, l, d, i));
@@ -101,6 +102,19 @@ public class XmsTask {
 		stakeHostingTaskServiceImpl.testCalculateStaticRate(null);
 	}
 
+	/**
+	 * 结算Polymarket平台内部订单。
+	 *
+	 * <p>该方法由RuoYi定时任务调用。它扫描已到结束时间的待结算订单，查询Polymarket最终结果；
+	 * 猜中订单兑付USDT到用户validNum1，结果不明确的订单转入待人工复核。</p>
+	 */
+	public void settlePolymarketOrders() {
+		log.info("settle Polymarket local orders");
+		// 每次任务最多处理100笔，避免单次Quartz任务执行时间过长。
+		int count = polymarketOrderService.settlePendingOrders(100);
+		log.info("settled Polymarket local orders, updated={}", count);
+	}
+
 
 	/**
 	 * 查询没有处理的节点订单
@@ -116,6 +130,14 @@ public class XmsTask {
 	public void getIdoOrder() {
 		log.info("重新计算等级相关");
 		asyncTaskServiceImpl.getIdoOrder();
+	}
+
+	/**
+	 * 补偿业务(重新计算等级先关)
+	 */
+	public void getIdoOrder1() {
+		log.info("重新计算等级相关");
+		asyncTaskServiceImpl.getIdoOrder1();
 	}
 
 	/**

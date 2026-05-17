@@ -108,45 +108,48 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	}
 
 	/**
+	 * 确认链上支付成功并让托管订单正式生效。
 	 *
+	 * <p>该方法用于链上支付回调或轮询确认后的订单状态推进。它会校验支付参数和支付金额，
+	 * 通过待支付状态条件更新保证幂等，订单生效后同步增加本人/团队业绩和全球分红权重，
+	 * 并在事务提交后发送托管订单生效异步消息，继续处理G7团队新增、小区业绩和等级刷新。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param orderNo 托管订单号
+	 * @param payHash 链上支付交易哈希
+	 * @param payAmount 实际支付USDT金额
+	 * @return 1表示处理完成；已支付订单重复回调也返回1
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public int confirmChainPaid(String orderNo, String payHash, BigDecimal payAmount) {
-		// Business processing note.
+		// 步骤1：校验链上支付确认需要的基础参数，金额必须为正数，单位为USDT。
 		if (StrUtil.isBlank(orderNo) || StrUtil.isBlank(payHash)) {
 			throw new ServiceException("Order no and pay hash are required");
 		}
 		if (payAmount == null || payAmount.compareTo(BigDecimal.ZERO) <= 0) {
 			throw new ServiceException("Business processing failed");
 		}
-		// Business processing note.
+
+		// 步骤2：按订单号读取订单。查不到时返回成功，避免外部重复推送阻塞回调流程。
 		StakeHostingOrder order = lambdaQuery()
 			.eq(StakeHostingOrder::getOrderNo, orderNo)
 			.one();
 		if (order == null) {
 			return 1;
 		}
-		// Business processing note.
+
+		// 步骤3：已支付订单视为幂等成功，不重复增加业绩、权重或发送异步消息。
 		if (PAY_SUCCESS == order.getPayStatus()) {
 			return 1;
 		}
-		// Business processing note.
+
+		// 步骤4：实付金额不能小于订单托管USDT金额，防止少付订单被错误激活。
 		if (payAmount.compareTo(order.getStakeUsdtAmount()) < 0) {
 			throw new ServiceException("Pay amount is less than stake amount");
 		}
 		Date now = new Date();
-		// Business processing note.
-		// Business processing note.
+
+		// 步骤5：只允许待支付、待生效状态推进为生效中，同时记录支付哈希、实付金额和生效时间快照。
 		boolean update = lambdaUpdate()
 			.eq(StakeHostingOrder::getId, order.getId())
 			.eq(StakeHostingOrder::getPayStatus, PAY_WAIT)
@@ -164,8 +167,11 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		if (!update) {
 			throw new ServiceException("Stake hosting order status changed");
 		}
-		// Business processing note.
+
+		// 步骤6：订单生效后同步维护本人业绩、团队业绩和全球分红权重；该部分在当前事务内落库。
 		addHostingPerformance(order);
+
+		// 步骤7：事务提交后发送异步消息，继续处理G7团队新增、小区业绩重算和真实等级刷新。
 		sendStakeHostingEffectiveAfterCommit(order.getId());
 		return 1;
 	}
@@ -380,23 +386,23 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	}
 
 	/**
-	 * Recalculates current global dividend community weight for affected parent users.
+	 * 按团队质押大区重新计算当前全球分红小区权重。
 	 *
-	 * <p>Each direct invitee is one line. A line's current global dividend weight is the direct user's
-	 * own global dividend weight plus their umbrella global dividend weight. The parent community weight is
-	 * the sum of all direct lines minus the largest direct line. This updates only the current fields on
-	 * {@code t_user_info}; weekly immutable snapshots are produced later by the 102 global dividend task.</p>
+	 * <p>每个直推用户形成一条线。大区归属必须按质押业绩线判断：
+	 * {@code performance + umbrella_performance} 最大的直推线是团队质押大区。
+	 * 全球分红小区权重不是排除权重最大线，而是排除这条质押大区对应的权重线。</p>
 	 *
-	 * @param parentIds parent users whose direct-line global dividend weight may have changed
+	 * @param parentIds 直推线权重或质押业绩发生变化的上级用户ID
 	 */
 	private void recalculateGlobalDividendCommunityWeight(List<Long> parentIds) {
 		if (CollectionUtil.isEmpty(parentIds)) {
 			return;
 		}
-		// Batch-load all direct invitees for the affected parents, avoiding a query per parent.
+		// 批量读取受影响用户的所有直推，避免每个上级单独查询一次。
 		List<UserInfo> directUsers = userInfoService.lambdaQuery()
 			.in(UserInfo::getInviteUserId, parentIds)
 			.eq(UserInfo::getDeleted, 0)
+			.orderByAsc(UserInfo::getUserId)
 			.list();
 		Map<Long, List<UserInfo>> directUserMap = new HashMap<>();
 		for (UserInfo directUser : directUsers) {
@@ -408,19 +414,24 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		Date now = new Date();
 		for (Long parentId : parentIds) {
 			BigDecimal totalLineWeight = BigDecimal.ZERO;
-			BigDecimal maxLineWeight = BigDecimal.ZERO;
+			BigDecimal maxPerformance = null;
+			BigDecimal maxPerformanceLineWeight = BigDecimal.ZERO;
 			List<UserInfo> directUserList = directUserMap.get(parentId);
 			if (CollectionUtil.isNotEmpty(directUserList)) {
 				for (UserInfo directUser : directUserList) {
+					// 质押业绩线用于判断团队大区是谁；权重线用于最终计算全球分红小区权重。
+					BigDecimal linePerformance = nvl(directUser.getPerformance())
+						.add(nvl(directUser.getUmbrellaPerformance()));
 					BigDecimal lineWeight = nvl(directUser.getGlobalDividendWeight())
 						.add(nvl(directUser.getGlobalDividendUmbrellaWeight()));
 					totalLineWeight = totalLineWeight.add(lineWeight);
-					if (lineWeight.compareTo(maxLineWeight) > 0) {
-						maxLineWeight = lineWeight;
+					if (maxPerformance == null || linePerformance.compareTo(maxPerformance) > 0) {
+						maxPerformance = linePerformance;
+						maxPerformanceLineWeight = lineWeight;
 					}
 				}
 			}
-			BigDecimal communityWeight = totalLineWeight.subtract(maxLineWeight)
+			BigDecimal communityWeight = totalLineWeight.subtract(maxPerformanceLineWeight)
 				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 			if (communityWeight.compareTo(BigDecimal.ZERO) < 0) {
 				communityWeight = BigDecimal.ZERO;

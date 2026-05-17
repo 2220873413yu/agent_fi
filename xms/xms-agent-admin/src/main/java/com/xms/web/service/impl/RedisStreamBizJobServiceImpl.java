@@ -131,7 +131,8 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			}else if(orderMsgDO.getBizType().equals(5)){
 				// Business processing note.
 			}else if(orderMsgDO.getBizType().equals(6)){
-				// Business processing note.
+				// 托管订单生效后的异步处理：G7团队新增、小区业绩、真实等级重算。
+				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
 			}else if(orderMsgDO.getBizType().equals(7)){
 				// Business processing note.
 			}
@@ -159,11 +160,12 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	}
 
 	/**
+	 * 处理托管订单生效后的异步业务。
 	 *
+	 * <p>托管订单在事务内只负责改订单状态并同步增加个人/团队业绩。事务提交后的消息在这里继续处理：
+	 * 记录G7团队新增快照，重算上级链路的小区业绩，并刷新相关用户真实等级。</p>
 	 *
-	 *
-	 *
-	 *
+	 * @param orderMsgDO 托管订单生效消息，id为托管订单ID，bizType=6
 	 */
 	private void handleStakeHostingEffectiveAfter(OrderMsgDO orderMsgDO) {
 		StakeHostingOrder order = stakeHostingOrderService.lambdaQuery()
@@ -171,15 +173,42 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
 			.one();
 		if (order == null) {
-			log.info("Business processing log");
+			log.info("托管订单生效异步处理：订单不存在或未支付成功，orderId={}", orderMsgDO.getId());
 			return;
 		}
-		// Business processing note.
+
+		// 步骤1：保留原有G7团队新增统计，给静态收益率平滑窗口使用。
 		stakeHostingDailyTeamPerformanceService.recordOrderTeamNewAmount(order.getId());
-		// Business processing note.
-//			&& order.getWeeklyPerformanceStatus().equals(StakeHostingOrderServiceImpl.WEEKLY_STATUS_QUEUED)) {
-//		}
-		// Business processing note.
+
+		// 步骤2：按订单用户找到本人和所有上级，这些用户的小区业绩和真实等级都可能变化。
+		UserInfo userInfo = userInfoService.lambdaQuery()
+			.eq(UserInfo::getUserId, order.getUserId())
+			.one();
+		if (userInfo == null) {
+			log.info("托管订单生效异步处理：订单用户不存在，orderId={}, userId={}", order.getId(), order.getUserId());
+			return;
+		}
+		LinkedHashSet<Long> recalculateUserIds = new LinkedHashSet<>();
+		recalculateUserIds.add(userInfo.getUserId());
+		List<Long> parentIds = userInfo.getParentIds();
+		if (CollectionUtil.isNotEmpty(parentIds)) {
+			recalculateUserIds.addAll(parentIds);
+		}
+
+		// 步骤3：重算community_performance。用户本人通常不产生变化，放进去是为了和等级刷新集合保持一致。
+		stakeOrderService.calculateCommunityPerformance(new ArrayList<>(recalculateUserIds));
+
+		// 步骤4：使用最新个人业绩和小区业绩刷新真实等级game_level。
+		List<UserLevelConfig> userLevelConfigList = userLevelConfigService.lambdaQuery()
+			.gt(UserLevelConfig::getLevel, 0)
+			.orderByAsc(UserLevelConfig::getLevel)
+			.list();
+		List<UserInfo> userInfoList = userInfoService.lambdaQuery()
+			.in(UserInfo::getUserId, recalculateUserIds)
+			.list();
+		for (UserInfo item : userInfoList) {
+			stakeOrderService.callUserLevel(item, userLevelConfigList);
+		}
 	}
 
 	/**

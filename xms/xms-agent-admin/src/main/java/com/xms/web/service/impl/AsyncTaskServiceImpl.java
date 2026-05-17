@@ -274,29 +274,36 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	}
 
 	/**
-	 * 补偿历史托管订单的全球分红权重。
+	 * 补偿历史生效托管订单的当前全球分红权重。
 	 *
-	 * <p>早期托管订单生效时没有维护全球分红权重字段，本方法按当前仍在产出中的托管订单重算用户表里的
-	 * 个人权重、团队权重和小区权重。方法会先清零再按订单重建，因此可以重复执行，不会把权重越加越大。</p>
+	 * <p>本任务会清零用户表当前全球分红权重字段，再按当前仍生效的托管订单全量重建个人权重、
+	 * 团队权重和小区权重。小区权重必须先按团队质押业绩找出大区，再排除该大区对应的权重线，
+	 * 不能按权重最大区排除。任务可重复执行，不会把当前权重越加越大。</p>
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	@Override
 	public void getIdoOrder1() {
+		/*
+		 * 全球分红权重补偿任务。
+		 *
+		 * 本任务清零当前用户表里的全球分红权重字段，再按当前仍生效的托管订单全量重建。
+		 * 小区权重必须先用质押业绩线判断团队大区是谁，再排除该团队质押大区对应的权重线。
+		 */
 		List<StakeHostingOrder> runningOrders = stakeHostingOrderService.lambdaQuery()
 			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
 			.eq(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_RUNNING)
 			.eq(StakeHostingOrder::getDeleted, 0)
 			.list();
 
-		// 步骤1：先清空当前权重字段，后面按生效订单全量重建，保证补偿任务具备幂等性。
+		// 步骤1：先清空当前权重字段，再按生效订单全量重建，保证补偿任务幂等。
 		Date now = new Date();
 		jdbcTemplate.update(SQL_RESET_USER_GLOBAL_DIVIDEND_WEIGHT, new java.sql.Timestamp(now.getTime()));
 		if (CollectionUtil.isEmpty(runningOrders)) {
-			log.info("托管全球分红权重补偿：当前无生效订单，已清空历史权重");
+			log.info("托管全球分红权重补偿：当前无生效订单，已清空历史当前权重");
 			return;
 		}
 
-		// 步骤2：批量读取套餐系数和下单用户，避免每笔订单循环查询数据库。
+		// 步骤2：批量读取套餐系数和下单用户，避免每笔订单循环查数据库。
 		List<Long> packageIds = runningOrders.stream()
 			.map(StakeHostingOrder::getPackageId)
 			.filter(Objects::nonNull)
@@ -326,6 +333,7 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 		List<StakeHostingOrder> snapshotPatchOrders = new ArrayList<>();
 		Set<Long> affectedParentIds = new LinkedHashSet<>();
 
+		// 步骤3：订单本人累计个人权重；所有上级累计团队权重。
 		for (StakeHostingOrder order : runningOrders) {
 			UserInfo userInfo = userInfoMap.get(order.getUserId());
 			if (userInfo == null) {
@@ -337,8 +345,6 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 				log.warn("托管全球分红权重补偿：订单{}无法计算权重，跳过", order.getId());
 				continue;
 			}
-
-			// 步骤3：订单本人累计个人权重；所有上级累计团队权重。
 			selfWeightMap.merge(order.getUserId(), weight, BigDecimal::add);
 			List<Long> parentIds = userInfo.getParentIds();
 			if (CollectionUtil.isNotEmpty(parentIds)) {
@@ -349,17 +355,18 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 			}
 		}
 
-		// 步骤4：历史订单缺少权重快照时，同步反写订单快照，后续订单到期扣减才能读取到同一口径。
+		// 步骤4：历史订单缺少权重快照时，同步反写订单快照，后续到期扣减仍能读取同一口径。
 		if (CollectionUtil.isNotEmpty(snapshotPatchOrders)) {
 			batchUpdateStakeHostingOrderPerformanceSnapshot(snapshotPatchOrders, now);
 		}
 
-		// 步骤5：按直推区重算小区权重，小区权重 = 所有直推区权重合计 - 最大直推区权重。
+		// 步骤5：按团队质押大区重算小区权重，排除的是质押大区对应的权重线。
 		Map<Long, BigDecimal> communityWeightMap = calculateCommunityWeightMap(affectedParentIds, selfWeightMap, umbrellaWeightMap);
 		batchUpdateUserGlobalDividendWeight(selfWeightMap, umbrellaWeightMap, communityWeightMap, now);
 		log.info("托管全球分红权重补偿完成：订单数={}，反写订单快照={}，更新用户={}",
 			runningOrders.size(), snapshotPatchOrders.size(),
 			mergeAffectedUserIds(selfWeightMap, umbrellaWeightMap, communityWeightMap).size());
+
 	}
 
 	/**
@@ -414,6 +421,18 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	 * @param umbrellaWeightMap 用户团队权重汇总
 	 * @return 用户ID到小区权重的映射
 	 */
+	/**
+	 * 按团队质押大区重新计算受影响上级的全球分红小区权重。
+	 *
+	 * <p>每个直推用户形成一条线。团队大区按质押业绩线
+	 * {@code performance + umbrella_performance} 判断；全球分红小区权重按所有直推线权重合计，
+	 * 减去这条团队质押大区对应的权重线。</p>
+	 *
+	 * @param affectedParentIds 团队权重发生变化的上级用户ID
+	 * @param selfWeightMap 用户个人权重汇总
+	 * @param umbrellaWeightMap 用户团队权重汇总
+	 * @return 用户ID到小区权重的映射
+	 */
 	private Map<Long, BigDecimal> calculateCommunityWeightMap(Set<Long> affectedParentIds,
 															  Map<Long, BigDecimal> selfWeightMap,
 															  Map<Long, BigDecimal> umbrellaWeightMap) {
@@ -424,25 +443,31 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 		List<UserInfo> directUsers = userInfoService.lambdaQuery()
 			.in(UserInfo::getInviteUserId, affectedParentIds)
 			.eq(UserInfo::getDeleted, 0)
+			.orderByAsc(UserInfo::getUserId)
 			.list();
 		Map<Long, List<UserInfo>> directUserMap = directUsers.stream()
 			.filter(user -> user.getInviteUserId() != null)
 			.collect(Collectors.groupingBy(UserInfo::getInviteUserId));
 		for (Long parentId : affectedParentIds) {
 			BigDecimal totalLineWeight = BigDecimal.ZERO;
-			BigDecimal maxLineWeight = BigDecimal.ZERO;
+			BigDecimal maxPerformance = null;
+			BigDecimal maxPerformanceLineWeight = BigDecimal.ZERO;
 			List<UserInfo> directUserList = directUserMap.get(parentId);
 			if (CollectionUtil.isNotEmpty(directUserList)) {
 				for (UserInfo directUser : directUserList) {
+					// 质押业绩线决定团队大区；权重线决定全球分红可参与的小区权重。
+					BigDecimal linePerformance = nvl(directUser.getPerformance())
+						.add(nvl(directUser.getUmbrellaPerformance()));
 					BigDecimal lineWeight = nvl(selfWeightMap.get(directUser.getUserId()))
 						.add(nvl(umbrellaWeightMap.get(directUser.getUserId())));
 					totalLineWeight = totalLineWeight.add(lineWeight);
-					if (lineWeight.compareTo(maxLineWeight) > 0) {
-						maxLineWeight = lineWeight;
+					if (maxPerformance == null || linePerformance.compareTo(maxPerformance) > 0) {
+						maxPerformance = linePerformance;
+						maxPerformanceLineWeight = lineWeight;
 					}
 				}
 			}
-			BigDecimal communityWeight = totalLineWeight.subtract(maxLineWeight)
+			BigDecimal communityWeight = totalLineWeight.subtract(maxPerformanceLineWeight)
 				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 			communityWeightMap.put(parentId, communityWeight.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : communityWeight);
 		}

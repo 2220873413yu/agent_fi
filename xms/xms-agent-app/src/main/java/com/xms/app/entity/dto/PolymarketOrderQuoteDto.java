@@ -36,6 +36,21 @@ public class PolymarketOrderQuoteDto {
 	@ApiModelProperty(value = "按购买份额和实时价格折算出的预计扣减AFI数量，单位AFI")
 	private BigDecimal afiAmount;
 
+	@ApiModelProperty(value = "系统基础交易手续费比例快照，单位%")
+	private BigDecimal feeRatio;
+
+	@ApiModelProperty(value = "节点订单带来的手续费减免比例快照，单位%")
+	private BigDecimal feeReliefRatio;
+
+	@ApiModelProperty(value = "实际外扣手续费比例快照，单位%")
+	private BigDecimal actualFeeRatio;
+
+	@ApiModelProperty(value = "本单外扣手续费AFI数量")
+	private BigDecimal feeAfiAmount;
+
+	@ApiModelProperty(value = "实际总扣款AFI数量，等于购买成本AFI加手续费AFI")
+	private BigDecimal totalPayAfiAmount;
+
 	@ApiModelProperty(value = "AFI价格快照，单位USDT")
 	private BigDecimal afiPrice;
 

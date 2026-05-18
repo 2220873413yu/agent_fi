@@ -113,6 +113,11 @@ public class PolymarketMarket extends BaseEntity {
 	@ApiModelProperty(value = "市场总下单AFI数量")
 	private BigDecimal totalAfiAmount;
 
+	/** 市场外扣手续费AFI合计。 */
+	@Excel(name = "总手续费AFI", sort = 15)
+	@ApiModelProperty(value = "市场外扣手续费AFI合计")
+	private BigDecimal totalFeeAfiAmount;
+
 	/** 市场总下单等值USDT。 */
 	@Excel(name = "总USDT", sort = 15)
 	@ApiModelProperty(value = "市场总下单等值USDT")

@@ -154,27 +154,27 @@ public class PolymarketController {
 	/**
 	 * 预览平台内部Polymarket订单报价。
 	 *
-	 * <p>只实时读取AFI价格和Polymarket outcome价格，计算等值USDT、份额和最大兑付；不会扣钱包、不会写订单。</p>
+	 * <p>只实时读取AFI价格、Polymarket outcome价格和用户节点手续费减免，计算等值USDT、购买成本AFI、外扣手续费和最大兑付；不会扣钱包、不会写订单。</p>
 	 *
 	 * @param req 报价参数：marketSlug、outcomeIndex、shareAmount
-	 * @return 报价快照，金额单位包括AFI和USDT
+	 * @return 报价快照，金额单位包括购买成本AFI、手续费AFI、实际总扣款AFI和USDT
 	 */
-	@ApiOperation(value = "Polymarket内部订单报价", notes = "请求体字段为marketSlug、outcomeIndex、shareAmount、bizType。bizType为1加密、2体育、3Up/Down；后端实时读取AFI价格和Polymarket outcome价格，按购买份额反算预计扣减AFI，不扣钱包、不写订单。")
+	@ApiOperation(value = "Polymarket内部订单报价", notes = "请求体字段为marketSlug、outcomeIndex、shareAmount、bizType。bizType为1加密、2体育、3Up/Down；后端实时读取AFI价格、Polymarket outcome价格和用户节点手续费减免，按购买份额反算购买成本AFI、外扣手续费AFI和实际总扣款AFI，不扣钱包、不写订单。")
 	@PostMapping("/orders/quote")
 	public ResultPista<PolymarketOrderQuoteDto> quote(@ApiParam(value = "报价请求体：marketSlug市场slug，outcomeIndex选择结果下标，shareAmount购买份额，bizType业务类型1加密2体育3Up/Down", required = true)
 													  @Valid @RequestBody PolymarketOrderReq req) {
-		return ResultPista.data(polymarketOrderAppService.quote(req));
+		return ResultPista.data(polymarketOrderAppService.quote(req, SecurityUtils.getLoginAppUser().getUserId()));
 	}
 
 	/**
 	 * 为当前App用户创建平台内部Polymarket订单。
 	 *
-	 * <p>创建时会重新拉取实时价格，不信任前端报价；成功后扣减用户AFI钱包validNum2并保存订单快照。</p>
+	 * <p>创建时会重新拉取实时价格，不信任前端报价；成功后从用户AFI钱包validNum2扣减购买成本和外扣手续费，并保存订单快照。</p>
 	 *
 	 * @param req 下单参数：marketSlug、outcomeIndex、shareAmount、bizType
 	 * @return 已创建的内部订单快照
 	 */
-	@ApiOperation(value = "创建Polymarket内部订单", notes = "请求体字段为marketSlug、outcomeIndex、shareAmount、bizType。bizType为1加密、2体育、3Up/Down；创建时重新拉实时价格，按购买份额折算AFI并扣减用户validNum2，生成平台内部订单。")
+	@ApiOperation(value = "创建Polymarket内部订单", notes = "请求体字段为marketSlug、outcomeIndex、shareAmount、bizType。bizType为1加密、2体育、3Up/Down；创建时重新拉实时价格，按购买份额折算购买成本AFI和外扣手续费AFI，合并扣减用户validNum2，生成平台内部订单。")
 	@PostMapping("/orders/create")
 	@RepeatSubmit
 	public ResultPista<PolymarketOrderDto> createOrder(@ApiParam(value = "下单请求体：marketSlug市场slug，outcomeIndex选择结果下标，shareAmount购买份额，bizType业务类型1加密2体育3Up/Down", required = true)

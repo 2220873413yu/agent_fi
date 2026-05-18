@@ -19,9 +19,10 @@ public interface PolymarketOrderAppService {
 	 * 预览内部订单报价。
 	 *
 	 * @param req 报价参数，包含市场slug、选择结果下标和购买份额数量
-	 * @return 报价结果，字段单位包括AFI、USDT和Polymarket结果价格
+	 * @param userId 当前App用户ID，用于读取节点手续费减免比例
+	 * @return 报价结果，包含购买成本AFI、外扣手续费AFI、实际总扣款AFI、USDT等值和Polymarket结果价格
 	 */
-	PolymarketOrderQuoteDto quote(PolymarketOrderReq req);
+	PolymarketOrderQuoteDto quote(PolymarketOrderReq req, Long userId);
 
 	/**
 	 * 读取Polymarket内部订单最低AFI下单数量。

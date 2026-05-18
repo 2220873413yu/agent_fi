@@ -104,6 +104,31 @@ public class PolymarketOrder extends BaseEntity {
 	@ApiModelProperty(value = "实际扣减AFI数量，由购买份额按实时价格折算得到")
 	private BigDecimal afiAmount;
 
+	/** 系统基础交易手续费比例快照，单位%。 */
+	@Excel(name = "基础手续费比例", sort = 14)
+	@ApiModelProperty(value = "系统基础交易手续费比例快照，单位%")
+	private BigDecimal feeRatio;
+
+	/** 节点订单带来的手续费减免比例快照，单位%。 */
+	@Excel(name = "手续费减免比例", sort = 15)
+	@ApiModelProperty(value = "节点订单带来的手续费减免比例快照，单位%")
+	private BigDecimal feeReliefRatio;
+
+	/** 实际外扣手续费比例快照，单位%。 */
+	@Excel(name = "实际手续费比例", sort = 16)
+	@ApiModelProperty(value = "实际外扣手续费比例快照，单位%")
+	private BigDecimal actualFeeRatio;
+
+	/** 本单额外扣减的手续费AFI数量。 */
+	@Excel(name = "手续费AFI", sort = 17)
+	@ApiModelProperty(value = "本单外扣手续费AFI数量")
+	private BigDecimal feeAfiAmount;
+
+	/** 本单实际总扣款AFI数量，等于购买成本AFI加手续费AFI。 */
+	@Excel(name = "总扣款AFI", sort = 18)
+	@ApiModelProperty(value = "实际总扣款AFI数量，等于购买成本AFI加手续费AFI")
+	private BigDecimal totalPayAfiAmount;
+
 	/** 下单时AFI/USDT价格快照。 */
 	@Excel(name = "AFI价格", sort = 14)
 	@ApiModelProperty(value = "AFI价格快照，单位USDT")

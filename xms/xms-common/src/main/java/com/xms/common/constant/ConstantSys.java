@@ -156,4 +156,9 @@ public class ConstantSys {
 	 */
 	public static final String POLYMARKET_MIN_ORDER_AFI_AMOUNT = "POLYMARKET_MIN_ORDER_AFI_AMOUNT";
 
+	/**
+	 * Polymarket内部交易手续费比例，单位%。
+	 */
+	public static final String biz_polymarket_trade_fee_ratio = "biz_polymarket_trade_fee_ratio";
+
 }

@@ -21,10 +21,12 @@ import com.xms.common.result.ResponseCode;
 import com.xms.common.thread.ExecutorRegionKit;
 import com.xms.common.utils.uuid.IDUtils;
 import com.xms.dao.domain.PolymarketMarket;
+import com.xms.dao.domain.NodePackageOrder;
 import com.xms.dao.domain.PolymarketOrder;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.entity.domain.UserMoney;
 import com.xms.dao.service.IPolymarketMarketService;
+import com.xms.dao.service.INodePackageOrderService;
 import com.xms.dao.service.IPolymarketOrderService;
 import com.xms.dao.service.ISysParaService;
 import com.xms.dao.service.IUserMoneyService;
@@ -64,6 +66,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	private static final int BIZ_TYPE_SPORTS = 2;
 	private static final int BIZ_TYPE_UP_DOWN = 3;
 	private static final String UP_DOWN_SLUG_MARK = "-updown-5m-";
+	private static final BigDecimal PERCENT_DIVISOR = new BigDecimal("100");
 	private static final BigDecimal DEFAULT_MIN_ORDER_AFI_AMOUNT = new BigDecimal("10");
 	private static final long WS_SUBSCRIBED_MARKET_DEFAULT_TTL_SECONDS = TimeUnit.DAYS.toSeconds(30);
 	private static final long WS_SUBSCRIBED_MARKET_AFTER_END_TTL_SECONDS = TimeUnit.DAYS.toSeconds(7);
@@ -72,6 +75,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	private final BizCommonService bizCommonService;
 	private final IPolymarketOrderService polymarketOrderService;
 	private final IPolymarketMarketService polymarketMarketService;
+	private final INodePackageOrderService nodePackageOrderService;
 	private final IUserMoneyService userMoneyService;
 	private final UserWalletService userWalletService;
 	private final UserInfoService userInfoService;
@@ -83,6 +87,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 										 BizCommonService bizCommonService,
 										 IPolymarketOrderService polymarketOrderService,
 										 IPolymarketMarketService polymarketMarketService,
+										 INodePackageOrderService nodePackageOrderService,
 										 IUserMoneyService userMoneyService,
 										 UserWalletService userWalletService,
 										 UserInfoService userInfoService,
@@ -93,6 +98,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		this.bizCommonService = bizCommonService;
 		this.polymarketOrderService = polymarketOrderService;
 		this.polymarketMarketService = polymarketMarketService;
+		this.nodePackageOrderService = nodePackageOrderService;
 		this.userMoneyService = userMoneyService;
 		this.userWalletService = userWalletService;
 		this.userInfoService = userInfoService;
@@ -110,8 +116,8 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 * @return 基于当前结果价格计算出的报价快照
 	 */
 	@Override
-	public PolymarketOrderQuoteDto quote(PolymarketOrderReq req) {
-		MarketPriceSnapshot snapshot = buildMarketPriceSnapshot(req);
+	public PolymarketOrderQuoteDto quote(PolymarketOrderReq req, Long userId) {
+		MarketPriceSnapshot snapshot = buildMarketPriceSnapshot(req, userId);
 		return PolymarketOrderQuoteDto.builder()
 			.marketSlug(snapshot.marketSlug)
 			.marketQuestion(snapshot.marketQuestion)
@@ -119,6 +125,11 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			.outcomeName(snapshot.outcomeName)
 			.assetId(snapshot.assetId)
 			.afiAmount(snapshot.afiAmount)
+			.feeRatio(snapshot.feeRatio)
+			.feeReliefRatio(snapshot.feeReliefRatio)
+			.actualFeeRatio(snapshot.actualFeeRatio)
+			.feeAfiAmount(snapshot.feeAfiAmount)
+			.totalPayAfiAmount(snapshot.totalPayAfiAmount)
 			.afiPrice(snapshot.afiPrice)
 			.afiUsdtAmount(snapshot.afiUsdtAmount)
 			.outcomePrice(snapshot.outcomePrice)
@@ -150,11 +161,97 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	}
 
 	/**
+	 * 读取Polymarket基础交易手续费比例。
+	 *
+	 * <p>系统参数按百分比保存，例如1表示1%。参数缺失、为空或小于0时按0处理，避免配置异常导致用户被多扣手续费。</p>
+	 *
+	 * @return 基础手续费比例，单位%
+	 */
+	private BigDecimal loadTradeFeeRatio() {
+		String value = sysParaServiceImpl.getValue(ConstantSys.biz_polymarket_trade_fee_ratio);
+		if (StrUtil.isBlank(value)) {
+			return BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN);
+		}
+		try {
+			BigDecimal feeRatio = new BigDecimal(value.trim()).setScale(MONEY_SCALE, RoundingMode.DOWN);
+			return feeRatio.compareTo(BigDecimal.ZERO) > 0 ? feeRatio : BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN);
+		} catch (NumberFormatException e) {
+			return BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN);
+		}
+	}
+
+	/**
+	 * 查询用户节点订单可享受的最高Polymarket手续费减免比例。
+	 *
+	 * <p>只统计已支付成功的节点认购订单，取订单快照pred_order_fee_relief_rate最大值；该值单位为%，最高按100%封顶。</p>
+	 *
+	 * @param userId 当前App用户ID
+	 * @return 手续费减免比例，单位%
+	 */
+	private BigDecimal loadUserFeeReliefRatio(Long userId) {
+		if (userId == null) {
+			return BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN);
+		}
+		List<NodePackageOrder> paidNodeOrders = nodePackageOrderService.lambdaQuery()
+			.eq(NodePackageOrder::getUserId, userId)
+			.eq(NodePackageOrder::getStatus, 1)
+			.select(NodePackageOrder::getPredOrderFeeReliefRate)
+			.list();
+		BigDecimal maxReliefRatio = BigDecimal.ZERO;
+		for (NodePackageOrder nodeOrder : paidNodeOrders) {
+			BigDecimal reliefRatio = nodeOrder.getPredOrderFeeReliefRate();
+			if (reliefRatio != null && reliefRatio.compareTo(maxReliefRatio) > 0) {
+				maxReliefRatio = reliefRatio;
+			}
+		}
+		if (maxReliefRatio.compareTo(BigDecimal.ZERO) < 0) {
+			return BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN);
+		}
+		if (maxReliefRatio.compareTo(PERCENT_DIVISOR) > 0) {
+			return PERCENT_DIVISOR.setScale(MONEY_SCALE, RoundingMode.DOWN);
+		}
+		return maxReliefRatio.setScale(MONEY_SCALE, RoundingMode.DOWN);
+	}
+
+	/**
+	 * 根据基础手续费比例和节点减免比例计算最终外扣手续费比例。
+	 *
+	 * @param feeRatio 基础手续费比例，单位%
+	 * @param feeReliefRatio 手续费减免比例，单位%
+	 * @return 实际手续费比例，单位%
+	 */
+	private BigDecimal calculateActualFeeRatio(BigDecimal feeRatio, BigDecimal feeReliefRatio) {
+		BigDecimal baseRatio = feeRatio == null ? BigDecimal.ZERO : feeRatio;
+		BigDecimal reliefRatio = feeReliefRatio == null ? BigDecimal.ZERO : feeReliefRatio;
+		BigDecimal reliefAmount = baseRatio.multiply(reliefRatio).divide(PERCENT_DIVISOR, MONEY_SCALE, RoundingMode.DOWN);
+		BigDecimal actualRatio = baseRatio.subtract(reliefAmount);
+		return actualRatio.compareTo(BigDecimal.ZERO) > 0
+			? actualRatio.setScale(MONEY_SCALE, RoundingMode.DOWN)
+			: BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN);
+	}
+
+	/**
+	 * 计算本单需要额外外扣的AFI手续费。
+	 *
+	 * @param afiAmount 购买份额成本折算出的AFI数量，不含手续费
+	 * @param actualFeeRatio 实际手续费比例，单位%
+	 * @return 外扣手续费AFI数量
+	 */
+	private BigDecimal calculateFeeAfiAmount(BigDecimal afiAmount, BigDecimal actualFeeRatio) {
+		if (afiAmount == null || afiAmount.compareTo(BigDecimal.ZERO) <= 0
+			|| actualFeeRatio == null || actualFeeRatio.compareTo(BigDecimal.ZERO) <= 0) {
+			return BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN);
+		}
+		return afiAmount.multiply(actualFeeRatio).divide(PERCENT_DIVISOR, MONEY_SCALE, RoundingMode.UP);
+	}
+
+	/**
 	 * 创建平台内部Polymarket订单并扣减用户AFI余额。
 	 *
-	 * <p>即使前端已经请求过报价，这里也会重新拉取AFI价格和Polymarket价格，防止前端提交过期价格或篡改价格。</p>
+	 * <p>即使前端已经请求过报价，这里也会重新拉取AFI价格和Polymarket价格，防止前端提交过期价格或篡改价格。手续费为外扣，
+	 * 购买份额成本AFI与手续费AFI会合并从用户AFI钱包validNum2扣减。</p>
 	 *
-	 * @param req 下单请求，shareAmount表示购买份额；后端按实时价格折算并从AFI钱包validNum2扣减
+	 * @param req 下单请求，shareAmount表示购买份额；后端按实时价格折算购买成本和外扣手续费
 	 * @param userId 当前App用户ID
 	 * @return 已创建的内部订单快照
 	 */
@@ -168,20 +265,20 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		validateRequest(req);
 		validateUserMarketNotOrdered(req.getMarketSlug(), userId);
 		// 步骤2：重新生成价格快照，保证下单使用后端实时价格，不使用前端报价结果。
-		MarketPriceSnapshot snapshot = buildMarketPriceSnapshot(req);
+		MarketPriceSnapshot snapshot = buildMarketPriceSnapshot(req, userId);
 		// 步骤3：读取用户与钱包余额，确认用户存在且AFI可用余额足够。
 		UserInfo userInfo = userInfoService.lambdaQuery().eq(UserInfo::getUserId, userId).one();
 		if (userInfo == null) {
 			throw new ServiceException(ResponseCode.CODE_1001);
 		}
 		UserMoney userMoney = userMoneyService.lambdaQuery().eq(UserMoney::getId, userId).one();
-		if (userMoney.getValidNum2().compareTo(snapshot.afiAmount) < 0) {
+		if (userMoney.getValidNum2().compareTo(snapshot.totalPayAfiAmount) < 0) {
 			throw new ServiceException(ResponseCode.CODE_1015);
 		}
 
 		// 步骤4：事务内先扣AFI并写钱包流水；后续订单入库失败会整体回滚。
 		String orderNo = IDUtils.getSnowflakeStr();
-		int rows = userWalletService.handerUserMoney(snapshot.afiAmount.negate(), orderNo, userId, userId,
+		int rows = userWalletService.handerUserMoney(snapshot.totalPayAfiAmount.negate(), orderNo, userId, userId,
 			ConstantType.user_money_log_source_type.type_40, ConstantType.user_money_coin_type.type_2);
 		if (rows != 1) {
 			throw new ServiceException(ResponseCode.CODE_1015);
@@ -277,7 +374,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 * @param req 报价或下单请求
 	 * @return 报价和创建订单共用的不可变业务快照
 	 */
-	private MarketPriceSnapshot buildMarketPriceSnapshot(PolymarketOrderReq req) {
+	private MarketPriceSnapshot buildMarketPriceSnapshot(PolymarketOrderReq req, Long userId) {
 		// 这里统一生成报价/下单快照：正式下单时仍重新拉实时价格，不信任前端传回来的报价。
 		// Polymarket的outcomes、outcomePrices、clobTokenIds三个数组按同一个outcomeIndex对应。
 		// outcomes[outcomeIndex]是结果名称，outcomePrices[outcomeIndex]是成交价，clobTokenIds[outcomeIndex]是asset_id/token_id。
@@ -349,6 +446,12 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		if (afiAmount.compareTo(BigDecimal.ZERO) <= 0) {
 			throw new ServiceException(ResponseCode.CODE_1287);
 		}
+		// 手续费为外扣：购买份额、成本USDT和最大兑付不变，只在应扣AFI上额外增加手续费。
+		BigDecimal feeRatio = loadTradeFeeRatio();
+		BigDecimal feeReliefRatio = loadUserFeeReliefRatio(userId);
+		BigDecimal actualFeeRatio = calculateActualFeeRatio(feeRatio, feeReliefRatio);
+		BigDecimal feeAfiAmount = calculateFeeAfiAmount(afiAmount, actualFeeRatio);
+		BigDecimal totalPayAfiAmount = afiAmount.add(feeAfiAmount).setScale(MONEY_SCALE, RoundingMode.UP);
 		BigDecimal minAfiAmount = getMinAfiOrderAmount();
 		if (afiAmount.compareTo(minAfiAmount) < 0) {
 			throw new ServiceException(ResponseCode.CODE_1291);
@@ -371,6 +474,11 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		snapshot.assetIdsJson = clobTokenIds.toJSONString();
 		snapshot.outcomesJson = outcomes.toJSONString();
 		snapshot.afiAmount = afiAmount;
+		snapshot.feeRatio = feeRatio;
+		snapshot.feeReliefRatio = feeReliefRatio;
+		snapshot.actualFeeRatio = actualFeeRatio;
+		snapshot.feeAfiAmount = feeAfiAmount;
+		snapshot.totalPayAfiAmount = totalPayAfiAmount;
 		snapshot.afiPrice = afiPrice;
 		snapshot.afiUsdtAmount = afiUsdtAmount;
 		snapshot.outcomePrice = outcomePrice;
@@ -475,6 +583,11 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			.outcomeName(snapshot.outcomeName)
 			.assetId(snapshot.assetId)
 			.afiAmount(snapshot.afiAmount)
+			.feeRatio(snapshot.feeRatio)
+			.feeReliefRatio(snapshot.feeReliefRatio)
+			.actualFeeRatio(snapshot.actualFeeRatio)
+			.feeAfiAmount(snapshot.feeAfiAmount)
+			.totalPayAfiAmount(snapshot.totalPayAfiAmount)
 			.afiPrice(snapshot.afiPrice)
 			.afiUsdtAmount(snapshot.afiUsdtAmount)
 			.outcomePrice(snapshot.outcomePrice)
@@ -518,6 +631,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			.status(STATUS_PENDING)
 			.orderCount(1)
 			.totalAfiAmount(snapshot.afiAmount)
+			.totalFeeAfiAmount(snapshot.feeAfiAmount)
 			.totalUsdtAmount(snapshot.afiUsdtAmount)
 			.totalShareAmount(snapshot.shareAmount)
 			.totalPayoutUsdtAmount(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN))
@@ -724,6 +838,11 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		private String assetIdsJson;
 		private String outcomesJson;
 		private BigDecimal afiAmount;
+		private BigDecimal feeRatio;
+		private BigDecimal feeReliefRatio;
+		private BigDecimal actualFeeRatio;
+		private BigDecimal feeAfiAmount;
+		private BigDecimal totalPayAfiAmount;
 		private BigDecimal afiPrice;
 		private BigDecimal afiUsdtAmount;
 		private BigDecimal outcomePrice;

@@ -20,6 +20,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="outcomeName" column="outcome_name"/>
         <result property="assetId" column="asset_id"/>
         <result property="afiAmount" column="afi_amount"/>
+        <result property="feeRatio" column="fee_ratio"/>
+        <result property="feeReliefRatio" column="fee_relief_ratio"/>
+        <result property="actualFeeRatio" column="actual_fee_ratio"/>
+        <result property="feeAfiAmount" column="fee_afi_amount"/>
+        <result property="totalPayAfiAmount" column="total_pay_afi_amount"/>
         <result property="afiPrice" column="afi_price"/>
         <result property="afiUsdtAmount" column="afi_usdt_amount"/>
         <result property="outcomePrice" column="outcome_price"/>
@@ -43,7 +48,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectPolymarketOrderVo">
         select id, order_no, user_id, account, event_slug, event_title, market_slug, biz_type, market_id, condition_id,
-               market_question, outcome_index, outcome_name, asset_id, afi_amount, afi_price, afi_usdt_amount, outcome_price,
+               market_question, outcome_index, outcome_name, asset_id, afi_amount, fee_ratio, fee_relief_ratio,
+               actual_fee_ratio, fee_afi_amount, total_pay_afi_amount, afi_price, afi_usdt_amount, outcome_price,
                share_amount, max_payout_usdt, end_time, status, result_outcome_index, result_outcome_name,
                payout_usdt_amount, payout_afi_price, payout_afi_amount, settle_time, order_snapshot_json, settle_snapshot_json, create_time, update_time,
                remark, deleted

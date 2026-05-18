@@ -22,6 +22,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="winningAssetId" column="winning_asset_id"/>
         <result property="orderCount" column="order_count"/>
         <result property="totalAfiAmount" column="total_afi_amount"/>
+        <result property="totalFeeAfiAmount" column="total_fee_afi_amount"/>
         <result property="totalUsdtAmount" column="total_usdt_amount"/>
         <result property="totalShareAmount" column="total_share_amount"/>
         <result property="totalPayoutUsdtAmount" column="total_payout_usdt_amount"/>
@@ -39,7 +40,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select id, market_slug, market_id, condition_id, event_slug, event_title, market_question, end_time, status,
                asset_ids_json, outcomes_json, uma_resolution_status, result_outcome_index, result_outcome_name,
                winning_asset_id, order_count, total_afi_amount, total_usdt_amount, total_share_amount,
-               total_payout_usdt_amount, total_payout_afi_amount, last_check_time, settle_time, market_snapshot_json, create_time, update_time,
+               total_fee_afi_amount, total_payout_usdt_amount, total_payout_afi_amount, last_check_time, settle_time, market_snapshot_json, create_time, update_time,
                remark, deleted
         from t_polymarket_market
     </sql>
@@ -65,11 +66,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         insert into t_polymarket_market (
             market_slug, market_id, condition_id, event_slug, event_title, market_question, asset_ids_json,
             outcomes_json, end_time, status, order_count, total_afi_amount, total_usdt_amount, total_share_amount,
-            total_payout_usdt_amount, total_payout_afi_amount, market_snapshot_json, create_time, update_time, remark, deleted
+            total_fee_afi_amount, total_payout_usdt_amount, total_payout_afi_amount, market_snapshot_json, create_time, update_time, remark, deleted
         ) values (
             #{marketSlug}, #{marketId}, #{conditionId}, #{eventSlug}, #{eventTitle}, #{marketQuestion}, #{assetIdsJson},
             #{outcomesJson}, #{endTime}, #{status}, #{orderCount}, #{totalAfiAmount}, #{totalUsdtAmount}, #{totalShareAmount},
-            #{totalPayoutUsdtAmount}, #{totalPayoutAfiAmount}, #{marketSnapshotJson}, #{createTime}, #{updateTime}, #{remark}, #{deleted}
+            #{totalFeeAfiAmount}, #{totalPayoutUsdtAmount}, #{totalPayoutAfiAmount}, #{marketSnapshotJson}, #{createTime}, #{updateTime}, #{remark}, #{deleted}
         )
         on duplicate key update
             market_id = values(market_id),
@@ -82,6 +83,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             end_time = values(end_time),
             order_count = order_count + values(order_count),
             total_afi_amount = total_afi_amount + values(total_afi_amount),
+            total_fee_afi_amount = total_fee_afi_amount + values(total_fee_afi_amount),
             total_usdt_amount = total_usdt_amount + values(total_usdt_amount),
             total_share_amount = total_share_amount + values(total_share_amount),
             market_snapshot_json = values(market_snapshot_json),

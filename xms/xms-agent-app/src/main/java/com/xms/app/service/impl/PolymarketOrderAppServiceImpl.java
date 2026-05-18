@@ -48,6 +48,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static com.xms.app.service.impl.BizUserServiceImpl.checkWallet;
+
 /**
  * 处理App端AFI支付的Polymarket平台内部订单。
  *
@@ -266,15 +268,19 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		// 下单主流程保持同步强一致：扣AFI、写内部订单、写市场聚合必须在同一个事务里完成。
 		// WebSocket刷新只是实时监听增强，放到事务提交后执行，失败也不影响订单创建和资金扣减结果。
 		// 步骤1：先做本地参数和重复下单校验；同一用户同一市场临时只允许保留一笔正常订单。
-		validateRequest(req);
-		validateUserMarketNotOrdered(req.getMarketSlug(), userId);
-		// 步骤2：重新生成价格快照，保证下单使用后端实时价格，不使用前端报价结果。
-		MarketPriceSnapshot snapshot = buildMarketPriceSnapshot(req, userId);
+		//验签，随机数
 		// 步骤3：读取用户与钱包余额，确认用户存在且AFI可用余额足够。
 		UserInfo userInfo = userInfoService.lambdaQuery().eq(UserInfo::getUserId, userId).one();
 		if (userInfo == null) {
 			throw new ServiceException(ResponseCode.CODE_1001);
 		}
+
+		checkWallet(req.getRandomNum(), req.getSignature(), userInfo.getAccount(), xmsRedis);
+		validateRequest(req);
+		validateUserMarketNotOrdered(req.getMarketSlug(), userId);
+		// 步骤2：重新生成价格快照，保证下单使用后端实时价格，不使用前端报价结果。
+		MarketPriceSnapshot snapshot = buildMarketPriceSnapshot(req, userId);
+
 		UserMoney userMoney = userMoneyService.lambdaQuery().eq(UserMoney::getId, userId).one();
 		if (userMoney.getValidNum2().compareTo(snapshot.totalPayAfiAmount) < 0) {
 			throw new ServiceException(ResponseCode.CODE_1015);

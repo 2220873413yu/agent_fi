@@ -93,7 +93,8 @@ public class BizCommonServiceImpl implements BizCommonService {
 	@Override
 	public BigDecimal getOortPrice() {
 		String profile = environment.getProperty(Constants.ACTIVE_PROFILES_PROPERTY);
-		if (Constants.ACTIVE_PROPERTY_DEV_HOME.equalsIgnoreCase(profile)) {
+		if (Constants.ACTIVE_PROPERTY_DEV_HOME.equalsIgnoreCase(profile)||
+			Constants.ACTIVE_PROPERTY_DEV.equalsIgnoreCase(profile)) {
 			//本地环境走这边
 			return new BigDecimal("0.5");
 		}

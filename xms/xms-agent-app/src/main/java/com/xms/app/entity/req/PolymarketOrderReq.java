@@ -36,4 +36,14 @@ public class PolymarketOrderReq {
 	@Max(value = 3, message = "bizType must be 1, 2 or 3")
 	@ApiModelProperty(value = "业务类型：1加密，2体育，3Up/Down", required = true, example = "1")
 	private Integer bizType;
+
+	@ApiModelProperty(value = "签名")
+	@NotBlank
+	private String signature;
+
+	/**
+	 * 随机数不能为空
+	 */
+	@NotBlank(message = "随机数不能为空")
+	private String randomNum;
 }

@@ -22,10 +22,9 @@ public class PolymarketOrderReq {
 	@ApiModelProperty(value = "Polymarket市场slug，用于定位要购买的市场", required = true, example = "will-bitcoin-hit-150k-by-december-31")
 	private String marketSlug;
 
-	@NotNull(message = "outcomeIndex cannot be null")
-	@Min(value = 0, message = "outcomeIndex must be non-negative")
-	@ApiModelProperty(value = "选择结果下标，对应Polymarket outcomes数组下标，0通常表示第一个结果", required = true, example = "0")
-	private Integer outcomeIndex;
+	@NotBlank(message = "assetId cannot be blank")
+	@ApiModelProperty(value = "用户选择结果对应的Polymarket asset_id/token_id，来自事件列表或市场详情的assetIds", required = true, example = "93694900555669388759405753550770573998169287228984912881955464376232163096213")
+	private String assetId;
 
 	@NotNull(message = "shareAmount cannot be null")
 	@DecimalMin(value = "0.000001", message = "shareAmount must be greater than 0")

@@ -58,6 +58,15 @@ public class PolymarketEventMarketDto {
 	private List<String> outcomePrices;
 
 	/**
+	 * 每个结果对应的Polymarket asset_id/token_id。
+	 *
+	 * <p>顺序与outcomes、outcomePrices一致。前端下单时传该字段里的assetId，
+	 * 后端会实时查询市场详情并用assetId反查当前结果下标，避免只靠数组下标导致选错结果。</p>
+	 */
+	@ApiModelProperty(value = "每个结果对应的Polymarket asset_id/token_id，顺序与outcomes和outcomePrices一致")
+	private List<String> assetIds;
+
+	/**
 	 * 当前最佳买价。
 	 */
 	@ApiModelProperty(value = "当前最佳买价")

@@ -26,7 +26,7 @@ import java.util.Date;
 @NoArgsConstructor
 @AllArgsConstructor
 @ApiModel(value = "PolymarketOrder", description = "Polymarket平台内部订单快照")
-@TableName(value = "t_polymarket_order")
+@TableName(value = "t_polymarket_order", excludeProperty = {"createBy", "updateBy", "deleted"})
 public class PolymarketOrder extends BaseEntity {
 	private static final long serialVersionUID = 1L;
 
@@ -99,9 +99,9 @@ public class PolymarketOrder extends BaseEntity {
 	@ApiModelProperty(value = "用户选择结果对应的Polymarket asset_id/token_id快照")
 	private String assetId;
 
-	/** 后端按购买份额、outcome价格和AFI价格折算出的实际扣减AFI数量，对应用户valid_num2。 */
-	@Excel(name = "下单AFI", sort = 13)
-	@ApiModelProperty(value = "实际扣减AFI数量，由购买份额按实时价格折算得到")
+	/** 后端按购买份额、outcome价格和AFI价格折算出的购买成本AFI数量，不包含外扣手续费。 */
+	@Excel(name = "购买成本AFI", sort = 13)
+	@ApiModelProperty(value = "购买成本AFI数量，不包含外扣手续费")
 	private BigDecimal afiAmount;
 
 	/** 系统基础交易手续费比例快照，单位%。 */
@@ -198,17 +198,16 @@ public class PolymarketOrder extends BaseEntity {
 	@ApiModelProperty(value = "下单市场快照JSON")
 	private String orderSnapshotJson;
 
-	/** 结算时市场原始JSON快照。 */
-	@ApiModelProperty(value = "结算市场快照JSON")
-	private String settleSnapshotJson;
-
-	/** 删除标志：0正常，1删除。 */
-	@ApiModelProperty(value = "删除标志 0正常 1删除")
-	private Integer deleted;
-
 	@TableField(exist = false)
 	private String beginCreateTime;
 
 	@TableField(exist = false)
 	private String endCreateTime;
+
+	@TableField(exist = false)
+	private Integer deleted;
+	@TableField(exist = false)
+	private String updateBy;
+	@TableField(exist = false)
+	private String createBy;
 }

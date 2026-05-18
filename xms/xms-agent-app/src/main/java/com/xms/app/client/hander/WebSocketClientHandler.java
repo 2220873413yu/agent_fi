@@ -186,7 +186,7 @@ public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> 
 			handleMarketResolved(event);
 			return;
 		}
-		log.debug("Polymarket WebSocket收到非结算事件，eventType={}, event={}", eventType, event);
+		//log.debug("Polymarket WebSocket收到非结算事件，eventType={}, event={}", eventType, event);
 	}
 
 	/**

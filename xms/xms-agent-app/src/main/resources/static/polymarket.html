@@ -566,20 +566,18 @@
       <div class="panel side-card">
         <div class="side-title">报价结果</div>
         <div id="quoteBox" class="quote-box">
-          <div class="muted">点击“报价预览”后显示购买份额、成交价格、等值USDT、预计扣AFI和最大兑付。</div>
+          <div class="muted">点击“报价预览”后显示购买份额、成交价格、购买成本AFI、外扣手续费、实际总扣款和最大兑付。</div>
         </div>
       </div>
 
       <div class="panel side-card">
         <div class="side-title">我的订单</div>
         <div class="action-row" style="grid-template-columns:1fr auto;margin-top:0">
-          <select id="orderStatusFilter">
-            <option value="">全部状态</option>
-            <option value="0">待结算</option>
-            <option value="1">已猜中</option>
-            <option value="2">未猜中</option>
-            <option value="3">待人工复核</option>
-            <option value="4">已作废</option>
+          <select id="orderBizTypeFilter">
+            <option value="">全部类型</option>
+            <option value="1">加密</option>
+            <option value="2">体育</option>
+            <option value="3">Up/Down</option>
           </select>
           <button id="myOrdersBtn" type="button">刷新</button>
         </div>
@@ -631,7 +629,7 @@
   const orderMessage = document.getElementById('orderMessage');
   const quoteBox = document.getElementById('quoteBox');
   const myOrdersBtn = document.getElementById('myOrdersBtn');
-  const orderStatusFilter = document.getElementById('orderStatusFilter');
+  const orderBizTypeFilter = document.getElementById('orderBizTypeFilter');
   const ordersBox = document.getElementById('ordersBox');
   const slugInput = document.getElementById('slugInput');
   const slugBtn = document.getElementById('slugBtn');
@@ -754,9 +752,9 @@
       if (Number.isFinite(minSecondsBeforeEnd) && minSecondsBeforeEnd >= 0) {
         state.minSecondsBeforeEnd = minSecondsBeforeEnd;
       }
-      minAfiHint.textContent = `按当前价格折算后，最低扣减：${formatNumber(state.minAfiAmount)} AFI`;
+      minAfiHint.textContent = `按当前价格折算后，购买成本最低：${formatNumber(state.minAfiAmount)} AFI`;
     } catch (error) {
-      minAfiHint.textContent = `按当前价格折算后，最低扣减：${formatNumber(state.minAfiAmount)} AFI（配置读取失败，使用页面兜底）`;
+      minAfiHint.textContent = `按当前价格折算后，购买成本最低：${formatNumber(state.minAfiAmount)} AFI（配置读取失败，使用页面兜底）`;
     }
   }
 
@@ -834,33 +832,37 @@
     `;
   }
 
-  function selectOutcome(eventSlug, eventTitle, market, outcomeIndex, outcomeName, price) {
+  function selectOutcome(eventSlug, eventTitle, market, assetId, outcomeIndex, outcomeName, price) {
     state.selected = {
       eventSlug,
       eventTitle,
       marketSlug: market.slug,
       question: market.question,
+      assetId,
       outcomeIndex,
       outcomeName,
       price
     };
     state.lastQuote = null;
-    quoteBox.innerHTML = '<div class="muted">已选择结果，点击“报价预览”获取当前成交价格、预计扣AFI和最大兑付。</div>';
+    quoteBox.innerHTML = '<div class="muted">已选择结果，点击“报价预览”获取当前成交价格、购买成本AFI、外扣手续费和最大兑付。</div>';
     setOrderMessage('');
     updateSelectedBox();
     document.querySelectorAll('.outcome-btn').forEach((button) => {
-      const same = button.dataset.slug === market.slug && Number(button.dataset.index) === outcomeIndex;
+      const same = button.dataset.slug === market.slug && button.dataset.assetId === assetId;
       button.classList.toggle('selected', same);
     });
   }
 
   function renderOutcomeButton(event, market, outcome, index, price, tradeState) {
-    const disabled = tradeState.disabled || !market.slug || price === undefined || Number(price) <= 0;
+    const assetIds = toArray(market.assetIds).length ? toArray(market.assetIds) : toArray(market.clobTokenIds);
+    const assetId = assetIds[index] || '';
+    const disabled = tradeState.disabled || !market.slug || !assetId || price === undefined || Number(price) <= 0;
     const choiceId = `choice-${Object.keys(window.__choices).length}`;
     window.__choices[choiceId] = {
       eventSlug: event.slug || '',
       eventTitle: event.title || event.slug || '',
       market,
+      assetId,
       outcomeIndex: index,
       outcomeName: outcome,
       price
@@ -871,8 +873,10 @@
         type="button"
         data-slug="${escapeAttr(market.slug || '')}"
         data-index="${index}"
+        data-asset-id="${escapeAttr(assetId)}"
         data-choice="${choiceId}"
         ${disabled ? 'disabled' : ''}
+        title="${!assetId ? '缺少assetId，请刷新市场详情后再下单' : ''}"
       >
         <span>${escapeHtml(outcome || `结果 ${index + 1}`)}</span>
         <span class="price">${formatNumber(price)}</span>
@@ -1056,7 +1060,7 @@
         if (!choice) {
           return;
         }
-        selectOutcome(choice.eventSlug, choice.eventTitle, choice.market, choice.outcomeIndex, choice.outcomeName, choice.price);
+        selectOutcome(choice.eventSlug, choice.eventTitle, choice.market, choice.assetId, choice.outcomeIndex, choice.outcomeName, choice.price);
       });
     });
   }
@@ -1092,11 +1096,25 @@
     if (!Number.isFinite(shareAmount) || shareAmount <= 0) {
       throw new Error('请输入大于 0 的购买份额。');
     }
+    if (!state.selected.assetId) {
+      throw new Error('当前市场结果缺少assetId，请刷新市场后再下单。');
+    }
     return {
       marketSlug: state.selected.marketSlug,
-      outcomeIndex: state.selected.outcomeIndex,
-      shareAmount: shareAmountInput.value
+      assetId: state.selected.assetId,
+      shareAmount: shareAmountInput.value,
+      bizType: currentBizType()
     };
+  }
+
+  function currentBizType() {
+    if (state.section === 'sports') {
+      return 2;
+    }
+    if (state.section === 'updown') {
+      return 3;
+    }
+    return 1;
   }
 
   async function quoteOrder() {
@@ -1108,7 +1126,11 @@
         <div class="kv"><span>购买份额</span><strong>${formatNumber(quote.shareAmount, 8)}</strong></div>
         <div class="kv"><span>成交价格</span><strong>${formatNumber(quote.outcomePrice)}</strong></div>
         <div class="kv"><span>等值USDT</span><strong>${formatNumber(quote.afiUsdtAmount)} USDT</strong></div>
-        <div class="kv"><span>预计扣AFI</span><strong>${formatNumber(quote.afiAmount)} AFI</strong></div>
+        <div class="kv"><span>购买成本AFI</span><strong>${formatNumber(quote.afiAmount)} AFI</strong></div>
+        <div class="kv"><span>基础手续费</span><span>${formatNumber(quote.feeRatio)}%</span></div>
+        <div class="kv"><span>节点减免</span><span>${formatNumber(quote.feeReliefRatio)}%</span></div>
+        <div class="kv"><span>实际手续费</span><strong>${formatNumber(quote.feeAfiAmount)} AFI (${formatNumber(quote.actualFeeRatio)}%)</strong></div>
+        <div class="kv"><span>实际总扣</span><strong>${formatNumber(quote.totalPayAfiAmount)} AFI</strong></div>
         <div class="kv"><span>AFI价格</span><strong>${formatNumber(quote.afiPrice)} USDT</strong></div>
         <div class="kv"><span>最大兑付</span><strong>${formatNumber(quote.maxPayoutUsdt)} USDT</strong></div>
         <div class="kv"><span>结束时间</span><span>${formatDate(quote.endTime)}</span></div>
@@ -1137,8 +1159,8 @@
   async function loadMyOrders() {
     ordersBox.innerHTML = '<div class="muted">加载中...</div>';
     try {
-      const status = orderStatusFilter.value;
-      const url = status ? `/api/polymarket/orders/my?status=${encodeURIComponent(status)}` : '/api/polymarket/orders/my';
+      const bizType = orderBizTypeFilter.value;
+      const url = bizType ? `/api/polymarket/orders/my?bizType=${encodeURIComponent(bizType)}` : '/api/polymarket/orders/my';
       const orders = await requestJson(url, authedOptions('GET'));
       renderOrders(orders || []);
     } catch (error) {
@@ -1158,10 +1180,12 @@
           <div><span class="pill ${tone}">${label}</span> <strong>${escapeHtml(order.outcomeName || '-')}</strong></div>
           <div class="slug">${escapeHtml(order.orderNo || '')}</div>
           <div class="muted">${escapeHtml(order.marketQuestion || order.marketSlug || '-')}</div>
-          <div class="kv"><span>AFI</span><strong>${formatNumber(order.afiAmount)} AFI</strong></div>
+          <div class="kv"><span>成本AFI</span><strong>${formatNumber(order.afiAmount)} AFI</strong></div>
+          <div class="kv"><span>手续费</span><span>${formatNumber(order.feeAfiAmount || 0)} AFI</span></div>
+          <div class="kv"><span>总扣款</span><strong>${formatNumber(order.totalPayAfiAmount || order.afiAmount)} AFI</strong></div>
           <div class="kv"><span>成交价</span><span>${formatNumber(order.outcomePrice)}</span></div>
           <div class="kv"><span>份额</span><span>${formatNumber(order.shareAmount, 8)}</span></div>
-          <div class="kv"><span>兑付</span><span>${formatNumber(order.payoutUsdtAmount || 0)} USDT</span></div>
+          <div class="kv"><span>兑付</span><span>${formatNumber(order.payoutAfiAmount || 0)} AFI</span></div>
         </div>
       `;
     }).join('');
@@ -1227,7 +1251,7 @@
   quoteBtn.addEventListener('click', quoteOrder);
   createBtn.addEventListener('click', createOrder);
   myOrdersBtn.addEventListener('click', loadMyOrders);
-  orderStatusFilter.addEventListener('change', loadMyOrders);
+  orderBizTypeFilter.addEventListener('change', loadMyOrders);
   slugBtn.addEventListener('click', loadMarketBySlug);
   tokenInput.addEventListener('change', () => localStorage.setItem('polymarketAppAuthorization', tokenInput.value.trim()));
   loadOrderConfig();

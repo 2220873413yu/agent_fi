@@ -117,9 +117,9 @@ DEALLOCATE PREPARE stmt;
 
 -- 订单表：临时限制同一用户同一Polymarket市场只能下一笔正常订单。
 -- 建唯一索引前可先执行以下SQL排查历史重复数据；如有结果，需要先人工处理后再建索引。
--- SELECT user_id, market_slug, deleted, COUNT(*)
+-- SELECT user_id, market_slug, COUNT(*)
 -- FROM t_polymarket_order
--- GROUP BY user_id, market_slug, deleted
+-- GROUP BY user_id, market_slug
 -- HAVING COUNT(*) > 1;
 SET @index_exists := (
   SELECT COUNT(1)
@@ -130,7 +130,7 @@ SET @index_exists := (
 );
 SET @sql := IF(
   @index_exists = 0,
-  'ALTER TABLE t_polymarket_order ADD UNIQUE KEY uk_user_market_slug (user_id, market_slug, deleted)',
+  'ALTER TABLE t_polymarket_order ADD UNIQUE KEY uk_user_market_slug (user_id, market_slug)',
   'SELECT ''t_polymarket_order.uk_user_market_slug already exists'''
 );
 PREPARE stmt FROM @sql;

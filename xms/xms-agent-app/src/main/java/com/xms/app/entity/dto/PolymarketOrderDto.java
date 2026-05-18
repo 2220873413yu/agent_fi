@@ -11,7 +11,7 @@ import java.util.Date;
 /**
  * App端Polymarket内部订单返回对象。
  *
- * <p>该对象只返回订单展示和对账需要的快照字段；列表接口会隐藏原始JSON快照，详情接口才返回。</p>
+ * <p>该对象只返回订单展示和对账需要的结构化快照字段；后台订单实体会保留下单市场原始JSON用于核对。</p>
  */
 @Data
 @ApiModel(value = "PolymarketOrderDto", description = "Polymarket内部订单返回对象")

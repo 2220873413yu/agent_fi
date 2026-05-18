@@ -239,7 +239,6 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 		List<PolymarketOrder> pendingOrders = lambdaQuery()
 			.eq(PolymarketOrder::getMarketSlug, slug)
 			.eq(PolymarketOrder::getStatus, ORDER_STATUS_PENDING)
-			.eq(PolymarketOrder::getDeleted, 0)
 			.orderByAsc(PolymarketOrder::getId)
 			.list();
 
@@ -257,7 +256,6 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 		for (PolymarketOrder order : pendingOrders) {
 			order.setResultOutcomeIndex(result.winnerIndex);
 			order.setResultOutcomeName(result.winnerName);
-			order.setSettleSnapshotJson(marketSnapshot.toJSONString());
 			order.setSettleTime(settleTime);
 			order.setUpdateTime(settleTime);
 			order.setPayoutAfiPrice(payoutAfiPrice);

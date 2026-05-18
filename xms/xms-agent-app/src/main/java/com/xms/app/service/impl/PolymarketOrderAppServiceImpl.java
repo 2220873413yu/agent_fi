@@ -319,7 +319,6 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	public List<PolymarketOrderDto> myOrders(Long lastId, Integer bizType, Long userId) {
 		List<PolymarketOrder> orders = polymarketOrderService.lambdaQuery()
 			.eq(PolymarketOrder::getUserId, userId)
-			.eq(PolymarketOrder::getDeleted, 0)
 			.eq(bizType != null, PolymarketOrder::getBizType, bizType)
 			.lt(lastId != null, PolymarketOrder::getId, lastId)
 			.orderByDesc(PolymarketOrder::getId)
@@ -333,7 +332,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 *
 	 * @param orderNo 平台内部订单号
 	 * @param userId 当前App用户ID
-	 * @return 包含下单/结算市场快照的订单详情
+	 * @return 当前用户的订单详情；下单市场快照统一保存在市场表，不再从订单表返回
 	 */
 	@Override
 	public PolymarketOrderDto detail(String orderNo, Long userId) {
@@ -343,7 +342,6 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		PolymarketOrder order = polymarketOrderService.lambdaQuery()
 			.eq(PolymarketOrder::getOrderNo, orderNo.trim())
 			.eq(PolymarketOrder::getUserId, userId)
-			.eq(PolymarketOrder::getDeleted, 0)
 			.one();
 		if (order == null) {
 			throw new ServiceException(ResponseCode.CODE_1295);
@@ -376,8 +374,8 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 */
 	private MarketPriceSnapshot buildMarketPriceSnapshot(PolymarketOrderReq req, Long userId) {
 		// 这里统一生成报价/下单快照：正式下单时仍重新拉实时价格，不信任前端传回来的报价。
-		// Polymarket的outcomes、outcomePrices、clobTokenIds三个数组按同一个outcomeIndex对应。
-		// outcomes[outcomeIndex]是结果名称，outcomePrices[outcomeIndex]是成交价，clobTokenIds[outcomeIndex]是asset_id/token_id。
+		// 前端只传assetId，后端在实时clobTokenIds里反查当前下标，再取同位置的outcome名称和价格。
+		// 这样即使Polymarket列表展示顺序变化，也不会因为前端传旧下标导致买错结果。
 		// 步骤1：先做本地请求参数校验，避免无效参数触发外部请求。
 		validateRequest(req);
 		// 步骤2：实时读取Polymarket市场详情，并校验市场仍可交易。
@@ -396,24 +394,25 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		}
 		validateMarketOpen(market);
 
-		// 步骤3：解析结果名称与结果价格，outcomeIndex必须同时落在两个数组范围内。
+		// 步骤3：解析结果名称、结果价格和token数组，并用assetId反查当前结果下标。
 		JSONArray outcomes = parseJsonArray(market.getString("outcomes"), "outcomes");
 		JSONArray outcomePrices = parseJsonArray(market.getString("outcomePrices"), "outcomePrices");
 		JSONArray clobTokenIds = parseJsonArray(market.getString("clobTokenIds"), "clobTokenIds");
-		if (req.getOutcomeIndex() >= outcomes.size() || req.getOutcomeIndex() >= outcomePrices.size() || req.getOutcomeIndex() >= clobTokenIds.size()) {
+		Integer outcomeIndex = findOutcomeIndexByAssetId(clobTokenIds, req.getAssetId());
+		if (outcomeIndex == null || outcomeIndex >= outcomes.size() || outcomeIndex >= outcomePrices.size()) {
 			throw new ServiceException(ResponseCode.CODE_1286);
 		}
-		String outcomeName = outcomes.getString(req.getOutcomeIndex());
+		String outcomeName = outcomes.getString(outcomeIndex);
 		if (StrUtil.isBlank(outcomeName)) {
 			throw new ServiceException(ResponseCode.CODE_1286);
 		}
-		String assetId = clobTokenIds.getString(req.getOutcomeIndex());
+		String assetId = StrUtil.trim(clobTokenIds.getString(outcomeIndex));
 		if (StrUtil.isBlank(assetId)) {
 			throw new ServiceException(ResponseCode.CODE_1286);
 		}
 		BigDecimal outcomePrice;
 		try {
-			outcomePrice = outcomePrices.getBigDecimal(req.getOutcomeIndex());
+			outcomePrice = outcomePrices.getBigDecimal(outcomeIndex);
 		} catch (Exception e) {
 			throw new ServiceException(ResponseCode.CODE_1287);
 		}
@@ -468,7 +467,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		snapshot.marketQuestion = market.getString("question");
 		snapshot.eventSlug = firstEventString(market, "slug");
 		snapshot.eventTitle = firstEventString(market, "title");
-		snapshot.outcomeIndex = req.getOutcomeIndex();
+		snapshot.outcomeIndex = outcomeIndex;
 		snapshot.outcomeName = outcomeName;
 		snapshot.assetId = assetId;
 		snapshot.assetIdsJson = clobTokenIds.toJSONString();
@@ -489,6 +488,29 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	}
 
 	/**
+	 * 根据前端传入的assetId定位当前Polymarket结果下标。
+	 *
+	 * <p>Polymarket的outcomes、outcomePrices、clobTokenIds在同一次market详情中按相同顺序对应；
+	 * 前端传assetId后，这里只把assetId作为稳定结果标识，再反查当前数组下标用于读取结果名称和价格。</p>
+	 *
+	 * @param clobTokenIds Polymarket market详情中的clobTokenIds数组
+	 * @param requestAssetId 前端选择结果对应的asset_id/token_id
+	 * @return assetId在clobTokenIds中的下标；找不到时返回null
+	 */
+	private Integer findOutcomeIndexByAssetId(JSONArray clobTokenIds, String requestAssetId) {
+		if (clobTokenIds == null || StrUtil.isBlank(requestAssetId)) {
+			return null;
+		}
+		String normalizedAssetId = requestAssetId.trim();
+		for (int i = 0; i < clobTokenIds.size(); i++) {
+			if (normalizedAssetId.equals(StrUtil.trim(clobTokenIds.getString(i)))) {
+				return i;
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * 校验报价/下单请求参数。
 	 *
 	 * <p>这里只校验本地必填和购买份额大于0；最低AFI数量需要先按实时价格折算，在价格快照计算阶段校验。</p>
@@ -499,7 +521,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		if (req == null || StrUtil.isBlank(req.getMarketSlug())) {
 			throw new ServiceException(ResponseCode.CODE_1294);
 		}
-		if (req.getOutcomeIndex() == null || req.getOutcomeIndex() < 0) {
+		if (StrUtil.isBlank(req.getAssetId())) {
 			throw new ServiceException(ResponseCode.CODE_1294);
 		}
 		if (req.getShareAmount() == null || req.getShareAmount().compareTo(BigDecimal.ZERO) <= 0) {
@@ -528,7 +550,6 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		boolean exists = polymarketOrderService.lambdaQuery()
 			.eq(PolymarketOrder::getUserId, userId)
 			.eq(PolymarketOrder::getMarketSlug, marketSlug.trim())
-			.eq(PolymarketOrder::getDeleted, 0)
 			.exists();
 		if (exists) {
 			throw new ServiceException(ResponseCode.CODE_1297);
@@ -599,7 +620,6 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			.payoutAfiPrice(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN))
 			.payoutAfiAmount(BigDecimal.ZERO.setScale(SHARE_SCALE, RoundingMode.DOWN))
 			.orderSnapshotJson(snapshot.marketWrapperJson)
-			.deleted(0)
 			.build();
 		order.setCreateTime(now);
 		order.setUpdateTime(now);
@@ -748,7 +768,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 * 将订单实体转换为App返回对象。
 	 *
 	 * @param order 订单实体
-	 * @param includeSnapshots 是否返回原始JSON快照；列表页通常不返回，详情页返回
+	 * @param includeSnapshots 兼容旧调用的保留参数；订单DTO不再返回原始下单快照
 	 * @return App订单DTO
 	 */
 	private PolymarketOrderDto toDto(PolymarketOrder order, boolean includeSnapshots) {

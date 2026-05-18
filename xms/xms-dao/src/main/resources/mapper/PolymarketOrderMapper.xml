@@ -39,11 +39,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="payoutAfiAmount" column="payout_afi_amount"/>
         <result property="settleTime" column="settle_time"/>
         <result property="orderSnapshotJson" column="order_snapshot_json"/>
-        <result property="settleSnapshotJson" column="settle_snapshot_json"/>
         <result property="createTime" column="create_time"/>
         <result property="updateTime" column="update_time"/>
         <result property="remark" column="remark"/>
-        <result property="deleted" column="deleted"/>
     </resultMap>
 
     <sql id="selectPolymarketOrderVo">
@@ -51,15 +49,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                market_question, outcome_index, outcome_name, asset_id, afi_amount, fee_ratio, fee_relief_ratio,
                actual_fee_ratio, fee_afi_amount, total_pay_afi_amount, afi_price, afi_usdt_amount, outcome_price,
                share_amount, max_payout_usdt, end_time, status, result_outcome_index, result_outcome_name,
-               payout_usdt_amount, payout_afi_price, payout_afi_amount, settle_time, order_snapshot_json, settle_snapshot_json, create_time, update_time,
-               remark, deleted
+               payout_usdt_amount, payout_afi_price, payout_afi_amount, settle_time, order_snapshot_json, create_time, update_time,
+               remark
         from t_polymarket_order
     </sql>
 
     <select id="selectPolymarketOrderList" parameterType="PolymarketOrder" resultMap="PolymarketOrderResult">
         <include refid="selectPolymarketOrderVo"/>
         <where>
-            deleted = 0
             <if test="orderNo != null and orderNo != ''"> and order_no = #{orderNo}</if>
             <if test="userId != null"> and user_id = #{userId}</if>
             <if test="account != null and account != ''"> and account = #{account}</if>

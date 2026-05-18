@@ -307,6 +307,7 @@ public class PolymarketServiceImpl implements PolymarketService {
 			.slug(market.getString("slug"))
 			.outcomes(toStringList(parseJsonArrayField(market, "outcomes")))
 			.outcomePrices(toStringList(parseJsonArrayField(market, "outcomePrices")))
+			.assetIds(toStringList(parseJsonArrayField(market, "clobTokenIds")))
 			.bestBid(getBigDecimal(market, "bestBid"))
 			.bestAsk(getBigDecimal(market, "bestAsk"))
 			.lastTradePrice(getBigDecimal(market, "lastTradePrice"))

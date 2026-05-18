@@ -169,9 +169,6 @@
         <el-form-item label="下单快照">
           <el-input v-model="form.orderSnapshotJson" type="textarea" :rows="6" disabled />
         </el-form-item>
-        <el-form-item label="结算快照">
-          <el-input v-model="form.settleSnapshotJson" type="textarea" :rows="6" disabled />
-        </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button type="primary" @click="submitForm">确定</el-button>

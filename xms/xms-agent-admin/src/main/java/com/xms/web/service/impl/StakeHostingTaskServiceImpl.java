@@ -109,6 +109,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	private static final int GLOBAL_DIVIDEND_SNAPSHOT_NOT_SETTLED = 0;
 	private static final int GLOBAL_DIVIDEND_SNAPSHOT_SETTLED = 1;
 	private static final int G7_CALC_STATUS_DONE = 1;
+	private static final int RATE_SOURCE_PURE_STATIC = 3;
 	private static final int DELETED_NO = 0;
 
 	/**
@@ -986,47 +987,52 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 计算单笔托管订单当天使用的基础静态收益率乘数。
 	 *
+	 * <p>收益率优先级为：用户后台指定收益率、纯静态规则、G7快照收益率。未推广快照
+	 * {@code rate_source=3} 只是用户维度的G7计算结果，真实发放必须回到订单维度，
+	 * 按订单是否已回本读取回本前/回本后纯静态系统参数。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param order 托管订单，使用订单的用户ID和是否回本状态
+	 * @param rewardDay 收益日期，格式yyyyMMdd；当前方法通过context读取该日快照
+	 * @param context 101任务预加载上下文，包含用户、G7快照和纯静态系统参数
+	 * @return 基础静态收益率乘数，例如0.005表示0.5%
 	 */
 	private BigDecimal calculateStaticRate(StakeHostingOrder order, int rewardDay, StaticRewardCalculateContext context) {
-		// Business processing note.
+		// 保留历史测试开关注释，正式发放不启用强制测试收益率。
 //		if (FORCE_TEST_STATIC_RATE) {
 //			return percentToRate(TEST_STATIC_RATE_PERCENT);
 //		}
 
+		// 用户后台指定收益率最高优先级，单位是%，这里转换为乘数参与订单收益计算。
 		UserInfo user = context.userMap.get(order.getUserId());
 		if (user != null && user.getStakeHostingStaticRate() != null && user.getStakeHostingStaticRate().compareTo(BigDecimal.ZERO) > 0) {
 			return percentToRate(user.getStakeHostingStaticRate());
 		}
 		StakeHostingDailyTeamPerformance snapshot = context.snapshotMap.get(order.getUserId());
-		if (snapshot == null) {
-			BigDecimal pureStaticRate = loadPureStaticRatePercent(context, order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1);
+		boolean returnedPrincipal = order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1;
+		if (snapshot == null || Integer.valueOf(RATE_SOURCE_PURE_STATIC).equals(snapshot.getRateSource())) {
+			// 没有G7快照，或快照明确为未推广规则时，按订单是否回本选择0.5/0.2等纯静态参数。
+			BigDecimal pureStaticRate = loadPureStaticRatePercent(context, returnedPrincipal);
 			return percentToRate(pureStaticRate);
 		}
 		if (snapshot.getBaseStaticRate() == null) {
 			return PLACEHOLDER_STATIC_RATE;
 		}
+		// G7区间快照的收益率是用户当天团队新增窗口计算结果，可直接用于该用户订单。
 		return percentToRate(snapshot.getBaseStaticRate());
 	}
 
 	/**
+	 * 测算单笔托管订单当天会命中的基础静态收益率。
 	 *
+	 * <p>该方法不发放收益，只返回测试DTO并与真实发放的收益率选择规则保持一致；
+	 * 当G7快照为未推广规则时，同样按订单是否已回本读取纯静态系统参数。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param order 托管订单
+	 * @param rewardDay 收益日期，格式yyyyMMdd
+	 * @param context 101任务预加载上下文
+	 * @return 静态收益率测试DTO，finalStaticRate单位为%
 	 */
 	private StakeHostingStaticRateTestDto calculateStaticRateForTest(StakeHostingOrder order, int rewardDay,
 																	 StaticRewardCalculateContext context) {
@@ -1035,17 +1041,18 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		BigDecimal finalStaticRate;
 		String rateSource;
 		String remark;
+		boolean returnedPrincipal = order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1;
 		if (user != null && user.getStakeHostingStaticRate() != null
 			&& user.getStakeHostingStaticRate().compareTo(BigDecimal.ZERO) > 0) {
 			finalStaticRate = user.getStakeHostingStaticRate();
 			rateSource = "user_config";
 			remark = "Static rate source: user config";
-		} else if (snapshot == null) {
-			finalStaticRate = loadPureStaticRatePercent(context, order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1);
+		} else if (snapshot == null || Integer.valueOf(RATE_SOURCE_PURE_STATIC).equals(snapshot.getRateSource())) {
+			finalStaticRate = loadPureStaticRatePercent(context, returnedPrincipal);
 			rateSource = "pure_static";
-			remark = order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1
-				? "Pure static rate after return"
-				: "Pure static rate before return";
+			remark = returnedPrincipal
+				? "Pure static rate after return; snapshot is missing or pure-static source"
+				: "Pure static rate before return; snapshot is missing or pure-static source";
 		} else if (snapshot.getBaseStaticRate() == null) {
 			finalStaticRate = rateToPercent(PLACEHOLDER_STATIC_RATE);
 			rateSource = "snapshot_placeholder";

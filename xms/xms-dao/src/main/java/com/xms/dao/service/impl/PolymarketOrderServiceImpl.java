@@ -353,7 +353,8 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 	 */
 	private BigDecimal loadSettlementAfiPrice() {
 		String profile = environment.getProperty(Constants.ACTIVE_PROFILES_PROPERTY);
-		if (Constants.ACTIVE_PROPERTY_DEV_HOME.equalsIgnoreCase(profile)) {
+		if (Constants.ACTIVE_PROPERTY_DEV_HOME.equalsIgnoreCase(profile)||
+			Constants.ACTIVE_PROPERTY_DEV.equalsIgnoreCase(profile)) {
 			return new BigDecimal("0.5").setScale(MONEY_SCALE, RoundingMode.DOWN);
 		}
 		try {

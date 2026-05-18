@@ -60,6 +60,10 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	private static final int MIN_SECONDS_BEFORE_END = 5;
 	private static final int MONEY_SCALE = 6;
 	private static final int SHARE_SCALE = 8;
+	private static final int BIZ_TYPE_CRYPTO = 1;
+	private static final int BIZ_TYPE_SPORTS = 2;
+	private static final int BIZ_TYPE_UP_DOWN = 3;
+	private static final String UP_DOWN_SLUG_MARK = "-updown-5m-";
 	private static final BigDecimal DEFAULT_MIN_ORDER_AFI_AMOUNT = new BigDecimal("10");
 	private static final long WS_SUBSCRIBED_MARKET_DEFAULT_TTL_SECONDS = TimeUnit.DAYS.toSeconds(30);
 	private static final long WS_SUBSCRIBED_MARKET_AFTER_END_TTL_SECONDS = TimeUnit.DAYS.toSeconds(7);
@@ -355,6 +359,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		snapshot.marketWrapperJson = marketWrapper.toJSONString();
 		snapshot.market = market;
 		snapshot.marketSlug = StrUtil.blankToDefault(market.getString("slug"), req.getMarketSlug().trim());
+		snapshot.bizType = req.getBizType();
 		snapshot.marketId = market.getString("id");
 		snapshot.conditionId = market.getString("conditionId");
 		snapshot.marketQuestion = market.getString("question");
@@ -390,6 +395,14 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			throw new ServiceException(ResponseCode.CODE_1294);
 		}
 		if (req.getShareAmount() == null || req.getShareAmount().compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException(ResponseCode.CODE_1294);
+		}
+		if (req.getBizType() == null || (req.getBizType() != BIZ_TYPE_CRYPTO
+			&& req.getBizType() != BIZ_TYPE_SPORTS && req.getBizType() != BIZ_TYPE_UP_DOWN)) {
+			throw new ServiceException(ResponseCode.CODE_1294);
+		}
+		// Up/Down短周期市场的slug有固定标识，避免前端入口传错类型导致后台统计不准。
+		if (req.getMarketSlug().trim().contains(UP_DOWN_SLUG_MARK) && req.getBizType() != BIZ_TYPE_UP_DOWN) {
 			throw new ServiceException(ResponseCode.CODE_1294);
 		}
 	}
@@ -454,6 +467,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			.eventSlug(snapshot.eventSlug)
 			.eventTitle(snapshot.eventTitle)
 			.marketSlug(snapshot.marketSlug)
+			.bizType(snapshot.bizType)
 			.marketId(snapshot.marketId)
 			.conditionId(snapshot.conditionId)
 			.marketQuestion(snapshot.marketQuestion)
@@ -698,6 +712,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		private String marketWrapperJson;
 		private JSONObject market;
 		private String marketSlug;
+		private Integer bizType;
 		private String marketId;
 		private String conditionId;
 		private String marketQuestion;

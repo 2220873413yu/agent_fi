@@ -12,6 +12,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="eventSlug" column="event_slug"/>
         <result property="eventTitle" column="event_title"/>
         <result property="marketSlug" column="market_slug"/>
+        <result property="bizType" column="biz_type"/>
         <result property="marketId" column="market_id"/>
         <result property="conditionId" column="condition_id"/>
         <result property="marketQuestion" column="market_question"/>
@@ -41,7 +42,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectPolymarketOrderVo">
-        select id, order_no, user_id, account, event_slug, event_title, market_slug, market_id, condition_id,
+        select id, order_no, user_id, account, event_slug, event_title, market_slug, biz_type, market_id, condition_id,
                market_question, outcome_index, outcome_name, asset_id, afi_amount, afi_price, afi_usdt_amount, outcome_price,
                share_amount, max_payout_usdt, end_time, status, result_outcome_index, result_outcome_name,
                payout_usdt_amount, payout_afi_price, payout_afi_amount, settle_time, order_snapshot_json, settle_snapshot_json, create_time, update_time,
@@ -57,6 +58,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="userId != null"> and user_id = #{userId}</if>
             <if test="account != null and account != ''"> and account = #{account}</if>
             <if test="marketSlug != null and marketSlug != ''"> and market_slug like concat('%', #{marketSlug}, '%')</if>
+            <if test="bizType != null"> and biz_type = #{bizType}</if>
             <if test="outcomeName != null and outcomeName != ''"> and outcome_name = #{outcomeName}</if>
             <if test="status != null"> and status = #{status}</if>
             <if test="beginCreateTime != null and beginCreateTime != ''"> and create_time &gt;= #{beginCreateTime}</if>

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS `t_polymarket_order` (
   `event_slug` varchar(255) DEFAULT NULL COMMENT 'Polymarket事件slug快照',
   `event_title` varchar(500) DEFAULT NULL COMMENT 'Polymarket事件标题快照',
   `market_slug` varchar(255) NOT NULL COMMENT 'Polymarket市场slug',
+  `biz_type` int NOT NULL DEFAULT 1 COMMENT '业务类型 1加密 2体育 3Up/Down',
   `market_id` varchar(64) DEFAULT NULL COMMENT 'Polymarket市场ID快照',
   `condition_id` varchar(100) DEFAULT NULL COMMENT 'Polymarket conditionId快照',
   `market_question` varchar(500) DEFAULT NULL COMMENT 'Polymarket市场问题快照',
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS `t_polymarket_order` (
   UNIQUE KEY `uk_order_no` (`order_no`) USING BTREE,
   KEY `idx_user_id` (`user_id`) USING BTREE,
   KEY `idx_market_slug` (`market_slug`) USING BTREE,
+  KEY `idx_biz_type` (`biz_type`) USING BTREE,
   KEY `idx_status_end_time` (`status`,`end_time`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci ROW_FORMAT=DYNAMIC COMMENT='Polymarket内部订单表';
 
@@ -96,6 +98,22 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_polymarket_or
 INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
 SELECT 4, '已作废/已退款', '4', 't_polymarket_order_status', '', 'default', 'N', '0', 'admin', sysdate(), ''
 WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_polymarket_order_status' AND dict_value = '4');
+
+INSERT INTO sys_dict_type (dict_name, dict_type, status, create_by, create_time, remark)
+SELECT 'Polymarket订单业务类型', 't_polymarket_order_biz_type', '0', 'admin', sysdate(), 'Polymarket订单业务类型 1加密 2体育 3Up/Down'
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_type WHERE dict_type = 't_polymarket_order_biz_type');
+
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 1, '加密', '1', 't_polymarket_order_biz_type', '', 'primary', 'Y', '0', 'admin', sysdate(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_polymarket_order_biz_type' AND dict_value = '1');
+
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 2, '体育', '2', 't_polymarket_order_biz_type', '', 'success', 'N', '0', 'admin', sysdate(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_polymarket_order_biz_type' AND dict_value = '2');
+
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 3, 'Up/Down', '3', 't_polymarket_order_biz_type', '', 'warning', 'N', '0', 'admin', sysdate(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_polymarket_order_biz_type' AND dict_value = '3');
 
 INSERT INTO sys_dict_type (dict_name, dict_type, status, create_by, create_time, remark)
 SELECT 'Polymarket市场状态', 't_polymarket_market_status', '0', 'admin', sysdate(), 'Polymarket市场聚合结算状态'

@@ -1,6 +1,7 @@
 package com.xms.app.controller;
 
 import com.alibaba.fastjson.JSONObject;
+import com.xms.app.entity.dto.PolymarketEventListDto;
 import com.xms.app.entity.dto.PolymarketOrderConfigDto;
 import com.xms.app.entity.dto.PolymarketOrderDto;
 import com.xms.app.entity.dto.PolymarketOrderQuoteDto;
@@ -49,12 +50,12 @@ public class PolymarketController {
 	 * @param offset 分页偏移量
 	 * @return Polymarket原始事件列表，并带本地调试字段
 	 */
-	@ApiOperation(value = "Polymarket普通板块事件", notes = "按板块代理查询 Polymarket Gamma API 事件列表，返回上游原始事件结构，并补充section、tagId、sourceUrl、fetchedAt等本地调试字段。")
+	@ApiOperation(value = "Polymarket普通板块事件", notes = "按板块代理查询 Polymarket Gamma API 事件列表，默认返回精简DTO：事件基础信息和每个事件前8个市场。完整原始市场字段请使用market slug详情接口。")
 	@Anonymous
 	@GetMapping("/events")
-	public ResultPista<JSONObject> events(@ApiParam(value = "板块名称：crypto加密货币，sports体育", defaultValue = "crypto")
+	public ResultPista<PolymarketEventListDto> events(@ApiParam(value = "板块名称：crypto加密货币，sports体育", defaultValue = "crypto")
 										  @RequestParam(defaultValue = "crypto") String section,
-										  @ApiParam(value = "每页数量，后端会限制最大值", defaultValue = "20")
+										  @ApiParam(value = "每页事件数量，后端会限制最大值", defaultValue = "20")
 										  @RequestParam(defaultValue = "20") Integer limit,
 										  @ApiParam(value = "分页偏移量，从0开始", defaultValue = "0")
 										  @RequestParam(defaultValue = "0") Integer offset) {
@@ -68,10 +69,10 @@ public class PolymarketController {
 	 * @param offset 分页偏移量
 	 * @return 加密货币板块事件列表
 	 */
-	@ApiOperation(value = "Polymarket加密货币事件", notes = "固定查询 crypto 板块，返回 Polymarket 上游原始事件结构和本地调试字段。")
+	@ApiOperation(value = "Polymarket加密货币事件", notes = "固定查询 crypto 板块，返回精简事件DTO和每个事件前8个市场。完整原始市场字段请使用market slug详情接口。")
 	@Anonymous
 	@GetMapping("/crypto/events")
-	public ResultPista<JSONObject> cryptoEvents(@ApiParam(value = "每页数量，后端会限制最大值", defaultValue = "20")
+	public ResultPista<PolymarketEventListDto> cryptoEvents(@ApiParam(value = "每页事件数量，后端会限制最大值", defaultValue = "20")
 												@RequestParam(defaultValue = "20") Integer limit,
 												@ApiParam(value = "分页偏移量，从0开始", defaultValue = "0")
 												@RequestParam(defaultValue = "0") Integer offset) {
@@ -107,10 +108,10 @@ public class PolymarketController {
 	 * @param offset 分页偏移量
 	 * @return 体育板块事件列表
 	 */
-	@ApiOperation(value = "Polymarket体育事件", notes = "固定查询 sports 板块，返回 Polymarket 上游原始事件结构和本地调试字段。")
+	@ApiOperation(value = "Polymarket体育事件", notes = "固定查询 sports 板块，返回精简事件DTO和每个事件前8个市场。完整原始市场字段请使用market slug详情接口。")
 	@Anonymous
 	@GetMapping("/sports/events")
-	public ResultPista<JSONObject> sportsEvents(@ApiParam(value = "每页数量，后端会限制最大值", defaultValue = "20")
+	public ResultPista<PolymarketEventListDto> sportsEvents(@ApiParam(value = "每页事件数量，后端会限制最大值", defaultValue = "20")
 												@RequestParam(defaultValue = "20") Integer limit,
 												@ApiParam(value = "分页偏移量，从0开始", defaultValue = "0")
 												@RequestParam(defaultValue = "0") Integer offset) {
@@ -157,9 +158,9 @@ public class PolymarketController {
 	 * @param req 报价参数：marketSlug、outcomeIndex、shareAmount
 	 * @return 报价快照，金额单位包括AFI和USDT
 	 */
-	@ApiOperation(value = "Polymarket内部订单报价", notes = "请求体字段为marketSlug、outcomeIndex、shareAmount。后端实时读取AFI价格和Polymarket outcome价格，按购买份额反算预计扣减AFI，不扣钱包、不写订单。")
+	@ApiOperation(value = "Polymarket内部订单报价", notes = "请求体字段为marketSlug、outcomeIndex、shareAmount、bizType。bizType为1加密、2体育、3Up/Down；后端实时读取AFI价格和Polymarket outcome价格，按购买份额反算预计扣减AFI，不扣钱包、不写订单。")
 	@PostMapping("/orders/quote")
-	public ResultPista<PolymarketOrderQuoteDto> quote(@ApiParam(value = "报价请求体：marketSlug市场slug，outcomeIndex选择结果下标，shareAmount购买份额", required = true)
+	public ResultPista<PolymarketOrderQuoteDto> quote(@ApiParam(value = "报价请求体：marketSlug市场slug，outcomeIndex选择结果下标，shareAmount购买份额，bizType业务类型1加密2体育3Up/Down", required = true)
 													  @Valid @RequestBody PolymarketOrderReq req) {
 		return ResultPista.data(polymarketOrderAppService.quote(req));
 	}
@@ -169,13 +170,13 @@ public class PolymarketController {
 	 *
 	 * <p>创建时会重新拉取实时价格，不信任前端报价；成功后扣减用户AFI钱包validNum2并保存订单快照。</p>
 	 *
-	 * @param req 下单参数：marketSlug、outcomeIndex、shareAmount
+	 * @param req 下单参数：marketSlug、outcomeIndex、shareAmount、bizType
 	 * @return 已创建的内部订单快照
 	 */
-	@ApiOperation(value = "创建Polymarket内部订单", notes = "请求体字段为marketSlug、outcomeIndex、shareAmount。创建时重新拉实时价格，按购买份额折算AFI并扣减用户validNum2，生成平台内部订单。")
+	@ApiOperation(value = "创建Polymarket内部订单", notes = "请求体字段为marketSlug、outcomeIndex、shareAmount、bizType。bizType为1加密、2体育、3Up/Down；创建时重新拉实时价格，按购买份额折算AFI并扣减用户validNum2，生成平台内部订单。")
 	@PostMapping("/orders/create")
 	@RepeatSubmit
-	public ResultPista<PolymarketOrderDto> createOrder(@ApiParam(value = "下单请求体：marketSlug市场slug，outcomeIndex选择结果下标，shareAmount购买份额", required = true)
+	public ResultPista<PolymarketOrderDto> createOrder(@ApiParam(value = "下单请求体：marketSlug市场slug，outcomeIndex选择结果下标，shareAmount购买份额，bizType业务类型1加密2体育3Up/Down", required = true)
 													   @Valid @RequestBody PolymarketOrderReq req) {
 		return polymarketOrderAppService.create(req, SecurityUtils.getLoginAppUser().getUserId());
 	}

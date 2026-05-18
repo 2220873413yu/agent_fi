@@ -10,6 +10,16 @@
       <el-form-item label="市场slug" prop="marketSlug">
         <el-input v-model="queryParams.marketSlug" placeholder="请输入市场slug" clearable @keyup.enter.native="handleQuery" />
       </el-form-item>
+      <el-form-item label="业务类型" prop="bizType">
+        <el-select v-model="queryParams.bizType" placeholder="请选择业务类型" clearable>
+          <el-option
+            v-for="dict in dict.type.t_polymarket_order_biz_type"
+            :key="dict.value"
+            :label="dict.label"
+            :value="parseInt(dict.value)"
+          />
+        </el-select>
+      </el-form-item>
       <el-form-item label="状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
           <el-option
@@ -55,6 +65,11 @@
       <el-table-column label="用户ID" align="center" prop="userId" width="90" />
       <el-table-column label="钱包地址" align="center" prop="account" width="180" show-overflow-tooltip />
       <el-table-column label="市场" align="left" prop="marketQuestion" min-width="260" show-overflow-tooltip />
+      <el-table-column label="业务类型" align="center" prop="bizType" width="100">
+        <template slot-scope="scope">
+          <dict-tag :options="dict.type.t_polymarket_order_biz_type" :value="scope.row.bizType" />
+        </template>
+      </el-table-column>
       <el-table-column label="选择" align="center" prop="outcomeName" width="90" />
       <el-table-column label="下单AFI" align="center" prop="afiAmount" width="110" />
       <el-table-column label="AFI价格" align="center" prop="afiPrice" width="100" />
@@ -163,7 +178,7 @@ import { listPolymarketOrder, getPolymarketOrder, updatePolymarketOrder, settleP
 
 export default {
   name: 'PolymarketOrder',
-  dicts: ['t_polymarket_order_status'],
+  dicts: ['t_polymarket_order_status', 't_polymarket_order_biz_type'],
   data() {
     return {
       loading: true,
@@ -178,6 +193,7 @@ export default {
         orderNo: null,
         userId: null,
         marketSlug: null,
+        bizType: null,
         status: null
       },
       form: {}

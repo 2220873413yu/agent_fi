@@ -1,6 +1,7 @@
 package com.xms.app.service;
 
 import com.alibaba.fastjson.JSONObject;
+import com.xms.app.entity.dto.PolymarketEventListDto;
 
 /**
  * Polymarket公开行情代理服务。
@@ -15,9 +16,9 @@ public interface PolymarketService {
 	 * @param section 板块名称，目前支持crypto和sports
 	 * @param limit 每页数量，服务层会做上限保护
 	 * @param offset 分页偏移量
-	 * @return 原始事件列表，并带本地调试字段
+	 * @return 精简事件列表，每个事件默认最多返回8个市场
 	 */
-	JSONObject listEvents(String section, Integer limit, Integer offset);
+	PolymarketEventListDto listEvents(String section, Integer limit, Integer offset);
 
 	/**
 	 * 查询加密货币5分钟Up/Down短周期事件。

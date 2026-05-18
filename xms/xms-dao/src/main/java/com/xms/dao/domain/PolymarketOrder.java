@@ -64,33 +64,38 @@ public class PolymarketOrder extends BaseEntity {
 	@ApiModelProperty(value = "Polymarket市场slug")
 	private String marketSlug;
 
+	/** 业务类型：1加密，2体育，3Up/Down。 */
+	@Excel(name = "业务类型", sort = 7, dictType = "t_polymarket_order_biz_type")
+	@ApiModelProperty(value = "业务类型 1加密 2体育 3Up/Down")
+	private Integer bizType;
+
 	/** Polymarket市场ID快照。 */
-	@Excel(name = "市场ID", sort = 7)
+	@Excel(name = "市场ID", sort = 8)
 	@ApiModelProperty(value = "Polymarket市场ID")
 	private String marketId;
 
 	/** Polymarket conditionId快照。 */
-	@Excel(name = "条件ID", sort = 8, width = 50)
+	@Excel(name = "条件ID", sort = 9, width = 50)
 	@ApiModelProperty(value = "Polymarket conditionId")
 	private String conditionId;
 
 	/** Polymarket市场问题快照。 */
-	@Excel(name = "市场问题", sort = 9, width = 50)
+	@Excel(name = "市场问题", sort = 10, width = 50)
 	@ApiModelProperty(value = "Polymarket市场问题")
 	private String marketQuestion;
 
 	/** 用户选择结果在Polymarket outcomes数组中的下标。 */
-	@Excel(name = "结果下标", sort = 10)
+	@Excel(name = "结果下标", sort = 11)
 	@ApiModelProperty(value = "选择结果下标")
 	private Integer outcomeIndex;
 
 	/** 用户选择结果名称，例如Yes、No、Up、Down。 */
-	@Excel(name = "选择结果", sort = 11)
+	@Excel(name = "选择结果", sort = 12)
 	@ApiModelProperty(value = "选择结果")
 	private String outcomeName;
 
 	/** 用户选择结果对应的Polymarket asset_id/token_id快照。 */
-	@Excel(name = "资产ID", sort = 12, width = 50)
+	@Excel(name = "资产ID", sort = 13, width = 50)
 	@ApiModelProperty(value = "用户选择结果对应的Polymarket asset_id/token_id快照")
 	private String assetId;
 

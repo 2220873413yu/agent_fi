@@ -14,6 +14,56 @@ SET dict_label = 'Polymarket猜中兑付AFI',
 WHERE dict_type = 't_user_money_log_source_type'
   AND dict_value = '41';
 
+-- 字典：Polymarket订单业务类型，前端下单时显式传入并落库。
+INSERT INTO sys_dict_type (dict_name, dict_type, status, create_by, create_time, remark)
+SELECT 'Polymarket订单业务类型', 't_polymarket_order_biz_type', '0', 'admin', sysdate(), 'Polymarket订单业务类型 1加密 2体育 3Up/Down'
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_type WHERE dict_type = 't_polymarket_order_biz_type');
+
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 1, '加密', '1', 't_polymarket_order_biz_type', '', 'primary', 'Y', '0', 'admin', sysdate(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_polymarket_order_biz_type' AND dict_value = '1');
+
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 2, '体育', '2', 't_polymarket_order_biz_type', '', 'success', 'N', '0', 'admin', sysdate(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_polymarket_order_biz_type' AND dict_value = '2');
+
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 3, 'Up/Down', '3', 't_polymarket_order_biz_type', '', 'warning', 'N', '0', 'admin', sysdate(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_polymarket_order_biz_type' AND dict_value = '3');
+
+-- 订单表：业务类型，1加密、2体育、3Up/Down；历史订单默认加密。
+SET @column_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = @schema_name
+    AND table_name = 't_polymarket_order'
+    AND column_name = 'biz_type'
+);
+SET @sql := IF(
+  @column_exists = 0,
+  'ALTER TABLE t_polymarket_order ADD COLUMN biz_type int NOT NULL DEFAULT 1 COMMENT ''业务类型 1加密 2体育 3Up/Down'' AFTER market_slug',
+  'SELECT ''t_polymarket_order.biz_type already exists'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @index_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.statistics
+  WHERE table_schema = @schema_name
+    AND table_name = 't_polymarket_order'
+    AND index_name = 'idx_biz_type'
+);
+SET @sql := IF(
+  @index_exists = 0,
+  'ALTER TABLE t_polymarket_order ADD KEY idx_biz_type (biz_type)',
+  'SELECT ''t_polymarket_order.idx_biz_type already exists'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- 订单表：保存用户选择结果对应的asset_id/token_id，后续可用于按WebSocket结果定位用户选择。
 SET @column_exists := (
   SELECT COUNT(1)

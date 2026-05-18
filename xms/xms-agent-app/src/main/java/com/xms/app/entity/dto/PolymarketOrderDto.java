@@ -19,9 +19,9 @@ import java.util.Date;
 @ApiModel(value = "PolymarketOrderDto", description = "Polymarket内部订单返回对象，继承订单快照字段")
 public class PolymarketOrderDto{
 
-	/**
-	 * 1:加密市场,2:体育
-	 */
+	/** 业务类型：1加密，2体育，3Up/Down。 */
+	@Excel(name = "业务类型", sort = 7, dictType = "t_polymarket_order_biz_type")
+	@ApiModelProperty(value = "业务类型 1加密 2体育 3Up/Down")
 	private Integer bizType;
 
 	/** 主键ID。 */

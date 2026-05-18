@@ -626,10 +626,6 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	private PolymarketOrderDto toDto(PolymarketOrder order, boolean includeSnapshots) {
 		PolymarketOrderDto dto = new PolymarketOrderDto();
 		BeanUtils.copyProperties(order, dto);
-		if (!includeSnapshots) {
-			dto.setOrderSnapshotJson(null);
-			dto.setSettleSnapshotJson(null);
-		}
 		return dto;
 	}
 

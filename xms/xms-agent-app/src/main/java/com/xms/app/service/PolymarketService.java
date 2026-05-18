@@ -2,6 +2,7 @@ package com.xms.app.service;
 
 import com.alibaba.fastjson.JSONObject;
 import com.xms.app.entity.dto.PolymarketEventListDto;
+import com.xms.app.entity.dto.PolymarketMarketDetailDto;
 
 /**
  * Polymarket公开行情代理服务。
@@ -34,10 +35,22 @@ public interface PolymarketService {
 	JSONObject listCryptoUpDownEvents(String coins, Integer before, Integer after);
 
 	/**
-	 * 按公开slug查询一个Polymarket市场详情。
+	 * 按公开slug查询一个Polymarket市场精简详情。
+	 *
+	 * <p>该方法供前端刷新市场详情使用，返回字段已经裁剪并带5秒Redis缓存，不作为下单价格快照。</p>
 	 *
 	 * @param slug Polymarket市场slug
-	 * @return 原始市场详情，并带本地调试字段
+	 * @return 市场详情精简DTO
 	 */
-	JSONObject getMarketBySlug(String slug);
+	PolymarketMarketDetailDto getMarketBySlug(String slug);
+
+	/**
+	 * 按公开slug查询一个Polymarket市场原始详情。
+	 *
+	 * <p>该方法仅供内部报价、下单和结算复核使用，需要保留上游原始字段，如outcomes、outcomePrices、clobTokenIds。</p>
+	 *
+	 * @param slug Polymarket市场slug
+	 * @return 原始市场详情包装对象，并带本地调试字段
+	 */
+	JSONObject getRawMarketBySlug(String slug);
 }

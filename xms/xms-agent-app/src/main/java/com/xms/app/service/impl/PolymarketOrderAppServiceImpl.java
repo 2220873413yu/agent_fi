@@ -286,7 +286,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		// 步骤2：实时读取Polymarket市场详情，并校验市场仍可交易。
 		JSONObject marketWrapper;
 		try {
-			marketWrapper = polymarketService.getMarketBySlug(req.getMarketSlug().trim());
+			marketWrapper = polymarketService.getRawMarketBySlug(req.getMarketSlug().trim());
 		} catch (Exception e) {
 			throw new ServiceException(ResponseCode.CODE_1285);
 		}

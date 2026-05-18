@@ -9,6 +9,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.xms.app.entity.dto.PolymarketEventDto;
 import com.xms.app.entity.dto.PolymarketEventListDto;
 import com.xms.app.entity.dto.PolymarketEventMarketDto;
+import com.xms.app.entity.dto.PolymarketMarketDetailDto;
 import com.xms.app.service.PolymarketService;
 import com.xms.common.config.redis.XmsRedis;
 import com.xms.common.exception.ServiceException;
@@ -29,7 +30,7 @@ import java.util.stream.Collectors;
 /**
  * 读取Polymarket Gamma公开行情数据。
  *
- * <p>普通Crypto/Sports事件列表返回本地精简DTO，并用Redis做10秒短缓存；市场详情和Up/Down调研接口仍保留上游原始结构，方便排查字段变化。</p>
+ * <p>前端列表和详情接口返回本地精简DTO，并用Redis做短缓存；内部报价、下单和结算复核仍可读取上游原始JSON字段。</p>
  */
 @Service
 @Slf4j
@@ -38,6 +39,7 @@ public class PolymarketServiceImpl implements PolymarketService {
 
 	private static final String GAMMA_BASE_URL = "https://gamma-api.polymarket.com";
 	private static final String EVENT_LIST_CACHE_KEY_PREFIX = "polymarket:events:simple:";
+	private static final String MARKET_DETAIL_CACHE_KEY_PREFIX = "polymarket:market:detail:simple:";
 	private static final String SECTION_CRYPTO = "crypto";
 	private static final String SECTION_SPORTS = "sports";
 	private static final int CRYPTO_TAG_ID = 21;
@@ -46,6 +48,7 @@ public class PolymarketServiceImpl implements PolymarketService {
 	private static final int MAX_LIMIT = 100;
 	private static final int SIMPLE_MARKET_LIMIT = 8;
 	private static final long EVENT_LIST_CACHE_SECONDS = 10L;
+	private static final long MARKET_DETAIL_CACHE_SECONDS = 5L;
 	private static final int REQUEST_TIMEOUT_MS = 5000;
 	private static final long UP_DOWN_WINDOW_SECONDS = 300L;
 	private static final int DEFAULT_UP_DOWN_BEFORE = 2;
@@ -89,6 +92,97 @@ public class PolymarketServiceImpl implements PolymarketService {
 	}
 
 	/**
+	 * 查询前端展示用的单个市场精简详情。
+	 *
+	 * <p>Redis缓存只用于减少详情刷新时的Gamma API压力，缓存时间固定5秒；正式报价和下单不读取该缓存。</p>
+	 *
+	 * @param slug Polymarket市场slug
+	 * @return 市场详情精简DTO，不包含完整events原始数组
+	 */
+	@Override
+	public PolymarketMarketDetailDto getMarketBySlug(String slug) {
+		String cleanSlug = normalizeMarketSlug(slug);
+		String sourceUrl = marketSlugUrl(cleanSlug);
+		String cacheKey = MARKET_DETAIL_CACHE_KEY_PREFIX + cleanSlug;
+		try {
+			return xmsRedis.get(cacheKey, () -> loadSimpleMarketDetail(cleanSlug, sourceUrl),
+				MARKET_DETAIL_CACHE_SECONDS, TimeUnit.SECONDS);
+		} catch (Exception e) {
+			log.warn("Polymarket市场详情缓存读取失败，改为实时请求Gamma，cacheKey={}", cacheKey, e);
+			return loadSimpleMarketDetail(cleanSlug, sourceUrl);
+		}
+	}
+
+	/**
+	 * 查询内部业务使用的Polymarket原始市场详情。
+	 *
+	 * <p>报价、下单和结算复核依赖原始字段，例如outcomes、outcomePrices、clobTokenIds、events等，不能使用前端精简DTO替代。</p>
+	 *
+	 * @param slug Polymarket市场slug
+	 * @return 原始市场详情包装对象，并带本地调试字段
+	 */
+	@Override
+	public JSONObject getRawMarketBySlug(String slug) {
+		String cleanSlug = normalizeMarketSlug(slug);
+		String sourceUrl = marketSlugUrl(cleanSlug);
+		Object market = fetchJson(sourceUrl);
+		JSONObject result = baseResponse(null, null, sourceUrl);
+		result.put("slug", cleanSlug);
+		result.put("market", market);
+		return result;
+	}
+
+	/**
+	 * 查询加密货币5分钟Up/Down短周期事件。
+	 *
+	 * <p>Gamma没有提供一个完全等同官网短周期玩法页的聚合接口，所以这里按Polymarket固定slug规则生成
+	 * {@code {coin}-updown-5m-{timestamp}}，逐个拉取已发布的事件。未发布的未来窗口会被跳过，保证页面可用。</p>
+	 *
+	 * @param coins 逗号分隔的币种，支持btc、eth、sol、xrp
+	 * @param before 当前时间窗口之前的5分钟窗口数量
+	 * @param after 当前时间窗口之后的5分钟窗口数量
+	 * @return Up/Down事件集合，包含原始事件、币种、窗口开始/结束Unix秒和来源URL
+	 */
+	@Override
+	public JSONObject listCryptoUpDownEvents(String coins, Integer before, Integer after) {
+		List<String> normalizedCoins = normalizeUpDownCoins(coins);
+		int previousWindows = normalizeWindowCount(before, DEFAULT_UP_DOWN_BEFORE);
+		int futureWindows = normalizeWindowCount(after, DEFAULT_UP_DOWN_AFTER);
+		long currentWindow = floorToFiveMinuteWindow(Instant.now().getEpochSecond());
+		JSONArray events = new JSONArray();
+
+		for (String coin : normalizedCoins) {
+			for (int i = -previousWindows; i <= futureWindows; i++) {
+				// Polymarket短周期市场按5分钟Unix秒拼slug，直接用slug查询更贴近官网入口。
+				long windowStart = currentWindow + i * UP_DOWN_WINDOW_SECONDS;
+				String slug = coin + "-updown-5m-" + windowStart;
+				String sourceUrl = GAMMA_BASE_URL + "/events/slug/" + slug;
+				try {
+					Object event = fetchJson(sourceUrl);
+					if (event instanceof JSONObject) {
+						JSONObject eventObject = (JSONObject) event;
+						eventObject.put("coin", coin.toUpperCase(Locale.ROOT));
+						eventObject.put("windowStartUnix", windowStart);
+						eventObject.put("windowEndUnix", windowStart + UP_DOWN_WINDOW_SECONDS);
+						eventObject.put("sourceUrl", sourceUrl);
+						events.add(eventObject);
+					}
+				} catch (ServiceException ignored) {
+					// 部分未来窗口Polymarket可能尚未发布，跳过即可，不能因为单个slug不存在导致整个模块白屏。
+				}
+			}
+		}
+
+		JSONObject result = baseResponse("crypto-updown", null, GAMMA_BASE_URL + "/events/slug/{coin}-updown-5m-{timestamp}");
+		result.put("coins", normalizedCoins);
+		result.put("before", previousWindows);
+		result.put("after", futureWindows);
+		result.put("count", events.size());
+		result.put("events", events);
+		return result;
+	}
+
+	/**
 	 * 实时读取Gamma事件列表并裁剪成前端列表需要的精简结构。
 	 *
 	 * @param section 本地板块名称，当前支持crypto和sports
@@ -115,6 +209,56 @@ public class PolymarketServiceImpl implements PolymarketService {
 			.offset(offset)
 			.count(events.size())
 			.events(events)
+			.build();
+	}
+
+	/**
+	 * 实时读取单个市场详情并裁剪为前端展示需要的精简结构。
+	 *
+	 * @param slug 查询入参里的市场slug
+	 * @param sourceUrl 本次Gamma请求地址
+	 * @return 市场详情精简DTO
+	 */
+	private PolymarketMarketDetailDto loadSimpleMarketDetail(String slug, String sourceUrl) {
+		Object rawMarket = fetchJson(sourceUrl);
+		if (!(rawMarket instanceof JSONObject)) {
+			throw new ServiceException("Polymarket返回数据格式异常，预期为市场对象");
+		}
+		JSONObject market = (JSONObject) rawMarket;
+		JSONObject event = firstEvent(market);
+		return PolymarketMarketDetailDto.builder()
+			.sourceUrl(sourceUrl)
+			.fetchedAt(LocalDateTime.now().toString())
+			.slug(slug)
+			.eventId(event == null ? null : event.getString("id"))
+			.eventSlug(event == null ? null : event.getString("slug"))
+			.eventTitle(event == null ? null : event.getString("title"))
+			.eventDescription(event == null ? null : event.getString("description"))
+			.eventIcon(event == null ? null : event.getString("icon"))
+			.eventImage(event == null ? null : event.getString("image"))
+			.marketId(market.getString("id"))
+			.question(market.getString("question"))
+			.marketSlug(market.getString("slug"))
+			.description(market.getString("description"))
+			.conditionId(market.getString("conditionId"))
+			.questionId(market.getString("questionID"))
+			.outcomes(toStringList(parseJsonArrayField(market, "outcomes")))
+			.outcomePrices(toStringList(parseJsonArrayField(market, "outcomePrices")))
+			.assetIds(toStringList(parseJsonArrayField(market, "clobTokenIds")))
+			.bestBid(getBigDecimal(market, "bestBid"))
+			.bestAsk(getBigDecimal(market, "bestAsk"))
+			.lastTradePrice(getBigDecimal(market, "lastTradePrice"))
+			.spread(getBigDecimal(market, "spread"))
+			.volume24hr(getBigDecimal(market, "volume24hr"))
+			.volume1wk(getBigDecimal(market, "volume1wk"))
+			.volume1mo(getBigDecimal(market, "volume1mo"))
+			.liquidity(getBigDecimal(market, "liquidity"))
+			.active(market.getBoolean("active"))
+			.closed(market.getBoolean("closed"))
+			.acceptingOrders(market.getBoolean("acceptingOrders"))
+			.umaResolutionStatus(market.getString("umaResolutionStatus"))
+			.endDate(market.getString("endDate"))
+			.orderMinSize(getBigDecimal(market, "orderMinSize"))
 			.build();
 	}
 
@@ -179,10 +323,25 @@ public class PolymarketServiceImpl implements PolymarketService {
 	}
 
 	/**
+	 * 从Polymarket市场详情里取第一个所属事件。
+	 *
+	 * @param market Gamma返回的市场对象
+	 * @return 第一个事件对象；不存在时返回null
+	 */
+	private JSONObject firstEvent(JSONObject market) {
+		JSONArray events = market.getJSONArray("events");
+		if (events == null || events.isEmpty()) {
+			return null;
+		}
+		Object first = events.get(0);
+		return first instanceof JSONObject ? (JSONObject) first : null;
+	}
+
+	/**
 	 * 解析Gamma中以JSON字符串或数组形式返回的字段。
 	 *
 	 * @param object 原始JSON对象
-	 * @param field 字段名，例如outcomes、outcomePrices
+	 * @param field 字段名，例如outcomes、outcomePrices、clobTokenIds
 	 * @return 解析后的数组；字段缺失或格式异常时返回空数组
 	 */
 	private JSONArray parseJsonArrayField(JSONObject object, String field) {
@@ -240,76 +399,6 @@ public class PolymarketServiceImpl implements PolymarketService {
 	}
 
 	/**
-	 * 查询加密货币5分钟Up/Down短周期事件。
-	 *
-	 * <p>Gamma没有提供一个完全等同官网短周期玩法页的聚合接口，所以这里按Polymarket固定slug规则生成
-	 * {@code {coin}-updown-5m-{timestamp}}，逐个拉取已发布的事件。未发布的未来窗口会被跳过，保证页面可用。</p>
-	 *
-	 * @param coins 逗号分隔的币种，支持btc、eth、sol、xrp
-	 * @param before 当前时间窗口之前的5分钟窗口数量
-	 * @param after 当前时间窗口之后的5分钟窗口数量
-	 * @return Up/Down事件集合，包含原始事件、币种、窗口开始/结束Unix秒和来源URL
-	 */
-	@Override
-	public JSONObject listCryptoUpDownEvents(String coins, Integer before, Integer after) {
-		List<String> normalizedCoins = normalizeUpDownCoins(coins);
-		int previousWindows = normalizeWindowCount(before, DEFAULT_UP_DOWN_BEFORE);
-		int futureWindows = normalizeWindowCount(after, DEFAULT_UP_DOWN_AFTER);
-		long currentWindow = floorToFiveMinuteWindow(Instant.now().getEpochSecond());
-		JSONArray events = new JSONArray();
-
-		for (String coin : normalizedCoins) {
-			for (int i = -previousWindows; i <= futureWindows; i++) {
-				// Polymarket短周期市场按5分钟Unix秒拼slug，直接用slug查询更贴近官网入口。
-				long windowStart = currentWindow + i * UP_DOWN_WINDOW_SECONDS;
-				String slug = coin + "-updown-5m-" + windowStart;
-				String sourceUrl = GAMMA_BASE_URL + "/events/slug/" + slug;
-				try {
-					Object event = fetchJson(sourceUrl);
-					if (event instanceof JSONObject) {
-						JSONObject eventObject = (JSONObject) event;
-						eventObject.put("coin", coin.toUpperCase(Locale.ROOT));
-						eventObject.put("windowStartUnix", windowStart);
-						eventObject.put("windowEndUnix", windowStart + UP_DOWN_WINDOW_SECONDS);
-						eventObject.put("sourceUrl", sourceUrl);
-						events.add(eventObject);
-					}
-				} catch (ServiceException ignored) {
-					// 部分未来窗口Polymarket可能尚未发布，跳过即可，不能因为单个slug不存在导致整个模块白屏。
-				}
-			}
-		}
-
-		JSONObject result = baseResponse("crypto-updown", null, GAMMA_BASE_URL + "/events/slug/{coin}-updown-5m-{timestamp}");
-		result.put("coins", normalizedCoins);
-		result.put("before", previousWindows);
-		result.put("after", futureWindows);
-		result.put("count", events.size());
-		result.put("events", events);
-		return result;
-	}
-
-	/**
-	 * 按公开slug查询一个Polymarket市场详情。
-	 *
-	 * @param slug Polymarket市场slug
-	 * @return 原始市场详情，并带本地调试字段
-	 */
-	@Override
-	public JSONObject getMarketBySlug(String slug) {
-		if (StrUtil.isBlank(slug)) {
-			throw new ServiceException("Polymarket市场slug不能为空");
-		}
-		String cleanSlug = slug.trim();
-		String sourceUrl = GAMMA_BASE_URL + "/markets/slug/" + cleanSlug;
-		Object market = fetchJson(sourceUrl);
-		JSONObject result = baseResponse(null, null, sourceUrl);
-		result.put("slug", cleanSlug);
-		result.put("market", market);
-		return result;
-	}
-
-	/**
 	 * 标准化本地支持的Polymarket板块名称。
 	 *
 	 * @param section 前端传入的板块名称
@@ -357,6 +446,29 @@ public class PolymarketServiceImpl implements PolymarketService {
 			return 0;
 		}
 		return offset;
+	}
+
+	/**
+	 * 标准化市场slug并做空值保护。
+	 *
+	 * @param slug 前端或内部调用传入的市场slug
+	 * @return 去除首尾空格后的slug
+	 */
+	private String normalizeMarketSlug(String slug) {
+		if (StrUtil.isBlank(slug)) {
+			throw new ServiceException("Polymarket市场slug不能为空");
+		}
+		return slug.trim();
+	}
+
+	/**
+	 * 拼接Polymarket Gamma市场详情URL。
+	 *
+	 * @param slug 已标准化的市场slug
+	 * @return Gamma市场详情URL
+	 */
+	private String marketSlugUrl(String slug) {
+		return GAMMA_BASE_URL + "/markets/slug/" + slug;
 	}
 
 	/**

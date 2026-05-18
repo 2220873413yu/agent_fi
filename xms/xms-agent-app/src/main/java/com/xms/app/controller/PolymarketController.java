@@ -2,6 +2,7 @@ package com.xms.app.controller;
 
 import com.alibaba.fastjson.JSONObject;
 import com.xms.app.entity.dto.PolymarketEventListDto;
+import com.xms.app.entity.dto.PolymarketMarketDetailDto;
 import com.xms.app.entity.dto.PolymarketOrderConfigDto;
 import com.xms.app.entity.dto.PolymarketOrderDto;
 import com.xms.app.entity.dto.PolymarketOrderQuoteDto;
@@ -62,22 +63,22 @@ public class PolymarketController {
 		return ResultPista.data(polymarketService.listEvents(section, limit, offset));
 	}
 
-	/**
-	 * 查询Polymarket加密货币板块事件。
-	 *
-	 * @param limit 每页数量
-	 * @param offset 分页偏移量
-	 * @return 加密货币板块事件列表
-	 */
-	@ApiOperation(value = "Polymarket加密货币事件", notes = "固定查询 crypto 板块，返回精简事件DTO和每个事件前8个市场。完整原始市场字段请使用market slug详情接口。")
-	@Anonymous
-	@GetMapping("/crypto/events")
-	public ResultPista<PolymarketEventListDto> cryptoEvents(@ApiParam(value = "每页事件数量，后端会限制最大值", defaultValue = "20")
-												@RequestParam(defaultValue = "20") Integer limit,
-												@ApiParam(value = "分页偏移量，从0开始", defaultValue = "0")
-												@RequestParam(defaultValue = "0") Integer offset) {
-		return ResultPista.data(polymarketService.listEvents("crypto", limit, offset));
-	}
+//	/**
+//	 * 查询Polymarket加密货币板块事件。
+//	 *
+//	 * @param limit 每页数量
+//	 * @param offset 分页偏移量
+//	 * @return 加密货币板块事件列表
+//	 */
+//	@ApiOperation(value = "Polymarket加密货币事件", notes = "固定查询 crypto 板块，返回精简事件DTO和每个事件前8个市场。完整原始市场字段请使用market slug详情接口。")
+//	@Anonymous
+//	@GetMapping("/crypto/events")
+//	public ResultPista<PolymarketEventListDto> cryptoEvents(@ApiParam(value = "每页事件数量，后端会限制最大值", defaultValue = "20")
+//												@RequestParam(defaultValue = "20") Integer limit,
+//												@ApiParam(value = "分页偏移量，从0开始", defaultValue = "0")
+//												@RequestParam(defaultValue = "0") Integer offset) {
+//		return ResultPista.data(polymarketService.listEvents("crypto", limit, offset));
+//	}
 
 	/**
 	 * 查询加密货币5分钟Up/Down短周期事件。
@@ -101,22 +102,22 @@ public class PolymarketController {
 		return ResultPista.data(polymarketService.listCryptoUpDownEvents(coins, before, after));
 	}
 
-	/**
-	 * 查询Polymarket体育板块事件。
-	 *
-	 * @param limit 每页数量
-	 * @param offset 分页偏移量
-	 * @return 体育板块事件列表
-	 */
-	@ApiOperation(value = "Polymarket体育事件", notes = "固定查询 sports 板块，返回精简事件DTO和每个事件前8个市场。完整原始市场字段请使用market slug详情接口。")
-	@Anonymous
-	@GetMapping("/sports/events")
-	public ResultPista<PolymarketEventListDto> sportsEvents(@ApiParam(value = "每页事件数量，后端会限制最大值", defaultValue = "20")
-												@RequestParam(defaultValue = "20") Integer limit,
-												@ApiParam(value = "分页偏移量，从0开始", defaultValue = "0")
-												@RequestParam(defaultValue = "0") Integer offset) {
-		return ResultPista.data(polymarketService.listEvents("sports", limit, offset));
-	}
+//	/**
+//	 * 查询Polymarket体育板块事件。
+//	 *
+//	 * @param limit 每页数量
+//	 * @param offset 分页偏移量
+//	 * @return 体育板块事件列表
+//	 */
+//	@ApiOperation(value = "Polymarket体育事件", notes = "固定查询 sports 板块，返回精简事件DTO和每个事件前8个市场。完整原始市场字段请使用market slug详情接口。")
+//	@Anonymous
+//	@GetMapping("/sports/events")
+//	public ResultPista<PolymarketEventListDto> sportsEvents(@ApiParam(value = "每页事件数量，后端会限制最大值", defaultValue = "20")
+//												@RequestParam(defaultValue = "20") Integer limit,
+//												@ApiParam(value = "分页偏移量，从0开始", defaultValue = "0")
+//												@RequestParam(defaultValue = "0") Integer offset) {
+//		return ResultPista.data(polymarketService.listEvents("sports", limit, offset));
+//	}
 
 	/**
 	 * 按market slug查询Polymarket市场详情。
@@ -124,10 +125,10 @@ public class PolymarketController {
 	 * @param slug Polymarket市场slug
 	 * @return 市场原始详情，并带本地调试字段
 	 */
-	@ApiOperation(value = "Polymarket市场详情", notes = "按 Polymarket market slug 查询市场详情，返回上游原始市场结构，并补充sourceUrl、fetchedAt等本地调试字段。")
+	@ApiOperation(value = "Polymarket市场详情", notes = "按 Polymarket market slug 查询市场详情，返回前端展示用精简DTO；完整原始市场字段仅供后端报价、下单和结算内部使用。")
 	@Anonymous
 	@GetMapping("/markets/slug/{slug}")
-	public ResultPista<JSONObject> marketBySlug(@ApiParam(value = "Polymarket市场slug", required = true)
+	public ResultPista<PolymarketMarketDetailDto> marketBySlug(@ApiParam(value = "Polymarket市场slug", required = true)
 												@PathVariable String slug) {
 		return ResultPista.data(polymarketService.getMarketBySlug(slug));
 	}

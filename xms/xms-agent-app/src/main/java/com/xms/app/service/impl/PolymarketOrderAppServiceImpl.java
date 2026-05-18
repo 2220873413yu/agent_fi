@@ -311,16 +311,16 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 * <p>列表接口会隐藏原始JSON快照，避免页面列表返回过大；详情接口才返回快照。</p>
 	 *
 	 * @param lastId 可选游标，只返回ID更小的订单
-	 * @param status 可选订单状态
+	 * @param bizType 可选业务类型，1加密、2体育、3Up/Down
 	 * @param userId 当前App用户ID
 	 * @return 不包含原始JSON快照的订单列表
 	 */
 	@Override
-	public List<PolymarketOrderDto> myOrders(Long lastId, Integer status, Long userId) {
+	public List<PolymarketOrderDto> myOrders(Long lastId, Integer bizType, Long userId) {
 		List<PolymarketOrder> orders = polymarketOrderService.lambdaQuery()
 			.eq(PolymarketOrder::getUserId, userId)
 			.eq(PolymarketOrder::getDeleted, 0)
-			.eq(status != null, PolymarketOrder::getStatus, status)
+			.eq(bizType != null, PolymarketOrder::getBizType, bizType)
 			.lt(lastId != null, PolymarketOrder::getId, lastId)
 			.orderByDesc(PolymarketOrder::getId)
 			.last("limit 20")

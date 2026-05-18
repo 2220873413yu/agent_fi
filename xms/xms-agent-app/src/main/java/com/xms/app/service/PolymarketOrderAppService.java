@@ -44,11 +44,11 @@ public interface PolymarketOrderAppService {
 	 * 查询当前用户的内部订单列表。
 	 *
 	 * @param lastId 可选游标，只返回ID小于该值的记录
-	 * @param status 可选订单状态
+	 * @param bizType 可选业务类型，1加密、2体育、3Up/Down
 	 * @param userId 当前App用户ID
 	 * @return 用户订单列表
 	 */
-	List<PolymarketOrderDto> myOrders(Long lastId, Integer status, Long userId);
+	List<PolymarketOrderDto> myOrders(Long lastId, Integer bizType, Long userId);
 
 	/**
 	 * 查询当前用户的一笔内部订单详情。

@@ -186,16 +186,16 @@ public class PolymarketController {
 	 * 查询当前App用户的Polymarket内部订单列表。
 	 *
 	 * @param lastId 可选游标，只查id更小的记录
-	 * @param status 可选订单状态
+	 * @param bizType 可选业务类型
 	 * @return 当前用户订单列表
 	 */
-	@ApiOperation(value = "我的Polymarket内部订单", notes = "查询当前App登录用户的内部订单列表；lastId用于向下翻页，status为空时查询全部状态。")
+	@ApiOperation(value = "我的Polymarket内部订单", notes = "查询当前App登录用户的内部订单列表；lastId用于向下翻页，bizType为空时查询全部业务类型。")
 	@GetMapping("/orders/my")
 	public ResultPista<List<PolymarketOrderDto>> myOrders(@ApiParam(value = "分页游标，只查询id小于该值的订单")
 														  Long lastId,
-														  @ApiParam(value = "订单状态：0待结算，1已猜中，2未猜中，3待人工复核，4已作废/已退款")
-														  Integer status) {
-		return ResultPista.data(polymarketOrderAppService.myOrders(lastId, status, SecurityUtils.getLoginAppUser().getUserId()));
+														  @ApiParam(value = "业务类型：1加密，2体育，3Up/Down")
+														  Integer bizType) {
+		return ResultPista.data(polymarketOrderAppService.myOrders(lastId, bizType, SecurityUtils.getLoginAppUser().getUserId()));
 	}
 
 	/**

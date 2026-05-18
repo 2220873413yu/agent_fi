@@ -184,6 +184,11 @@ public interface SysConstant {
 	 */
 	String TSK_TYPE_105 = "105";
 
+	/**
+	 * 任务类型200 节点认购AFI每日线性释放
+	 */
+	String TSK_TYPE_200 = "200";
+
 
 	String CALLBACK_SUCCESS = "success";
 	String CALLBACK_FAIL = "fail";

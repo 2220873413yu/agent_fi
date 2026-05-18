@@ -546,8 +546,8 @@
             <input id="tokenInput" type="password" placeholder="粘贴 App token，裸 token 会自动补 App 前缀">
           </div>
           <div class="field">
-            <label for="afiAmountInput">下单 AFI 数量</label>
-            <input id="afiAmountInput" type="number" min="10" step="0.000001" value="10">
+            <label for="shareAmountInput">购买份额</label>
+            <input id="shareAmountInput" type="number" min="0.000001" step="0.000001" value="100">
             <div id="minAfiHint" class="muted">最低下单数量加载中...</div>
           </div>
         </div>
@@ -566,7 +566,7 @@
       <div class="panel side-card">
         <div class="side-title">报价结果</div>
         <div id="quoteBox" class="quote-box">
-          <div class="muted">点击“报价预览”后显示 AFI 价格、成交价格、份额和最大兑付。</div>
+          <div class="muted">点击“报价预览”后显示购买份额、成交价格、等值USDT、预计扣AFI和最大兑付。</div>
         </div>
       </div>
 
@@ -623,7 +623,7 @@
   const volumeMetric = document.getElementById('volumeMetric');
   const statusMetric = document.getElementById('statusMetric');
   const tokenInput = document.getElementById('tokenInput');
-  const afiAmountInput = document.getElementById('afiAmountInput');
+  const shareAmountInput = document.getElementById('shareAmountInput');
   const minAfiHint = document.getElementById('minAfiHint');
   const selectedBox = document.getElementById('selectedBox');
   const quoteBtn = document.getElementById('quoteBtn');
@@ -749,18 +749,14 @@
       const minAfiAmount = Number(config.minAfiAmount);
       if (Number.isFinite(minAfiAmount) && minAfiAmount > 0) {
         state.minAfiAmount = minAfiAmount;
-        afiAmountInput.min = String(minAfiAmount);
-        if (Number(afiAmountInput.value || 0) < minAfiAmount) {
-          afiAmountInput.value = String(minAfiAmount);
-        }
       }
       const minSecondsBeforeEnd = Number(config.minSecondsBeforeEnd);
       if (Number.isFinite(minSecondsBeforeEnd) && minSecondsBeforeEnd >= 0) {
         state.minSecondsBeforeEnd = minSecondsBeforeEnd;
       }
-      minAfiHint.textContent = `最低下单数量：${formatNumber(state.minAfiAmount)} AFI`;
+      minAfiHint.textContent = `按当前价格折算后，最低扣减：${formatNumber(state.minAfiAmount)} AFI`;
     } catch (error) {
-      minAfiHint.textContent = `最低下单数量：${formatNumber(state.minAfiAmount)} AFI（配置读取失败，使用页面兜底）`;
+      minAfiHint.textContent = `按当前价格折算后，最低扣减：${formatNumber(state.minAfiAmount)} AFI（配置读取失败，使用页面兜底）`;
     }
   }
 
@@ -849,7 +845,7 @@
       price
     };
     state.lastQuote = null;
-    quoteBox.innerHTML = '<div class="muted">已选择结果，点击“报价预览”获取当前 AFI 价格和预计份额。</div>';
+    quoteBox.innerHTML = '<div class="muted">已选择结果，点击“报价预览”获取当前成交价格、预计扣AFI和最大兑付。</div>';
     setOrderMessage('');
     updateSelectedBox();
     document.querySelectorAll('.outcome-btn').forEach((button) => {
@@ -1092,17 +1088,14 @@
     if (!state.selected) {
       throw new Error('请先选择一个市场结果。');
     }
-    const afiAmount = Number(afiAmountInput.value);
-    if (!Number.isFinite(afiAmount) || afiAmount <= 0) {
-      throw new Error('请输入大于 0 的 AFI 数量。');
-    }
-    if (afiAmount < state.minAfiAmount) {
-      throw new Error(`最低下单数量为 ${formatNumber(state.minAfiAmount)} AFI。`);
+    const shareAmount = Number(shareAmountInput.value);
+    if (!Number.isFinite(shareAmount) || shareAmount <= 0) {
+      throw new Error('请输入大于 0 的购买份额。');
     }
     return {
       marketSlug: state.selected.marketSlug,
       outcomeIndex: state.selected.outcomeIndex,
-      afiAmount: afiAmountInput.value
+      shareAmount: shareAmountInput.value
     };
   }
 
@@ -1112,10 +1105,11 @@
       const quote = await requestJson('/api/polymarket/orders/quote', authedOptions('POST', orderPayload()));
       state.lastQuote = quote;
       quoteBox.innerHTML = `
-        <div class="kv"><span>AFI价格</span><strong>${formatNumber(quote.afiPrice)} USDT</strong></div>
-        <div class="kv"><span>等值USDT</span><strong>${formatNumber(quote.afiUsdtAmount)} USDT</strong></div>
+        <div class="kv"><span>购买份额</span><strong>${formatNumber(quote.shareAmount, 8)}</strong></div>
         <div class="kv"><span>成交价格</span><strong>${formatNumber(quote.outcomePrice)}</strong></div>
-        <div class="kv"><span>预计份额</span><strong>${formatNumber(quote.shareAmount, 8)}</strong></div>
+        <div class="kv"><span>等值USDT</span><strong>${formatNumber(quote.afiUsdtAmount)} USDT</strong></div>
+        <div class="kv"><span>预计扣AFI</span><strong>${formatNumber(quote.afiAmount)} AFI</strong></div>
+        <div class="kv"><span>AFI价格</span><strong>${formatNumber(quote.afiPrice)} USDT</strong></div>
         <div class="kv"><span>最大兑付</span><strong>${formatNumber(quote.maxPayoutUsdt)} USDT</strong></div>
         <div class="kv"><span>结束时间</span><span>${formatDate(quote.endTime)}</span></div>
       `;

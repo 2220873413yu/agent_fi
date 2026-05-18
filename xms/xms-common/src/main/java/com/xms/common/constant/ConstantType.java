@@ -104,6 +104,8 @@ public class ConstantType {
 		public static final int type_30 = 30;
 		//托管全球分红
 		public static final int type_31 = 31;
+		//节点认购AFI线性释放
+		public static final int type_32 = 32;
 	}
 
 	/**
@@ -187,6 +189,8 @@ public class ConstantType {
 		//Polymarket猜中兑付USDT
 		public static final int type_41 = 41;
 		public static final int type_44 = 44;
+		//节点认购AFI线性释放
+		public static final int type_45 = 45;
 	}
 
 	//状态(0.待审核,1.审核成功,2.审核驳回,3.提现成功,4.打款失败)

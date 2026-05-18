@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.xms.common.annotation.Excel;
 import com.xms.common.core.domain.BaseEntity;
+import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,6 +25,7 @@ import java.util.Date;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@ApiModel(value = "PolymarketOrder", description = "Polymarket平台内部订单快照")
 @TableName(value = "t_polymarket_order")
 public class PolymarketOrder extends BaseEntity {
 	private static final long serialVersionUID = 1L;
@@ -92,9 +94,9 @@ public class PolymarketOrder extends BaseEntity {
 	@ApiModelProperty(value = "用户选择结果对应的Polymarket asset_id/token_id快照")
 	private String assetId;
 
-	/** 下单扣减的AFI数量，对应用户valid_num2。 */
+	/** 后端按购买份额、outcome价格和AFI价格折算出的实际扣减AFI数量，对应用户valid_num2。 */
 	@Excel(name = "下单AFI", sort = 13)
-	@ApiModelProperty(value = "下单AFI数量")
+	@ApiModelProperty(value = "实际扣减AFI数量，由购买份额按实时价格折算得到")
 	private BigDecimal afiAmount;
 
 	/** 下单时AFI/USDT价格快照。 */
@@ -112,9 +114,9 @@ public class PolymarketOrder extends BaseEntity {
 	@ApiModelProperty(value = "Polymarket outcome成交价格")
 	private BigDecimal outcomePrice;
 
-	/** 平台内部持有份额，等于AFI等值USDT除以结果价格。 */
+	/** 用户购买的结果份额，猜中后最大兑付USDT数量等于该份额。 */
 	@Excel(name = "份额", sort = 17)
-	@ApiModelProperty(value = "购买份额")
+	@ApiModelProperty(value = "购买份额，猜中后最大兑付USDT数量等于该份额")
 	private BigDecimal shareAmount;
 
 	/** 用户猜中时最大兑付USDT金额。 */

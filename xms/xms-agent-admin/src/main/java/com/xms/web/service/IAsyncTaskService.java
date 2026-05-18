@@ -63,4 +63,14 @@ public interface IAsyncTaskService {
 	void getIdoOrder();
 
 	void getIdoOrder1();
+
+	/**
+	 * 初始化节点认购AFI线性释放订单。
+	 */
+	void initNodePackageReleaseOrders();
+
+	/**
+	 * 每日释放节点认购AFI到用户AFI钱包。
+	 */
+	void releaseNodePackageAfiDaily();
 }

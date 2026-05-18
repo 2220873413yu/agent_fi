@@ -72,6 +72,11 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	private static final String SQL_RESET_USER_GLOBAL_DIVIDEND_WEIGHT = "UPDATE t_user_info SET global_dividend_weight = 0, global_dividend_umbrella_weight = 0, global_dividend_community_weight = 0, update_time = ?";
 	private static final String SQL_UPDATE_USER_GLOBAL_DIVIDEND_WEIGHT = "UPDATE t_user_info SET global_dividend_weight = ?, global_dividend_umbrella_weight = ?, global_dividend_community_weight = ?, update_time = ? WHERE user_id = ?";
 	private static final String SQL_UPDATE_STAKE_HOSTING_ORDER_PERFORMANCE_SNAPSHOT = "UPDATE t_stake_hosting_order SET performance_coefficient = ?, performance_points = ?, update_time = ? WHERE id = ?";
+	private static final BigDecimal NODE_RELEASE_POOL_AMOUNT = new BigDecimal("10000000");
+	private static final int NODE_RELEASE_TOTAL_DAYS = 365;
+	private static final int NODE_RELEASE_STATUS_PENDING = 0;
+	private static final int NODE_RELEASE_STATUS_RELEASING = 1;
+	private static final int NODE_RELEASE_STATUS_FINISHED = 2;
 	private final AsyncTaskMapper asyncTaskMapper;
 	private final JdbcTemplate jdbcTemplate;
 	private final RenegadeStreamTemplate redisTemplate;
@@ -93,8 +98,232 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	private final IStakeProductService stakeProductService;
 	private final IUserLevelConfigService userLevelConfigService;
 	private final INodePackageOrderService nodePackageOrderService;
+	private final INodePackageReleaseOrderService nodePackageReleaseOrderService;
 	private final IStakeHostingOrderService stakeHostingOrderService;
 	private final IStakeHostingPackageService stakeHostingPackageService;
+
+	/**
+	 * 一次性初始化节点认购AFI线性释放订单。
+	 *
+	 * <p>任务会读取所有已支付成功的节点认购订单，按订单权重瓜分固定的创世释放池，
+	 * 并为每一笔节点订单生成一条365天线性释放订单。方法按来源节点订单ID做幂等，
+	 * 重复执行时已生成释放订单的节点订单会被跳过。</p>
+	 */
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public void initNodePackageReleaseOrders() {
+		List<NodePackageOrder> paidOrders = nodePackageOrderService.lambdaQuery()
+			.eq(NodePackageOrder::getStatus, 1)
+			.list();
+		if (CollectionUtil.isEmpty(paidOrders)) {
+			log.info("节点认购AFI线性释放初始化：没有支付成功的节点订单");
+			return;
+		}
+
+		// 步骤1：只使用订单快照里的权重系数；权重为空或小于等于0的订单不参与本次释放池分配。
+		List<NodePackageOrder> weightedOrders = paidOrders.stream()
+			.filter(order -> nvl(order.getWeightMultiplier()).compareTo(BigDecimal.ZERO) > 0)
+			.collect(Collectors.toList());
+		if (CollectionUtil.isEmpty(weightedOrders)) {
+			log.warn("节点认购AFI线性释放初始化：支付成功订单均缺少有效权重");
+			return;
+		}
+
+		// 步骤2：总权重按所有已支付成功订单计算，确保每份权重的分配金额口径固定。
+		BigDecimal totalWeight = weightedOrders.stream()
+			.map(NodePackageOrder::getWeightMultiplier)
+			.reduce(BigDecimal.ZERO, BigDecimal::add)
+			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		if (totalWeight.compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException("节点认购AFI线性释放初始化失败：总权重为0");
+		}
+		BigDecimal amountPerWeight = NODE_RELEASE_POOL_AMOUNT.divide(totalWeight, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+
+		List<Long> nodeOrderIds = weightedOrders.stream()
+			.map(NodePackageOrder::getId)
+			.filter(Objects::nonNull)
+			.collect(Collectors.toList());
+		Set<Long> existingNodeOrderIds = CollectionUtil.isEmpty(nodeOrderIds) ? new HashSet<>() :
+			nodePackageReleaseOrderService.lambdaQuery()
+				.in(NodePackageReleaseOrder::getNodeOrderId, nodeOrderIds)
+				.eq(NodePackageReleaseOrder::getDeleted, 0)
+				.list()
+				.stream()
+				.map(NodePackageReleaseOrder::getNodeOrderId)
+				.collect(Collectors.toSet());
+
+		// 步骤3：为未初始化过的节点订单生成释放订单，释放总额=订单权重*每权重AFI，每日释放=释放总额/365。
+		Date now = new Date();
+		String initBatchNo = IDUtils.getSnowflakeStr();
+		List<NodePackageReleaseOrder> insertList = new ArrayList<>();
+		for (NodePackageOrder order : weightedOrders) {
+			if (order.getId() == null || existingNodeOrderIds.contains(order.getId())) {
+				continue;
+			}
+			BigDecimal totalReleaseAmount = order.getWeightMultiplier()
+				.multiply(amountPerWeight)
+				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			BigDecimal dailyReleaseAmount = totalReleaseAmount.divide(new BigDecimal(NODE_RELEASE_TOTAL_DAYS), ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			NodePackageReleaseOrder releaseOrder = NodePackageReleaseOrder.builder()
+				.releaseNo(IDUtils.getSnowflakeStr())
+				.nodeOrderId(order.getId())
+				.nodeOrderNo(order.getOrderNo())
+				.userId(order.getUserId())
+				.address(order.getAddress())
+				.packageLevel(order.getPackageLevel())
+				.orderValueUsdt(nvl(order.getOrderValueUsdt()).setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew))
+				.weightMultiplier(order.getWeightMultiplier().setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew))
+				.totalWeight(totalWeight)
+				.amountPerWeight(amountPerWeight)
+				.totalReleaseAmount(totalReleaseAmount)
+				.dailyReleaseAmount(dailyReleaseAmount)
+				.releasedAmount(BigDecimal.ZERO.setScale(ConstantStatic.newScale))
+				.remainingAmount(totalReleaseAmount)
+				.totalDays(NODE_RELEASE_TOTAL_DAYS)
+				.runDays(0)
+				.status(NODE_RELEASE_STATUS_PENDING)
+				.initBatchNo(initBatchNo)
+				.deleted(0)
+				.build();
+			releaseOrder.setCreateTime(now);
+			releaseOrder.setUpdateTime(now);
+			releaseOrder.setRemark("节点认购AFI线性释放初始化");
+			insertList.add(releaseOrder);
+		}
+
+		if (CollectionUtil.isEmpty(insertList)) {
+			log.info("节点认购AFI线性释放初始化：本次无新增释放订单，totalWeight={}", totalWeight);
+			return;
+		}
+		nodePackageReleaseOrderService.saveBatch(insertList);
+		log.info("节点认购AFI线性释放初始化完成：batchNo={}, totalWeight={}, amountPerWeight={}, inserted={}",
+			initBatchNo, totalWeight, amountPerWeight, insertList.size());
+	}
+
+	/**
+	 * 每日释放节点认购AFI到用户AFI钱包。
+	 *
+	 * <p>任务每天只允许执行一次。每条释放订单按每日释放金额入账，最后一天直接释放剩余金额，
+	 * 避免因为小数截断导致释放365天后仍残留尾差。钱包增加AFI的同时写奖励记录，方便后续核账。</p>
+	 */
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public void releaseNodePackageAfiDaily() {
+		int currentDate = Integer.parseInt(DateUtil.format(DateUtil.date(), "yyyyMMdd"));
+		Map<String, Object> task = getTask(SysConstant.TSK_TYPE_200, currentDate + "");
+		if (task != null) {
+			log.info("节点认购AFI线性释放：{} 已执行过，跳过", currentDate);
+			return;
+		}
+
+		List<NodePackageReleaseOrder> releaseOrders = nodePackageReleaseOrderService.lambdaQuery()
+			.in(NodePackageReleaseOrder::getStatus, NODE_RELEASE_STATUS_PENDING, NODE_RELEASE_STATUS_RELEASING)
+			.eq(NodePackageReleaseOrder::getDeleted, 0)
+			.gt(NodePackageReleaseOrder::getRemainingAmount, BigDecimal.ZERO)
+			.lt(NodePackageReleaseOrder::getRunDays, NODE_RELEASE_TOTAL_DAYS)
+			.list();
+		if (CollectionUtil.isEmpty(releaseOrders)) {
+			//todo 本地环境注释
+			//addTask(SysConstant.TSK_TYPE_200, currentDate + "");
+			log.info("节点认购AFI线性释放：{} 无待释放订单", currentDate);
+			return;
+		}
+
+		// 步骤1：逐单计算本日释放金额；同一释放订单同一天如果已经释放过，则直接跳过。
+		Date now = new Date();
+		List<UserMoney> userMoneyList = new ArrayList<>();
+		List<RewardRecord> rewardRecordList = new ArrayList<>();
+		List<NodePackageReleaseOrder> updateOrders = new ArrayList<>();
+		int releasedCount = 0;
+		for (NodePackageReleaseOrder releaseOrder : releaseOrders) {
+
+			BigDecimal remainingAmount = nvl(releaseOrder.getRemainingAmount());
+			if (remainingAmount.compareTo(BigDecimal.ZERO) <= 0) {
+				continue;
+			}
+			int nextRunDays = (releaseOrder.getRunDays() == null ? 0 : releaseOrder.getRunDays()) + 1;
+			BigDecimal releaseAmount = nextRunDays >= NODE_RELEASE_TOTAL_DAYS
+				? remainingAmount
+				: nvl(releaseOrder.getDailyReleaseAmount()).min(remainingAmount);
+			releaseAmount = releaseAmount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			if (releaseAmount.compareTo(BigDecimal.ZERO) <= 0) {
+				continue;
+			}
+
+			// 步骤2：更新释放进度，并准备AFI钱包入账和奖励记录。
+			BigDecimal releasedAmount = nvl(releaseOrder.getReleasedAmount()).add(releaseAmount).setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			BigDecimal newRemainingAmount = remainingAmount.subtract(releaseAmount).max(BigDecimal.ZERO).setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+			releaseOrder.setReleasedAmount(releasedAmount);
+			releaseOrder.setRemainingAmount(newRemainingAmount);
+			releaseOrder.setRunDays(nextRunDays);
+			releaseOrder.setLastReleaseDay(currentDate);
+			releaseOrder.setStatus(newRemainingAmount.compareTo(BigDecimal.ZERO) <= 0 || nextRunDays >= NODE_RELEASE_TOTAL_DAYS
+				? NODE_RELEASE_STATUS_FINISHED
+				: NODE_RELEASE_STATUS_RELEASING);
+			releaseOrder.setUpdateTime(now);
+			updateOrders.add(releaseOrder);
+
+			String gtId = IDUtils.getSnowflakeStr();
+			UserMoney userMoney = new UserMoney();
+			userMoney.setId(releaseOrder.getUserId());
+			userMoney.setValidNum2(releaseAmount);
+			userMoney.setGtId(gtId);
+			userMoney.setSourceCode(releaseOrder.getReleaseNo());
+			userMoney.setSourceType(ConstantType.user_money_log_source_type.type_45);
+			userMoney.setSourceId(releaseOrder.getUserId());
+			userMoney.setUpdateTime(now);
+			userMoneyList.add(userMoney);
+
+			RewardRecord rewardRecord = new RewardRecord();
+			rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
+			rewardRecord.setUserId(releaseOrder.getUserId());
+			rewardRecord.setAmount(releaseAmount);
+			rewardRecord.setCoinType(ConstantType.user_money_coin_type.type_2);
+			rewardRecord.setSourceType(ConstantType.xms_reward_record_source_type.type_32);
+			rewardRecord.setSourceOrderCode(releaseOrder.getReleaseNo());
+			rewardRecord.setSourceUserId(releaseOrder.getUserId());
+			rewardRecord.setGtId(gtId);
+			rewardRecord.setCreateTime(now);
+			rewardRecordList.add(rewardRecord);
+			releasedCount++;
+
+			if (userMoneyList.size() >= 1000) {
+				flushNodePackageReleaseDaily(userMoneyList, rewardRecordList, updateOrders);
+			}
+		}
+
+		// 步骤3：批量写钱包、奖励记录和释放进度；最后登记当天任务，防止重复跑。
+		flushNodePackageReleaseDaily(userMoneyList, rewardRecordList, updateOrders);
+		//todo 本地环境注释
+		/*int i = addTask(SysConstant.TSK_TYPE_200, currentDate + "");
+		if (i <= 0) {
+			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+			throw new ServiceException("节点认购AFI线性释放任务登记失败");
+		}*/
+		log.info("节点认购AFI线性释放完成：date={}, releasedCount={}", currentDate, releasedCount);
+	}
+
+	/**
+	 * 批量落库节点认购AFI每日释放产生的钱包、奖励记录和释放订单进度。
+	 *
+	 * <p>三类数据必须在同一事务中一起写入，任何一步失败都会回滚，避免出现钱包已加但释放订单进度未更新的情况。</p>
+	 */
+	private void flushNodePackageReleaseDaily(List<UserMoney> userMoneyList,
+											  List<RewardRecord> rewardRecordList,
+											  List<NodePackageReleaseOrder> updateOrders) {
+		if (CollectionUtil.isNotEmpty(userMoneyList)) {
+			bachUpdateMoneyValid2(userMoneyList);
+			userMoneyList.clear();
+		}
+		if (CollectionUtil.isNotEmpty(rewardRecordList)) {
+			rewardRecordService.saveBatch(rewardRecordList);
+			rewardRecordList.clear();
+		}
+		if (CollectionUtil.isNotEmpty(updateOrders)) {
+			nodePackageReleaseOrderService.updateBatchById(updateOrders);
+			updateOrders.clear();
+		}
+	}
 	/**
 	 * 批量更新订单可领取金额
 	 *

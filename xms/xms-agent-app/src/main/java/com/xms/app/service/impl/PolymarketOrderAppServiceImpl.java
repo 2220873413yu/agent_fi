@@ -16,6 +16,7 @@ import com.xms.common.constant.ConstantType;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.exception.ServiceException;
 import com.xms.common.result.ResponseCode;
+import com.xms.common.thread.ExecutorRegionKit;
 import com.xms.common.utils.uuid.IDUtils;
 import com.xms.dao.domain.PolymarketMarket;
 import com.xms.dao.domain.PolymarketOrder;
@@ -90,7 +91,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 *
 	 * <p>只读取当前AFI价格和Polymarket结果价格，不扣钱包、不写订单。正式下单时仍会重新拉取实时价格。</p>
 	 *
-	 * @param req 报价请求，afiAmount表示用户计划支付的AFI数量
+	 * @param req 报价请求，shareAmount表示用户计划购买的Yes/No结果份额数量
 	 * @return 基于当前结果价格计算出的报价快照
 	 */
 	@Override
@@ -138,7 +139,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 *
 	 * <p>即使前端已经请求过报价，这里也会重新拉取AFI价格和Polymarket价格，防止前端提交过期价格或篡改价格。</p>
 	 *
-	 * @param req 下单请求，afiAmount会从用户AFI钱包validNum2扣减
+	 * @param req 下单请求，shareAmount表示购买份额；后端按实时价格折算并从AFI钱包validNum2扣减
 	 * @param userId 当前App用户ID
 	 * @return 已创建的内部订单快照
 	 */
@@ -156,7 +157,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			throw new ServiceException(ResponseCode.CODE_1001);
 		}
 		UserMoney userMoney = userMoneyService.lambdaQuery().eq(UserMoney::getId, userId).one();
-		if (userMoney == null || userMoney.getValidNum2() == null || userMoney.getValidNum2().compareTo(snapshot.afiAmount) < 0) {
+		if (userMoney.getValidNum2().compareTo(snapshot.afiAmount) < 0) {
 			throw new ServiceException(ResponseCode.CODE_1015);
 		}
 
@@ -248,7 +249,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	/**
 	 * 构建下单或报价使用的价格快照。
 	 *
-	 * <p>该方法会实时读取Polymarket市场、校验是否可下单、读取AFI价格，并计算AFI等值USDT、购买份额和最大兑付。</p>
+	 * <p>该方法会实时读取Polymarket市场、校验是否可下单、读取AFI价格，并按用户输入的购买份额反算USDT成本和应扣AFI数量。</p>
 	 *
 	 * @param req 报价或下单请求
 	 * @return 报价和创建订单共用的不可变业务快照
@@ -284,16 +285,30 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			throw new ServiceException("Polymarket outcome price is empty or zero");
 		}
 
-		// 步骤4：读取当前AFI价格，按AFI金额折算USDT，再按结果价格计算持有份额。
-		BigDecimal afiAmount = req.getAfiAmount().setScale(MONEY_SCALE, RoundingMode.DOWN);
+		// 步骤4：用户输入的是购买份额，先按结果价格计算USDT成本，再用实时AFI价格反算应扣AFI数量。
+		BigDecimal shareAmount = req.getShareAmount().setScale(SHARE_SCALE, RoundingMode.DOWN);
+		if (shareAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException("shareAmount must be greater than zero");
+		}
 		BigDecimal afiPrice = bizCommonService.getAfiPrice().setScale(MONEY_SCALE, RoundingMode.DOWN);
-		BigDecimal afiUsdtAmount = afiAmount.multiply(afiPrice).setScale(MONEY_SCALE, RoundingMode.DOWN);
+		if (afiPrice.compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException("AFI price must be greater than zero");
+		}
+		if (outcomePrice.compareTo(BigDecimal.ONE) > 0) {
+			throw new ServiceException("Polymarket outcome price cannot be greater than 1");
+		}
+		BigDecimal afiUsdtAmount = shareAmount.multiply(outcomePrice).setScale(MONEY_SCALE, RoundingMode.DOWN);
 		if (afiUsdtAmount.compareTo(BigDecimal.ZERO) <= 0) {
 			throw new ServiceException("AFI USDT value must be greater than zero");
 		}
-		BigDecimal shareAmount = afiUsdtAmount.divide(outcomePrice, SHARE_SCALE, RoundingMode.DOWN);
-		if (shareAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("Calculated share amount must be greater than zero");
+		// AFI数量向上保留6位，避免除法舍入导致实际扣款低于购买份额所需USDT成本。
+		BigDecimal afiAmount = afiUsdtAmount.divide(afiPrice, MONEY_SCALE, RoundingMode.UP);
+		if (afiAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException("Calculated AFI amount must be greater than zero");
+		}
+		BigDecimal minAfiAmount = getMinAfiOrderAmount();
+		if (afiAmount.compareTo(minAfiAmount) < 0) {
+			throw new ServiceException("按当前价格折算后，至少需要 " + minAfiAmount.stripTrailingZeros().toPlainString() + " AFI 下单");
 		}
 
 		// 步骤5：组装快照，后续报价直接返回，正式下单会把这些字段落到订单表。
@@ -324,7 +339,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	/**
 	 * 校验报价/下单请求参数。
 	 *
-	 * <p>最低AFI数量使用系统参数，单位是AFI；该校验在外部接口调用前执行。</p>
+	 * <p>这里只校验本地必填和购买份额大于0；最低AFI数量需要先按实时价格折算，在价格快照计算阶段校验。</p>
 	 *
 	 * @param req 报价或下单请求
 	 */
@@ -335,12 +350,8 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		if (req.getOutcomeIndex() == null || req.getOutcomeIndex() < 0) {
 			throw new ServiceException("outcomeIndex must be non-negative");
 		}
-		if (req.getAfiAmount() == null || req.getAfiAmount().compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("afiAmount must be greater than zero");
-		}
-		BigDecimal minAfiAmount = getMinAfiOrderAmount();
-		if (req.getAfiAmount().compareTo(minAfiAmount) < 0) {
-			throw new ServiceException("afiAmount cannot be less than " + minAfiAmount.stripTrailingZeros().toPlainString() + " AFI");
+		if (req.getShareAmount() == null || req.getShareAmount().compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException("shareAmount must be greater than zero");
 		}
 	}
 
@@ -467,17 +478,25 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	private void refreshWebSocketSubscribeAfterCommit() {
 		// 只刷新订阅，不发奖、不修改市场状态；真正结算仍由市场派发和processSettlingMarket兜底复核。
 		// 放在afterCommit是为了保证刷新订阅时，市场表已经能查到本次下单写入的asset_ids_json。
-		Runnable refresher = polymarketWebSocketClient::refreshSubscribeAfterOrderCreated;
-		if (TransactionSynchronizationManager.isSynchronizationActive()) {
-			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-				@Override
-				public void afterCommit() {
-					refresher.run();
-				}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				submitWebSocketRefreshTask();
+			}
+		});
+	}
+
+	/**
+	 * 使用项目统一虚拟线程池异步刷新Polymarket WebSocket订阅。
+	 *
+	 * <p>刷新订阅是轻量级实时性增强动作，不能阻塞下单主流程；失败只记录在WebSocket客户端内部日志中，
+	 * 不影响订单创建结果，也不承担发奖职责。</p>
+	 */
+	private void submitWebSocketRefreshTask() {
+		ExecutorRegionKit.getExecutorRegion().getUserVirtualThreadExecutor(1)
+			.executeTry(() -> {
+				polymarketWebSocketClient.refreshSubscribeAfterOrderCreated();
 			});
-		} else {
-			refresher.run();
-		}
 	}
 
 	/**

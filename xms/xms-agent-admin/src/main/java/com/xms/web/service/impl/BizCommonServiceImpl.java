@@ -9,6 +9,7 @@ import com.esotericsoftware.minlog.Log;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.xms.common.config.redis.XmsRedis;
+import com.xms.common.constant.Constants;
 import com.xms.common.constant.RedisConstant;
 import com.xms.common.exception.ServiceException;
 import com.xms.common.result.ResponseCode;
@@ -16,6 +17,7 @@ import com.xms.web.service.BizCommonService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -25,6 +27,9 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 public class BizCommonServiceImpl implements BizCommonService {
+
+	@Autowired
+	private Environment environment;
 
 	private final Object lock = new Object();
 	/**
@@ -87,6 +92,11 @@ public class BizCommonServiceImpl implements BizCommonService {
 	 */
 	@Override
 	public BigDecimal getOortPrice() {
+		String profile = environment.getProperty(Constants.ACTIVE_PROFILES_PROPERTY);
+		if (Constants.ACTIVE_PROPERTY_DEV_HOME.equalsIgnoreCase(profile)) {
+			//本地环境走这边
+			return new BigDecimal("0.5");
+		}
 		try {
 			BigDecimal oortCoinPrice = xmsRedis.get(RedisConstant.CAPTCHA_OORT_PRICE, () -> {
 				synchronized (lock) {
@@ -164,6 +174,12 @@ public class BizCommonServiceImpl implements BizCommonService {
 	 */
 	@Override
 	public BigDecimal getAfiPrice() {
+		String profile = environment.getProperty(Constants.ACTIVE_PROFILES_PROPERTY);
+		if (Constants.ACTIVE_PROPERTY_DEV.equalsIgnoreCase(profile)) {
+			//本地环境走这边
+			return new BigDecimal("0.5");
+		}
+
 		BigDecimal cachedPrice = afiPriceCache.getIfPresent(AFI_USDT_PAIR);
 		if (cachedPrice != null) {
 			return cachedPrice;

@@ -143,6 +143,27 @@ public class XmsTask {
 	/**
 	 * 任务类型101 每日增加算力(订单天数的n次方)
 	 */
+	/**
+	 * 初始化节点认购AFI线性释放订单。
+	 *
+	 * <p>该任务按已支付成功的节点认购订单一次性生成释放计划，建议由后台手动执行一次，
+	 * 重复执行会按来源节点订单ID跳过已生成的数据。</p>
+	 */
+	public void initNodePackageReleaseOrders() {
+		log.info("初始化节点认购AFI线性释放订单");
+		asyncTaskServiceImpl.initNodePackageReleaseOrders();
+	}
+
+	/**
+	 * 每日释放节点认购AFI。
+	 *
+	 * <p>该任务每天把待释放订单的一天额度释放到用户AFI钱包，并同步写奖励记录和释放进度。</p>
+	 */
+	public void releaseNodePackageAfiDaily() {
+		log.info("每日释放节点认购AFI");
+		asyncTaskServiceImpl.releaseNodePackageAfiDaily();
+	}
+
 //	public void distributePtbInterest101() {
 //		log.info("任任务类型101 每日增加算力(订单天数的n次方)");
 //		asyncTaskServiceImpl.distributePtbInterest101();

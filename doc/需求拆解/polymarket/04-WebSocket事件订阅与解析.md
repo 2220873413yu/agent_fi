@@ -35,6 +35,24 @@ outcome_index    -> clobTokenIds[outcome_index]
   - 市场表 `t_polymarket_market.asset_ids_json` 保存该市场全部结果资产ID数组。
   - 市场表 `t_polymarket_market.outcomes_json` 保存该市场全部结果名称数组。
 
+## 为什么订阅asset_id
+
+Polymarket Market Channel 的订阅对象是结果 token，也就是 `asset_id/token_id`，不是我们内部使用的 `market_slug`。
+
+- 一个市场可以有多个结果，每个结果都有自己的 `asset_id/token_id`。
+- 用户买 Yes、No 或多结果里的某个选项，本质上买的是该结果对应的 token。
+- WebSocket 开奖事件可能返回 `slug`，也可能需要通过 `winning_asset_id` 辅助定位市场。
+- 所以市场表必须保存全量 `asset_ids_json`，订单表必须保存用户本单选择的 `asset_id`。
+
+定位关系：
+
+```text
+订阅阶段：t_polymarket_market.asset_ids_json -> WebSocket assets_ids
+开奖阶段：market_resolved.slug -> t_polymarket_market.market_slug
+兜底定位：market_resolved.winning_asset_id -> t_polymarket_market.asset_ids_json
+订单判断：t_polymarket_order.asset_id / outcome_index -> 用户买的结果
+```
+
 ## 订阅报文
 
 启动时从 `t_polymarket_market` 查询：
@@ -101,6 +119,12 @@ winning_outcome     赢家名称
         ↓
 保留延迟队列 TODO，后续由队列消费者调用 processSettlingMarket
 ```
+
+注意：
+
+- WebSocket 只负责发现“这个市场可能已经开奖”，不直接判断用户输赢。
+- 真正发奖前，`processSettlingMarket(marketSlug)` 仍会重新查询 Gamma API 复核 `umaResolutionStatus` 和最终赢家。
+- 复核通过后，再用 `result_outcome_index` 或赢家 token 对订单进行批量结算。
 
 ## 状态边界
 

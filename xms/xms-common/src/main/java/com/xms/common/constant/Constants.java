@@ -179,6 +179,7 @@ public class Constants {
 	public static final String ACTIVE_PROFILES_PROPERTY = "spring.profiles.active";
 	public static final String ACTIVE_PROPERTY_PROD = "prod";
 	public static final String ACTIVE_PROPERTY_DEV = "dev";
+	public static final String ACTIVE_PROPERTY_DEV_HOME = "dev-home";
 	public static final String ACTIVE_PROPERTY_TEST = "test";
 	public static final String OPRER_NAME = "admin";
 	public static final Integer THIRTY_ONE = 31;

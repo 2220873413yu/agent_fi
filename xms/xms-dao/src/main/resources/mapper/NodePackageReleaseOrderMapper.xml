@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.NodePackageReleaseOrderMapper">
+
+    <resultMap type="NodePackageReleaseOrder" id="NodePackageReleaseOrderResult">
+        <result property="id" column="id"/>
+        <result property="releaseNo" column="release_no"/>
+        <result property="nodeOrderId" column="node_order_id"/>
+        <result property="nodeOrderNo" column="node_order_no"/>
+        <result property="userId" column="user_id"/>
+        <result property="address" column="address"/>
+        <result property="packageLevel" column="package_level"/>
+        <result property="orderValueUsdt" column="order_value_usdt"/>
+        <result property="weightMultiplier" column="weight_multiplier"/>
+        <result property="totalWeight" column="total_weight"/>
+        <result property="amountPerWeight" column="amount_per_weight"/>
+        <result property="totalReleaseAmount" column="total_release_amount"/>
+        <result property="dailyReleaseAmount" column="daily_release_amount"/>
+        <result property="releasedAmount" column="released_amount"/>
+        <result property="remainingAmount" column="remaining_amount"/>
+        <result property="totalDays" column="total_days"/>
+        <result property="runDays" column="run_days"/>
+        <result property="lastReleaseDay" column="last_release_day"/>
+        <result property="status" column="status"/>
+        <result property="initBatchNo" column="init_batch_no"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+        <result property="deleted" column="deleted"/>
+    </resultMap>
+
+    <sql id="selectNodePackageReleaseOrderVo">
+        select id, release_no, node_order_id, node_order_no, user_id, address, package_level,
+               order_value_usdt, weight_multiplier, total_weight, amount_per_weight,
+               total_release_amount, daily_release_amount, released_amount, remaining_amount,
+               total_days, run_days, last_release_day, status, init_batch_no,
+               create_time, update_time, remark, deleted
+        from t_node_package_release_order
+    </sql>
+
+    <select id="selectNodePackageReleaseOrderList" parameterType="NodePackageReleaseOrder" resultMap="NodePackageReleaseOrderResult">
+        <include refid="selectNodePackageReleaseOrderVo"/>
+        <where>
+            deleted = 0
+            <if test="releaseNo != null and releaseNo != ''"> and release_no = #{releaseNo}</if>
+            <if test="nodeOrderNo != null and nodeOrderNo != ''"> and node_order_no = #{nodeOrderNo}</if>
+            <if test="nodeOrderId != null"> and node_order_id = #{nodeOrderId}</if>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="address != null and address != ''"> and address like concat('%', #{address}, '%')</if>
+            <if test="packageLevel != null"> and package_level = #{packageLevel}</if>
+            <if test="status != null"> and status = #{status}</if>
+            <if test="initBatchNo != null and initBatchNo != ''"> and init_batch_no = #{initBatchNo}</if>
+            <if test="lastReleaseDay != null"> and last_release_day = #{lastReleaseDay}</if>
+            <if test="beginCreateTime != null and beginCreateTime != '' and endCreateTime != null and endCreateTime != ''">
+                and create_time between #{beginCreateTime} and #{endCreateTime}
+            </if>
+        </where>
+        order by id desc
+    </select>
+</mapper>

@@ -18,7 +18,7 @@ public interface PolymarketOrderAppService {
 	/**
 	 * 预览内部订单报价。
 	 *
-	 * @param req 报价参数，包含市场slug、选择结果下标和AFI数量
+	 * @param req 报价参数，包含市场slug、选择结果下标和购买份额数量
 	 * @return 报价结果，字段单位包括AFI、USDT和Polymarket结果价格
 	 */
 	PolymarketOrderQuoteDto quote(PolymarketOrderReq req);
@@ -33,7 +33,7 @@ public interface PolymarketOrderAppService {
 	/**
 	 * 创建平台内部Polymarket订单。
 	 *
-	 * @param req 下单参数，包含市场slug、选择结果下标和AFI数量
+	 * @param req 下单参数，包含市场slug、选择结果下标和购买份额数量
 	 * @param userId 当前App用户ID
 	 * @return 已创建的订单快照
 	 */

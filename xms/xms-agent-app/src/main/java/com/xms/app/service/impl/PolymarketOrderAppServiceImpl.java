@@ -1,10 +1,9 @@
 package com.xms.app.service.impl;
 
 import cn.hutool.core.util.StrUtil;
-import com.xms.common.config.redis.delayqueue.RedissonDelayHandler;
-import com.xms.common.config.redis.delayqueue.RedissonDelayOrder;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.xms.app.client.LongLiveClientStart;
 import com.xms.app.entity.dto.PolymarketOrderDto;
 import com.xms.app.entity.dto.PolymarketOrderQuoteDto;
 import com.xms.app.entity.req.PolymarketOrderReq;
@@ -14,8 +13,6 @@ import com.xms.app.service.PolymarketService;
 import com.xms.common.config.redis.lock.RedisLock;
 import com.xms.common.constant.ConstantSys;
 import com.xms.common.constant.ConstantType;
-import com.xms.common.constant.RedisConstant;
-import com.xms.common.constant.SysConstant;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.exception.ServiceException;
 import com.xms.common.result.ResponseCode;
@@ -56,7 +53,6 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	private static final int MIN_SECONDS_BEFORE_END = 5;
 	private static final int MONEY_SCALE = 6;
 	private static final int SHARE_SCALE = 8;
-	private static final int MARKET_SETTLE_DELAY_SECONDS_AFTER_END = 30;
 	private static final BigDecimal DEFAULT_MIN_ORDER_AFI_AMOUNT = new BigDecimal("10");
 
 	private final PolymarketService polymarketService;
@@ -67,7 +63,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	private final UserWalletService userWalletService;
 	private final UserInfoService userInfoService;
 	private final ISysParaService sysParaServiceImpl;
-	private final RedissonDelayHandler redissonDelayHandler;
+	private final LongLiveClientStart polymarketWebSocketClient;
 
 	public PolymarketOrderAppServiceImpl(PolymarketService polymarketService,
 										 BizCommonService bizCommonService,
@@ -77,7 +73,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 										 UserWalletService userWalletService,
 										 UserInfoService userInfoService,
 										 ISysParaService sysParaServiceImpl,
-										 RedissonDelayHandler redissonDelayHandler) {
+										 LongLiveClientStart polymarketWebSocketClient) {
 		this.polymarketService = polymarketService;
 		this.bizCommonService = bizCommonService;
 		this.polymarketOrderService = polymarketOrderService;
@@ -86,7 +82,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		this.userWalletService = userWalletService;
 		this.userInfoService = userInfoService;
 		this.sysParaServiceImpl = sysParaServiceImpl;
-		this.redissonDelayHandler = redissonDelayHandler;
+		this.polymarketWebSocketClient = polymarketWebSocketClient;
 	}
 
 	/**
@@ -105,6 +101,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			.marketQuestion(snapshot.marketQuestion)
 			.outcomeIndex(snapshot.outcomeIndex)
 			.outcomeName(snapshot.outcomeName)
+			.assetId(snapshot.assetId)
 			.afiAmount(snapshot.afiAmount)
 			.afiPrice(snapshot.afiPrice)
 			.afiUsdtAmount(snapshot.afiUsdtAmount)
@@ -149,6 +146,8 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	@Transactional(rollbackFor = Exception.class)
 	@RedisLock(value = "polymarket:order:create", param = "#userId")
 	public ResultPista<PolymarketOrderDto> create(PolymarketOrderReq req, Long userId) {
+		// 下单主流程保持同步强一致：扣AFI、写内部订单、写市场聚合必须在同一个事务里完成。
+		// WebSocket刷新只是实时监听增强，放到事务提交后执行，失败也不影响订单创建和资金扣减结果。
 		// 步骤1：重新生成价格快照，保证下单使用后端实时价格，不使用前端报价结果。
 		MarketPriceSnapshot snapshot = buildMarketPriceSnapshot(req);
 		// 步骤2：读取用户与钱包余额，确认用户存在且AFI可用余额足够。
@@ -180,6 +179,8 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		}
 		// 步骤6：事务提交后投递市场延迟结算消息；数据库市场状态仍由Quartz兜底扫描。
 		sendMarketSettleDelayAfterCommit(snapshot);
+		// 步骤7：事务提交后刷新Polymarket WebSocket订阅，让新市场尽快进入market_resolved监听。
+		refreshWebSocketSubscribeAfterCommit();
 		return ResultPista.data(toDto(order, false));
 	}
 
@@ -253,6 +254,9 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 * @return 报价和创建订单共用的不可变业务快照
 	 */
 	private MarketPriceSnapshot buildMarketPriceSnapshot(PolymarketOrderReq req) {
+		// 这里统一生成报价/下单快照：正式下单时仍重新拉实时价格，不信任前端传回来的报价。
+		// Polymarket的outcomes、outcomePrices、clobTokenIds三个数组按同一个outcomeIndex对应。
+		// outcomes[outcomeIndex]是结果名称，outcomePrices[outcomeIndex]是成交价，clobTokenIds[outcomeIndex]是asset_id/token_id。
 		// 步骤1：先做本地请求参数校验，避免无效参数触发外部请求。
 		validateRequest(req);
 		// 步骤2：实时读取Polymarket市场详情，并校验市场仍可交易。
@@ -266,10 +270,15 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		// 步骤3：解析结果名称与结果价格，outcomeIndex必须同时落在两个数组范围内。
 		JSONArray outcomes = parseJsonArray(market.getString("outcomes"), "outcomes");
 		JSONArray outcomePrices = parseJsonArray(market.getString("outcomePrices"), "outcomePrices");
-		if (req.getOutcomeIndex() >= outcomes.size() || req.getOutcomeIndex() >= outcomePrices.size()) {
+		JSONArray clobTokenIds = parseJsonArray(market.getString("clobTokenIds"), "clobTokenIds");
+		if (req.getOutcomeIndex() >= outcomes.size() || req.getOutcomeIndex() >= outcomePrices.size() || req.getOutcomeIndex() >= clobTokenIds.size()) {
 			throw new ServiceException("outcomeIndex is out of range");
 		}
 		String outcomeName = outcomes.getString(req.getOutcomeIndex());
+		String assetId = clobTokenIds.getString(req.getOutcomeIndex());
+		if (StrUtil.isBlank(assetId)) {
+			throw new ServiceException("Polymarket asset_id/token_id is empty");
+		}
 		BigDecimal outcomePrice = outcomePrices.getBigDecimal(req.getOutcomeIndex());
 		if (outcomePrice == null || outcomePrice.compareTo(BigDecimal.ZERO) <= 0) {
 			throw new ServiceException("Polymarket outcome price is empty or zero");
@@ -299,6 +308,9 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		snapshot.eventTitle = firstEventString(market, "title");
 		snapshot.outcomeIndex = req.getOutcomeIndex();
 		snapshot.outcomeName = outcomeName;
+		snapshot.assetId = assetId;
+		snapshot.assetIdsJson = clobTokenIds.toJSONString();
+		snapshot.outcomesJson = outcomes.toJSONString();
 		snapshot.afiAmount = afiAmount;
 		snapshot.afiPrice = afiPrice;
 		snapshot.afiUsdtAmount = afiUsdtAmount;
@@ -377,6 +389,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			.marketQuestion(snapshot.marketQuestion)
 			.outcomeIndex(snapshot.outcomeIndex)
 			.outcomeName(snapshot.outcomeName)
+			.assetId(snapshot.assetId)
 			.afiAmount(snapshot.afiAmount)
 			.afiPrice(snapshot.afiPrice)
 			.afiUsdtAmount(snapshot.afiUsdtAmount)
@@ -403,6 +416,8 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 * @return 可直接upsert的市场聚合增量
 	 */
 	private PolymarketMarket buildMarketAggregate(MarketPriceSnapshot snapshot) {
+		// 市场聚合是订单的强一致附属数据，必须跟订单同事务写入，不能丢到延迟队列异步补。
+		// WebSocket刷新订阅依赖这里写入的asset_ids_json，后续结算也会按market_slug批量处理订单。
 		Date now = new Date();
 		PolymarketMarket market = PolymarketMarket.builder()
 			.marketSlug(snapshot.marketSlug)
@@ -411,6 +426,8 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			.eventSlug(snapshot.eventSlug)
 			.eventTitle(snapshot.eventTitle)
 			.marketQuestion(snapshot.marketQuestion)
+			.assetIdsJson(snapshot.assetIdsJson)
+			.outcomesJson(snapshot.outcomesJson)
 			.endTime(snapshot.endTime)
 			.status(STATUS_PENDING)
 			.orderCount(1)
@@ -427,9 +444,10 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	}
 
 	/**
-	 * 在订单事务提交后投递市场结算延迟消息。
+	 * 预留订单事务提交后的市场结算延迟消息投递入口。
 	 *
-	 * <p>延迟队列只是触发器；即使消息丢失，后台Quartz仍会扫描市场表兜底结算。没有结束时间的市场不投递延迟消息。</p>
+	 * <p>当前阶段延迟队列消费者尚未接入，所以下单后不真实发送Redisson消息。后续接入队列时，应在事务提交后投递marketSlug；
+	 * 即使消息丢失，后台Quartz仍会扫描市场表兜底派发。</p>
 	 *
 	 * @param snapshot 下单时市场和结束时间快照
 	 */
@@ -437,38 +455,29 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		if (snapshot.endTime == null || StrUtil.isBlank(snapshot.marketSlug)) {
 			return;
 		}
-		long delaySeconds = calculateMarketSettleDelaySeconds(snapshot.endTime);
-		Runnable sender = () -> redissonDelayHandler.add(new RedissonDelayOrder<>(
-			snapshot.marketSlug,
-			delaySeconds,
-			SysConstant.THIRTY,
-			snapshot.marketSlug,
-			RedisConstant.StreamMsgConstant.DELAY_ORDER_TIMEOUT_QUEUE
-		));
+		// TODO 后续接入Redisson延迟队列后，在事务提交后投递snapshot.marketSlug，让队列消费者统一调用processSettlingMarket发奖。
+	}
+
+	/**
+	 * 在订单事务提交后刷新Polymarket WebSocket订阅。
+	 *
+	 * <p>新市场下单成功后，市场表已经写入完整asset_ids_json；事务提交后刷新订阅，避免WebSocket只在启动或重连时订阅。
+	 * 刷新失败不会回滚订单，Quartz仍会兜底派发到期市场。</p>
+	 */
+	private void refreshWebSocketSubscribeAfterCommit() {
+		// 只刷新订阅，不发奖、不修改市场状态；真正结算仍由市场派发和processSettlingMarket兜底复核。
+		// 放在afterCommit是为了保证刷新订阅时，市场表已经能查到本次下单写入的asset_ids_json。
+		Runnable refresher = polymarketWebSocketClient::refreshSubscribeAfterOrderCreated;
 		if (TransactionSynchronizationManager.isSynchronizationActive()) {
 			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
 				@Override
 				public void afterCommit() {
-					sender.run();
+					refresher.run();
 				}
 			});
 		} else {
-			sender.run();
+			refresher.run();
 		}
-	}
-
-	/**
-	 * 计算市场延迟结算消息的延迟秒数。
-	 *
-	 * <p>目标时间是市场结束时间后30秒；如果下单时已经接近结束，则至少延迟1秒，避免立刻在当前事务中消费。</p>
-	 *
-	 * @param endTime 市场结束时间
-	 * @return 延迟秒数
-	 */
-	private long calculateMarketSettleDelaySeconds(Date endTime) {
-		long targetMillis = endTime.getTime() + MARKET_SETTLE_DELAY_SECONDS_AFTER_END * 1000L;
-		long delayMillis = targetMillis - System.currentTimeMillis();
-		return Math.max(1L, delayMillis / 1000L);
 	}
 
 	/**
@@ -554,6 +563,9 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		private String eventTitle;
 		private Integer outcomeIndex;
 		private String outcomeName;
+		private String assetId;
+		private String assetIdsJson;
+		private String outcomesJson;
 		private BigDecimal afiAmount;
 		private BigDecimal afiPrice;
 		private BigDecimal afiUsdtAmount;

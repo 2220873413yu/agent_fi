@@ -228,6 +228,7 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 		market.setUmaResolutionStatus(marketSnapshot.getString("umaResolutionStatus"));
 		market.setResultOutcomeIndex(result.winnerIndex);
 		market.setResultOutcomeName(result.winnerName);
+		market.setWinningAssetId(result.winnerAssetId);
 		market.setTotalPayoutUsdtAmount(totalPayout.setScale(MONEY_SCALE, RoundingMode.DOWN));
 		market.setLastCheckTime(now);
 		market.setSettleTime(settleTime);
@@ -346,6 +347,7 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 		}
 		JSONArray outcomes = JSONArray.parseArray(market.getString("outcomes"));
 		JSONArray prices = JSONArray.parseArray(market.getString("outcomePrices"));
+		JSONArray clobTokenIds = StrUtil.isBlank(market.getString("clobTokenIds")) ? null : JSONArray.parseArray(market.getString("clobTokenIds"));
 		int winnerIndex = -1;
 		for (int i = 0; i < prices.size(); i++) {
 			BigDecimal price = prices.getBigDecimal(i);
@@ -361,7 +363,8 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 		if (winnerIndex < 0 || winnerIndex >= outcomes.size()) {
 			return SettlementResult.unresolved("winner outcome not found");
 		}
-		return SettlementResult.resolved(winnerIndex, outcomes.getString(winnerIndex));
+		String winnerAssetId = clobTokenIds == null || winnerIndex >= clobTokenIds.size() ? null : clobTokenIds.getString(winnerIndex);
+		return SettlementResult.resolved(winnerIndex, outcomes.getString(winnerIndex), winnerAssetId);
 	}
 
 	/**
@@ -384,21 +387,23 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 		private final boolean resolved;
 		private final int winnerIndex;
 		private final String winnerName;
+		private final String winnerAssetId;
 		private final String reason;
 
-		private SettlementResult(boolean resolved, int winnerIndex, String winnerName, String reason) {
+		private SettlementResult(boolean resolved, int winnerIndex, String winnerName, String winnerAssetId, String reason) {
 			this.resolved = resolved;
 			this.winnerIndex = winnerIndex;
 			this.winnerName = winnerName;
+			this.winnerAssetId = winnerAssetId;
 			this.reason = reason;
 		}
 
-		private static SettlementResult resolved(int winnerIndex, String winnerName) {
-			return new SettlementResult(true, winnerIndex, winnerName, null);
+		private static SettlementResult resolved(int winnerIndex, String winnerName, String winnerAssetId) {
+			return new SettlementResult(true, winnerIndex, winnerName, winnerAssetId, null);
 		}
 
 		private static SettlementResult unresolved(String reason) {
-			return new SettlementResult(false, -1, null, reason);
+			return new SettlementResult(false, -1, null, null, reason);
 		}
 	}
 }

@@ -87,63 +87,68 @@ public class PolymarketOrder extends BaseEntity {
 	@ApiModelProperty(value = "选择结果")
 	private String outcomeName;
 
+	/** 用户选择结果对应的Polymarket asset_id/token_id快照。 */
+	@Excel(name = "资产ID", sort = 12, width = 50)
+	@ApiModelProperty(value = "用户选择结果对应的Polymarket asset_id/token_id快照")
+	private String assetId;
+
 	/** 下单扣减的AFI数量，对应用户valid_num2。 */
-	@Excel(name = "下单AFI", sort = 12)
+	@Excel(name = "下单AFI", sort = 13)
 	@ApiModelProperty(value = "下单AFI数量")
 	private BigDecimal afiAmount;
 
 	/** 下单时AFI/USDT价格快照。 */
-	@Excel(name = "AFI价格", sort = 13)
+	@Excel(name = "AFI价格", sort = 14)
 	@ApiModelProperty(value = "AFI价格快照，单位USDT")
 	private BigDecimal afiPrice;
 
 	/** AFI按下单价格折算后的USDT等值金额。 */
-	@Excel(name = "等值USDT", sort = 14)
+	@Excel(name = "等值USDT", sort = 15)
 	@ApiModelProperty(value = "AFI等值USDT")
 	private BigDecimal afiUsdtAmount;
 
 	/** 下单时Polymarket结果价格快照。 */
-	@Excel(name = "成交价格", sort = 15)
+	@Excel(name = "成交价格", sort = 16)
 	@ApiModelProperty(value = "Polymarket outcome成交价格")
 	private BigDecimal outcomePrice;
 
 	/** 平台内部持有份额，等于AFI等值USDT除以结果价格。 */
-	@Excel(name = "份额", sort = 16)
+	@Excel(name = "份额", sort = 17)
 	@ApiModelProperty(value = "购买份额")
 	private BigDecimal shareAmount;
 
 	/** 用户猜中时最大兑付USDT金额。 */
-	@Excel(name = "最大兑付USDT", sort = 17)
+	@Excel(name = "最大兑付USDT", sort = 18)
 	@ApiModelProperty(value = "最大兑付USDT")
 	private BigDecimal maxPayoutUsdt;
 
 	/** 市场结束时间快照。 */
-	@Excel(name = "结束时间", sort = 18, dateFormat = "yyyy-MM-dd HH:mm:ss")
+	@Excel(name = "结束时间", sort = 19, dateFormat = "yyyy-MM-dd HH:mm:ss")
 	@ApiModelProperty(value = "市场结束时间")
 	private Date endTime;
 
 	/** 订单状态：0待结算，1已猜中，2未猜中，3待人工复核，4已作废/已退款。 */
-	@Excel(name = "订单状态", sort = 19, dictType = "t_polymarket_order_status")
+	@Excel(name = "订单状态", sort = 20, dictType = "t_polymarket_order_status")
 	@ApiModelProperty(value = "订单状态 0待结算 1已猜中 2未猜中 3待人工复核 4已作废/已退款")
 	private Integer status;
 
 	/** 结算后赢家结果下标。 */
-	@Excel(name = "赢家下标", sort = 20)
+	@Excel(name = "赢家下标", sort = 21)
 	@ApiModelProperty(value = "赢家结果下标")
 	private Integer resultOutcomeIndex;
 
 	/** 结算后赢家结果名称。 */
-	@Excel(name = "赢家结果", sort = 21)
+	@Excel(name = "赢家结果", sort = 22)
 	@ApiModelProperty(value = "赢家结果")
 	private String resultOutcomeName;
 
 	/** 实际兑付到用户valid_num1的USDT金额。 */
-	@Excel(name = "兑付USDT", sort = 22)
+	@Excel(name = "兑付USDT", sort = 23)
 	@ApiModelProperty(value = "兑付USDT")
 	private BigDecimal payoutUsdtAmount;
 
 	/** 结算时间。 */
-	@Excel(name = "结算时间", sort = 23, dateFormat = "yyyy-MM-dd HH:mm:ss")
+	@Excel(name = "结算时间", sort = 24, dateFormat = "yyyy-MM-dd HH:mm:ss")
 	@ApiModelProperty(value = "结算时间")
 	private Date settleTime;
 

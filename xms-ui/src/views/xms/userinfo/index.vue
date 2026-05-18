@@ -527,8 +527,8 @@
             placeholder="0表示按G7规则，例如0.5表示0.5%"
             @input="onStakeHostingStaticRateInput"
           >
-            <template slot="append">%</template>
           </el-input>
+          <div class="form-tip">以百分比为单位，例如：1 表示 1%</div>
         </el-form-item>
 
         <el-form-item label="备注" prop="remark">

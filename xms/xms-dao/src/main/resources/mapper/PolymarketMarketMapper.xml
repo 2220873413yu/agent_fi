@@ -12,11 +12,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="eventSlug" column="event_slug"/>
         <result property="eventTitle" column="event_title"/>
         <result property="marketQuestion" column="market_question"/>
+        <result property="assetIdsJson" column="asset_ids_json"/>
+        <result property="outcomesJson" column="outcomes_json"/>
         <result property="endTime" column="end_time"/>
         <result property="status" column="status"/>
         <result property="umaResolutionStatus" column="uma_resolution_status"/>
         <result property="resultOutcomeIndex" column="result_outcome_index"/>
         <result property="resultOutcomeName" column="result_outcome_name"/>
+        <result property="winningAssetId" column="winning_asset_id"/>
         <result property="orderCount" column="order_count"/>
         <result property="totalAfiAmount" column="total_afi_amount"/>
         <result property="totalUsdtAmount" column="total_usdt_amount"/>
@@ -33,9 +36,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectPolymarketMarketVo">
         select id, market_slug, market_id, condition_id, event_slug, event_title, market_question, end_time, status,
-               uma_resolution_status, result_outcome_index, result_outcome_name, order_count, total_afi_amount,
-               total_usdt_amount, total_share_amount, total_payout_usdt_amount, last_check_time, settle_time,
-               market_snapshot_json, create_time, update_time, remark, deleted
+               asset_ids_json, outcomes_json, uma_resolution_status, result_outcome_index, result_outcome_name,
+               winning_asset_id, order_count, total_afi_amount, total_usdt_amount, total_share_amount,
+               total_payout_usdt_amount, last_check_time, settle_time, market_snapshot_json, create_time, update_time,
+               remark, deleted
         from t_polymarket_market
     </sql>
 
@@ -58,13 +62,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="upsertOrderAggregate" parameterType="PolymarketMarket">
         insert into t_polymarket_market (
-            market_slug, market_id, condition_id, event_slug, event_title, market_question, end_time, status,
-            order_count, total_afi_amount, total_usdt_amount, total_share_amount, total_payout_usdt_amount,
-            market_snapshot_json, create_time, update_time, remark, deleted
+            market_slug, market_id, condition_id, event_slug, event_title, market_question, asset_ids_json,
+            outcomes_json, end_time, status, order_count, total_afi_amount, total_usdt_amount, total_share_amount,
+            total_payout_usdt_amount, market_snapshot_json, create_time, update_time, remark, deleted
         ) values (
-            #{marketSlug}, #{marketId}, #{conditionId}, #{eventSlug}, #{eventTitle}, #{marketQuestion}, #{endTime}, #{status},
-            #{orderCount}, #{totalAfiAmount}, #{totalUsdtAmount}, #{totalShareAmount}, #{totalPayoutUsdtAmount},
-            #{marketSnapshotJson}, #{createTime}, #{updateTime}, #{remark}, #{deleted}
+            #{marketSlug}, #{marketId}, #{conditionId}, #{eventSlug}, #{eventTitle}, #{marketQuestion}, #{assetIdsJson},
+            #{outcomesJson}, #{endTime}, #{status}, #{orderCount}, #{totalAfiAmount}, #{totalUsdtAmount}, #{totalShareAmount},
+            #{totalPayoutUsdtAmount}, #{marketSnapshotJson}, #{createTime}, #{updateTime}, #{remark}, #{deleted}
         )
         on duplicate key update
             market_id = values(market_id),
@@ -72,6 +76,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             event_slug = values(event_slug),
             event_title = values(event_title),
             market_question = values(market_question),
+            asset_ids_json = values(asset_ids_json),
+            outcomes_json = values(outcomes_json),
             end_time = values(end_time),
             order_count = order_count + values(order_count),
             total_afi_amount = total_afi_amount + values(total_afi_amount),

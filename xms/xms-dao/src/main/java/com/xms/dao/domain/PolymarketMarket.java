@@ -65,6 +65,14 @@ public class PolymarketMarket extends BaseEntity {
 	@ApiModelProperty(value = "Polymarket市场问题")
 	private String marketQuestion;
 
+	/** Polymarket市场所有结果asset_id/token_id数组快照。 */
+	@ApiModelProperty(value = "Polymarket市场所有结果asset_id数组快照")
+	private String assetIdsJson;
+
+	/** Polymarket市场所有结果名称数组快照。 */
+	@ApiModelProperty(value = "Polymarket市场所有结果名称数组快照")
+	private String outcomesJson;
+
 	/** 市场结束时间。 */
 	@Excel(name = "结束时间", sort = 7, dateFormat = "yyyy-MM-dd HH:mm:ss")
 	@ApiModelProperty(value = "市场结束时间")
@@ -90,38 +98,43 @@ public class PolymarketMarket extends BaseEntity {
 	@ApiModelProperty(value = "赢家结果名称")
 	private String resultOutcomeName;
 
+	/** WebSocket或结算结果返回的赢家asset_id/token_id。 */
+	@Excel(name = "赢家资产ID", sort = 12, width = 50)
+	@ApiModelProperty(value = "WebSocket或结算结果返回的赢家asset_id/token_id")
+	private String winningAssetId;
+
 	/** 市场总下单次数。 */
-	@Excel(name = "下单次数", sort = 12)
+	@Excel(name = "下单次数", sort = 13)
 	@ApiModelProperty(value = "市场总下单次数")
 	private Integer orderCount;
 
 	/** 市场总下单AFI数量。 */
-	@Excel(name = "总AFI", sort = 13)
+	@Excel(name = "总AFI", sort = 14)
 	@ApiModelProperty(value = "市场总下单AFI数量")
 	private BigDecimal totalAfiAmount;
 
 	/** 市场总下单等值USDT。 */
-	@Excel(name = "总USDT", sort = 14)
+	@Excel(name = "总USDT", sort = 15)
 	@ApiModelProperty(value = "市场总下单等值USDT")
 	private BigDecimal totalUsdtAmount;
 
 	/** 市场总购买份额。 */
-	@Excel(name = "总份额", sort = 15)
+	@Excel(name = "总份额", sort = 16)
 	@ApiModelProperty(value = "市场总购买份额")
 	private BigDecimal totalShareAmount;
 
 	/** 市场总兑付USDT。 */
-	@Excel(name = "总兑付USDT", sort = 16)
+	@Excel(name = "总兑付USDT", sort = 17)
 	@ApiModelProperty(value = "市场总兑付USDT")
 	private BigDecimal totalPayoutUsdtAmount;
 
 	/** 上次检查Polymarket结果的时间。 */
-	@Excel(name = "上次检查时间", sort = 17, dateFormat = "yyyy-MM-dd HH:mm:ss")
+	@Excel(name = "上次检查时间", sort = 18, dateFormat = "yyyy-MM-dd HH:mm:ss")
 	@ApiModelProperty(value = "上次检查时间")
 	private Date lastCheckTime;
 
 	/** 市场结算完成时间。 */
-	@Excel(name = "结算时间", sort = 18, dateFormat = "yyyy-MM-dd HH:mm:ss")
+	@Excel(name = "结算时间", sort = 19, dateFormat = "yyyy-MM-dd HH:mm:ss")
 	@ApiModelProperty(value = "结算完成时间")
 	private Date settleTime;
 

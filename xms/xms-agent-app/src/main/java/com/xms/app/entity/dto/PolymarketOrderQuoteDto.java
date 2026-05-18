@@ -28,6 +28,9 @@ public class PolymarketOrderQuoteDto {
 	@ApiModelProperty(value = "选择结果")
 	private String outcomeName;
 
+	@ApiModelProperty(value = "用户选择结果对应的Polymarket asset_id/token_id")
+	private String assetId;
+
 	@ApiModelProperty(value = "下单AFI数量")
 	private BigDecimal afiAmount;
 

@@ -1,110 +1,192 @@
-///*
-// * Copyright (c) 2019-2029, Dreamlu 卢春梦 (596392912@qq.com & dreamlu.net).
-// *
-// * Licensed under the Apache License, Version 2.0 (the "License");
-// * you may not use this file except in compliance with the License.
-// * You may obtain a copy of the License at
-// *
-// *   http://www.apache.org/licenses/LICENSE-2.0
-// *
-// * Unless required by applicable law or agreed to in writing, software
-// * distributed under the License is distributed on an "AS IS" BASIS,
-// * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// * See the License for the specific language governing permissions and
-// * limitations under the License.
-// */
-//
-//package com.xms.app.client;
-//
-//import cn.hutool.core.collection.CollUtil;
-//import cn.hutool.core.map.MapUtil;
-//import cn.hutool.crypto.digest.MD5;
-//import com.alibaba.fastjson2.JSONObject;
-//import com.xms.app.server.WsStockService;
-//import com.xms.common.constant.SysConstant;
-//import com.xms.common.core.domain.entity.SysDictData;
-//import com.xms.common.utils.DictUtils;
-//import com.xms.dao.service.IMarketTradeConfigService;
-//import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-//import lombok.AllArgsConstructor;
-//import lombok.extern.slf4j.Slf4j;
-//import org.springframework.beans.factory.annotation.Autowired;
-//import org.springframework.scheduling.annotation.Async;
-//import org.springframework.stereotype.Component;
-//
-//import java.time.Instant;
-//import java.util.ArrayList;
-//import java.util.List;
-//import java.util.Map;
-//import java.util.concurrent.CountDownLatch;
-//import java.util.stream.Collectors;
-//
-///**
-// * 用户等级处理
-// *
-// * @author MIER
-// */
-//@Slf4j
-//@Component
-//@AllArgsConstructor
-//public class LongLiveClientStart {
-//	@Autowired
-//	private WsStockService wsStockServiceImpl;
-//	@Autowired
-//	private IMarketTradeConfigService marketTradeConfigServiceImpl;
-//	@Async("asyncVirtualExecutor")
-//	public void handerWsMsg(Map<String, Object> fundCodeSub) throws Exception {
-//		//List<SysDictData> sysDictData = DictUtils.getDictCache("exchange_contract_type");
-//		JSONObject event = new JSONObject(), data = new JSONObject();
-//		StringBuilder wlist = new StringBuilder();
-//
-//		//if (sysDictData != null && !sysDictData.isEmpty()) {
-//			//订阅市场代码，多个以逗号分割。如:SH,SZ
-//			//List<SysDictData> collect = new ArrayList<>();
-////				sysDictData.stream()
-////				.filter(e -> !"NYMEX".equals(e.getDictValue()))
-////				.collect(Collectors.toList());
-//			//data.put("market", CollUtil.join(collect, ",",SysDictData::getDictValue));
-//			data.put("market", "WI,WX,WA");
-//
-//			//产品白名单过滤【可选参数】，多个以逗号分割。如:SH600(A股过滤),SZ000002(单个产品过滤)。最多可指定50个
-//			// data.put("wlist", wlist.toString().trim());
-//			//产品黑名单过滤【可选参数】，多个以逗号分割。如:SH600(A股过滤),SZ000002(单个产品过滤)。最多可指定50个
-//			if (!wlist.toString().trim().isEmpty()) {
-//				data.put("wlist", wlist.toString().trim());
-//			}
-//			event.put("event", GlobalConstant.SUBSCRIBE);
-//			event.put("data", data);
-//			GlobalConstant.GLOBAL_GROUP_CHANNEL.add(JSONObject.toJSONString(event));
-//		//}
-//
-//		createWsMsg(fundCodeSub);
-//	}
-//
-//	/**
-//	 * 注意点：目前限制了最多20个不同的ws地址客户端没，超过20个，就需要做集群了。
-//	 *
-//	 * @param fundCodeSub
-//	 * @throws Exception
-//	 */
-//	public void createWsMsg(Map<String, Object> fundCodeSub) throws Exception {
-//		String wsUrl = MapUtil.getStr(fundCodeSub, TcpClient.WS_URL);
-//		CountDownLatch countDownLatch = new CountDownLatch(SysConstant.ONE);
-//		TcpClient webSocketClient = new TcpClient(wsUrl, SysConstant.ONE.toString(), countDownLatch,
-//			MapUtil.getStr(fundCodeSub, "mode"),wsStockServiceImpl, marketTradeConfigServiceImpl);
-//		webSocketClient.connect();
-//		countDownLatch.await();
-//		String stamp = String.valueOf(System.currentTimeMillis() / 1000);
-//		String str = "u=" + fundCodeSub.get("userName") + "&p=" + fundCodeSub.get("password") + "&stamp=" + stamp;
-//		JSONObject json = new JSONObject(), event = new JSONObject();
-//		json.put("u", fundCodeSub.get("userName"));
-//		json.put("sign", MD5.create().digestHex(str));
-//		json.put("stamp", stamp);
-//		event.put("event", "login");
-//		event.put("data", json);
-//		webSocketClient.getChannel().writeAndFlush(new TextWebSocketFrame(JSONObject.toJSONString(event)));
-//		log.info("兜底的数海登录成功要发送的数据是：{}", event);
-//	}
-//
-//
-//}
+package com.xms.app.client;
+
+import cn.hutool.core.collection.CollectionUtil;
+import com.alibaba.fastjson2.JSONArray;
+import com.xms.dao.domain.PolymarketMarket;
+import com.xms.dao.service.IPolymarketMarketService;
+import io.netty.channel.Channel;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+
+/**
+ * Polymarket WebSocket客户端启动和订阅服务。
+ *
+ * <p>该组件替代旧数海行情启动逻辑。启动时从市场聚合表加载待结算市场的asset_id，
+ * 连接Polymarket Market Channel，并在握手成功或重连后发送订阅消息。</p>
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class LongLiveClientStart {
+
+	private static final int MARKET_STATUS_PENDING = 0;
+	private static final int SUBSCRIBE_LIMIT = 500;
+
+	private final IPolymarketMarketService polymarketMarketService;
+	private volatile Channel activeChannel;
+
+	/**
+	 * 异步启动Polymarket Market Channel客户端。
+	 *
+	 * <p>启动后只订阅待结算市场的asset_id；没有待结算市场时仍保持连接，后续可通过重连或扩展刷新订阅。</p>
+	 */
+	@Async("asyncVirtualExecutor")
+	public void handerWsMsg() throws Exception {
+		createWsMsg();
+	}
+
+	/**
+	 * 创建Polymarket WebSocket连接。
+	 *
+	 * <p>连接建立后由handler在握手成功事件中调用{@link #sendSubscribeMessage(Channel)}发送订阅。</p>
+	 */
+	public void createWsMsg() throws Exception {
+		CountDownLatch countDownLatch = new CountDownLatch(1);
+		TcpClient webSocketClient = new TcpClient(GlobalConstant.POLYMARKET_MARKET_WS_URL, countDownLatch, this);
+		webSocketClient.connect();
+		countDownLatch.await();
+		log.info("Polymarket WebSocket客户端启动完成");
+	}
+
+	/**
+	 * 向Polymarket发送Market Channel订阅消息。
+	 *
+	 * <p>订阅资产来自当前待结算市场的asset_ids_json。该方法可在首次握手成功和断线重连后重复调用。</p>
+	 *
+	 * @param channel 已完成WebSocket握手的通道
+	 */
+	public void sendSubscribeMessage(Channel channel) {
+		// 采用全量重订阅：每次从数据库重新加载所有待结算市场asset_id，避免本地订阅状态和数据库不一致。
+		// 同一个市场多次下单会重复触发刷新，但loadPendingAssetIds会去重；重复开奖事件也由市场状态兜底。
+		if (channel == null || !channel.isActive()) {
+			log.info("Polymarket WebSocket通道不可用，暂不刷新订阅，等待重连或Quartz兜底");
+			return;
+		}
+		this.activeChannel = channel;
+		List<String> assetIds = loadPendingAssetIds();
+		if (CollectionUtil.isEmpty(assetIds)) {
+			log.info("当前没有可订阅的Polymarket待结算asset_id");
+			return;
+		}
+		com.alibaba.fastjson2.JSONObject subscribe = new com.alibaba.fastjson2.JSONObject();
+		subscribe.put("assets_ids", assetIds);
+		subscribe.put("type", GlobalConstant.POLYMARKET_MARKET_TYPE);
+		subscribe.put("custom_feature_enabled", true);
+		channel.writeAndFlush(new TextWebSocketFrame(subscribe.toJSONString()));
+		log.info("Polymarket Market Channel订阅已发送，asset数量：{}", assetIds.size());
+	}
+
+	/**
+	 * 下单成功后刷新Polymarket订阅。
+	 *
+	 * <p>这是实时监听增强逻辑：只重新发送当前所有待结算市场的asset_id订阅，不发奖、不改市场状态。
+	 * 如果WebSocket当前不可用，则只记录日志，等待重连重新订阅或Quartz兜底派发。</p>
+	 */
+	public void refreshSubscribeAfterOrderCreated() {
+		try {
+			sendSubscribeMessage(activeChannel);
+		} catch (Exception e) {
+			log.warn("Polymarket下单后刷新WebSocket订阅失败，等待重连或Quartz兜底，error={}", e.getMessage());
+		}
+	}
+
+	/**
+	 * 从市场表加载待结算市场的所有asset_id。
+	 *
+	 * <p>只查询status=0且未删除、asset_ids_json不为空的市场；使用LinkedHashSet去重并保持稳定顺序。</p>
+	 *
+	 * @return 待订阅的asset_id列表
+	 */
+	private List<String> loadPendingAssetIds() {
+		// 只订阅待结算市场；已结算、人工复核或已派发中的市场不再加入订阅集合。
+		// LinkedHashSet用于去重并保持稳定顺序，同市场先买Yes再买No时不会重复发送相同asset_id。
+		List<PolymarketMarket> markets = polymarketMarketService.lambdaQuery()
+			.eq(PolymarketMarket::getStatus, MARKET_STATUS_PENDING)
+			.eq(PolymarketMarket::getDeleted, 0)
+			.isNotNull(PolymarketMarket::getAssetIdsJson)
+			.orderByAsc(PolymarketMarket::getEndTime)
+			.last("limit " + SUBSCRIBE_LIMIT)
+			.list();
+		Set<String> assetIds = new LinkedHashSet<>();
+		for (PolymarketMarket market : markets) {
+			try {
+				JSONArray array = JSONArray.parseArray(market.getAssetIdsJson());
+				if (array == null) {
+					continue;
+				}
+				for (int i = 0; i < array.size(); i++) {
+					String assetId = array.getString(i);
+					if (assetId != null && !assetId.trim().isEmpty()) {
+						assetIds.add(assetId.trim());
+					}
+				}
+			} catch (Exception e) {
+				log.warn("Polymarket市场asset_ids_json解析失败，marketSlug={}, error={}", market.getMarketSlug(), e.getMessage());
+			}
+		}
+		return new ArrayList<>(assetIds);
+	}
+
+	/**
+	 * 派发Polymarket已开奖市场进入结算中。
+	 *
+	 * <p>WebSocket只负责触发状态抢占，不直接发奖、不写钱包。后续接入延迟队列后，在抢占成功处投递marketSlug。</p>
+	 *
+	 * @param slug Polymarket市场slug，可为空
+	 * @param winningAssetId 赢家asset_id/token_id，可为空
+	 * @param winningOutcome 赢家名称，仅用于日志
+	 */
+	public void dispatchResolvedMarket(String slug, String winningAssetId, String winningOutcome) {
+		// WebSocket只是发现市场已开奖：这里只把市场从0待结算抢占为1结算中。
+		// 不在这里结算订单、不写钱包；后续延迟队列消费者统一调用processSettlingMarket发奖。
+		PolymarketMarket market = findPendingMarket(slug, winningAssetId);
+		if (market == null) {
+			log.info("Polymarket已开奖事件未匹配到待结算市场，slug={}, winningAssetId={}, winningOutcome={}", slug, winningAssetId, winningOutcome);
+			return;
+		}
+		boolean dispatched = polymarketMarketService.markSettling(market.getMarketSlug());
+		if (dispatched) {
+			log.info("Polymarket市场已由WebSocket派发为结算中，marketSlug={}, winningAssetId={}, winningOutcome={}",
+				market.getMarketSlug(), winningAssetId, winningOutcome);
+			// TODO 后续接入Redisson延迟队列后，在这里投递marketSlug，让消费者统一调用processSettlingMarket发奖。
+		}
+	}
+
+	/**
+	 * 按slug或赢家asset_id查找仍待结算的市场。
+	 *
+	 * <p>优先使用slug精确匹配；如果事件缺少slug，则使用winning_asset_id在asset_ids_json中模糊匹配。</p>
+	 *
+	 * @param slug Polymarket市场slug
+	 * @param winningAssetId 赢家asset_id/token_id
+	 * @return 待结算市场，找不到时返回null
+	 */
+	private PolymarketMarket findPendingMarket(String slug, String winningAssetId) {
+		if (slug != null && !slug.trim().isEmpty()) {
+			return polymarketMarketService.lambdaQuery()
+				.eq(PolymarketMarket::getMarketSlug, slug.trim())
+				.eq(PolymarketMarket::getStatus, MARKET_STATUS_PENDING)
+				.eq(PolymarketMarket::getDeleted, 0)
+				.one();
+		}
+		if (winningAssetId == null || winningAssetId.trim().isEmpty()) {
+			return null;
+		}
+		return polymarketMarketService.lambdaQuery()
+			.eq(PolymarketMarket::getStatus, MARKET_STATUS_PENDING)
+			.eq(PolymarketMarket::getDeleted, 0)
+			.like(PolymarketMarket::getAssetIdsJson, winningAssetId.trim())
+			.orderByAsc(PolymarketMarket::getEndTime)
+			.last("limit 1")
+			.one();
+	}
+}

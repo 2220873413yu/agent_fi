@@ -5,15 +5,15 @@ import com.xms.dao.domain.PolymarketOrder;
 import java.util.List;
 
 /**
- * Polymarket internal order mapper.
+ * Polymarket内部订单Mapper。
  */
 public interface PolymarketOrderMapper extends XmsMapper<PolymarketOrder> {
 
 	/**
-	 * Selects Polymarket internal orders for admin and app list pages.
+	 * 查询后台和App侧使用的Polymarket内部订单列表。
 	 *
-	 * @param polymarketOrder query filter
-	 * @return matching orders ordered by id descending
+	 * @param polymarketOrder 查询条件
+	 * @return 按ID倒序返回的订单列表
 	 */
 	List<PolymarketOrder> selectPolymarketOrderList(PolymarketOrder polymarketOrder);
 }

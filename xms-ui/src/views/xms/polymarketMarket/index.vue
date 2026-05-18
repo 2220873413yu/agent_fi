@@ -52,7 +52,8 @@
       <el-table-column label="总AFI" align="center" prop="totalAfiAmount" width="120" />
       <el-table-column label="总USDT" align="center" prop="totalUsdtAmount" width="120" />
       <el-table-column label="总份额" align="center" prop="totalShareAmount" width="120" />
-      <el-table-column label="总兑付" align="center" prop="totalPayoutUsdtAmount" width="120" />
+      <el-table-column label="总兑付USDT等值" align="center" prop="totalPayoutUsdtAmount" width="130" />
+      <el-table-column label="总兑付AFI" align="center" prop="totalPayoutAfiAmount" width="120" />
       <el-table-column label="赢家" align="center" prop="resultOutcomeName" width="120" />
       <el-table-column label="结束时间" align="center" prop="endTime" width="160">
         <template slot-scope="scope">
@@ -109,6 +110,12 @@
         </el-form-item>
         <el-form-item label="赢家">
           <el-input v-model="form.resultOutcomeName" disabled />
+        </el-form-item>
+        <el-form-item label="总兑付USDT等值">
+          <el-input v-model="form.totalPayoutUsdtAmount" disabled />
+        </el-form-item>
+        <el-form-item label="总兑付AFI">
+          <el-input v-model="form.totalPayoutAfiAmount" disabled />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="3" disabled />

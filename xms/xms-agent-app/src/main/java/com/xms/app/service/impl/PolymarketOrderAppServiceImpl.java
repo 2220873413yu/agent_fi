@@ -10,9 +10,11 @@ import com.xms.app.entity.req.PolymarketOrderReq;
 import com.xms.app.service.BizCommonService;
 import com.xms.app.service.PolymarketOrderAppService;
 import com.xms.app.service.PolymarketService;
+import com.xms.common.config.redis.XmsRedis;
 import com.xms.common.config.redis.lock.RedisLock;
 import com.xms.common.constant.ConstantSys;
 import com.xms.common.constant.ConstantType;
+import com.xms.common.constant.RedisConstant;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.exception.ServiceException;
 import com.xms.common.result.ResponseCode;
@@ -28,6 +30,8 @@ import com.xms.dao.service.ISysParaService;
 import com.xms.dao.service.IUserMoneyService;
 import com.xms.dao.service.UserInfoService;
 import com.xms.dao.service.UserWalletService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +43,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -47,6 +52,7 @@ import java.util.stream.Collectors;
  * <p>本服务不会向Polymarket真实CLOB订单簿下单。创建订单时只冻结AFI价格、Polymarket结果价格和市场JSON快照；
  * 市场结束并resolved后，再按快照订单和Polymarket最终结果做平台内部兑付。</p>
  */
+@Slf4j
 @Service
 public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService {
 
@@ -55,6 +61,8 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	private static final int MONEY_SCALE = 6;
 	private static final int SHARE_SCALE = 8;
 	private static final BigDecimal DEFAULT_MIN_ORDER_AFI_AMOUNT = new BigDecimal("10");
+	private static final long WS_SUBSCRIBED_MARKET_DEFAULT_TTL_SECONDS = TimeUnit.DAYS.toSeconds(30);
+	private static final long WS_SUBSCRIBED_MARKET_AFTER_END_TTL_SECONDS = TimeUnit.DAYS.toSeconds(7);
 
 	private final PolymarketService polymarketService;
 	private final BizCommonService bizCommonService;
@@ -65,6 +73,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	private final UserInfoService userInfoService;
 	private final ISysParaService sysParaServiceImpl;
 	private final LongLiveClientStart polymarketWebSocketClient;
+	private final XmsRedis xmsRedis;
 
 	public PolymarketOrderAppServiceImpl(PolymarketService polymarketService,
 										 BizCommonService bizCommonService,
@@ -74,7 +83,8 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 										 UserWalletService userWalletService,
 										 UserInfoService userInfoService,
 										 ISysParaService sysParaServiceImpl,
-										 LongLiveClientStart polymarketWebSocketClient) {
+										 LongLiveClientStart polymarketWebSocketClient,
+										 XmsRedis xmsRedis) {
 		this.polymarketService = polymarketService;
 		this.bizCommonService = bizCommonService;
 		this.polymarketOrderService = polymarketOrderService;
@@ -84,6 +94,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		this.userInfoService = userInfoService;
 		this.sysParaServiceImpl = sysParaServiceImpl;
 		this.polymarketWebSocketClient = polymarketWebSocketClient;
+		this.xmsRedis = xmsRedis;
 	}
 
 	/**
@@ -145,13 +156,16 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
-	@RedisLock(value = "polymarket:order:create", param = "#userId")
+	@RedisLock(value = RedisConstant.LockConstant.POLYMARKET_ORDER_CREATE, param = "#userId")
 	public ResultPista<PolymarketOrderDto> create(PolymarketOrderReq req, Long userId) {
 		// 下单主流程保持同步强一致：扣AFI、写内部订单、写市场聚合必须在同一个事务里完成。
 		// WebSocket刷新只是实时监听增强，放到事务提交后执行，失败也不影响订单创建和资金扣减结果。
-		// 步骤1：重新生成价格快照，保证下单使用后端实时价格，不使用前端报价结果。
+		// 步骤1：先做本地参数和重复下单校验；同一用户同一市场临时只允许保留一笔正常订单。
+		validateRequest(req);
+		validateUserMarketNotOrdered(req.getMarketSlug(), userId);
+		// 步骤2：重新生成价格快照，保证下单使用后端实时价格，不使用前端报价结果。
 		MarketPriceSnapshot snapshot = buildMarketPriceSnapshot(req);
-		// 步骤2：读取用户与钱包余额，确认用户存在且AFI可用余额足够。
+		// 步骤3：读取用户与钱包余额，确认用户存在且AFI可用余额足够。
 		UserInfo userInfo = userInfoService.lambdaQuery().eq(UserInfo::getUserId, userId).one();
 		if (userInfo == null) {
 			throw new ServiceException(ResponseCode.CODE_1001);
@@ -161,7 +175,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			throw new ServiceException(ResponseCode.CODE_1015);
 		}
 
-		// 步骤3：事务内先扣AFI并写钱包流水；后续订单入库失败会整体回滚。
+		// 步骤4：事务内先扣AFI并写钱包流水；后续订单入库失败会整体回滚。
 		String orderNo = IDUtils.getSnowflakeStr();
 		int rows = userWalletService.handerUserMoney(snapshot.afiAmount.negate(), orderNo, userId, userId,
 			ConstantType.user_money_log_source_type.type_40, ConstantType.user_money_coin_type.type_2);
@@ -169,19 +183,24 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			throw new ServiceException(ResponseCode.CODE_1015);
 		}
 
-		// 步骤4：保存内部订单，记录下单时的市场、价格、份额和最大兑付快照。
+		// 步骤5：保存内部订单，记录下单时的市场、价格、份额和最大兑付快照。
 		PolymarketOrder order = buildOrder(orderNo, userId, userInfo.getAccount(), snapshot);
-		if (!polymarketOrderService.save(order)) {
-			throw new ServiceException(ResponseCode.CODE_1002);
+		try {
+			if (!polymarketOrderService.save(order)) {
+				throw new ServiceException(ResponseCode.CODE_1292);
+			}
+		} catch (DuplicateKeyException e) {
+			// 唯一索引兜底并发重复下单：同一用户同一市场只能保留一笔正常订单。
+			throw new ServiceException(ResponseCode.CODE_1297);
 		}
-		// 步骤5：同事务累加市场级聚合金额，结算任务后续按市场批量处理订单。
+		// 步骤6：同事务累加市场级聚合金额，结算任务后续按市场批量处理订单。
 		if (!polymarketMarketService.upsertOrderAggregate(buildMarketAggregate(snapshot))) {
-			throw new ServiceException("Polymarket market aggregate update failed");
+			throw new ServiceException(ResponseCode.CODE_1293);
 		}
-		// 步骤6：事务提交后投递市场延迟结算消息；数据库市场状态仍由Quartz兜底扫描。
+		// 步骤7：事务提交后投递市场延迟结算消息；数据库市场状态仍由Quartz兜底扫描。
 		sendMarketSettleDelayAfterCommit(snapshot);
-		// 步骤7：事务提交后刷新Polymarket WebSocket订阅，让新市场尽快进入market_resolved监听。
-		refreshWebSocketSubscribeAfterCommit();
+		// 步骤8：事务提交后按marketSlug做Redis去重，只有该市场首次触发时才刷新WebSocket订阅。
+		refreshWebSocketSubscribeAfterCommit(snapshot);
 		return ResultPista.data(toDto(order, false));
 	}
 
@@ -218,7 +237,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	@Override
 	public PolymarketOrderDto detail(String orderNo, Long userId) {
 		if (StrUtil.isBlank(orderNo)) {
-			throw new ServiceException("orderNo cannot be blank");
+			throw new ServiceException(ResponseCode.CODE_1294);
 		}
 		PolymarketOrder order = polymarketOrderService.lambdaQuery()
 			.eq(PolymarketOrder::getOrderNo, orderNo.trim())
@@ -226,7 +245,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			.eq(PolymarketOrder::getDeleted, 0)
 			.one();
 		if (order == null) {
-			throw new ServiceException(ResponseCode.CODE_1001);
+			throw new ServiceException(ResponseCode.CODE_1295);
 		}
 		return toDto(order, true);
 	}
@@ -261,10 +280,18 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		// 步骤1：先做本地请求参数校验，避免无效参数触发外部请求。
 		validateRequest(req);
 		// 步骤2：实时读取Polymarket市场详情，并校验市场仍可交易。
-		JSONObject marketWrapper = polymarketService.getMarketBySlug(req.getMarketSlug().trim());
+		JSONObject marketWrapper;
+		try {
+			marketWrapper = polymarketService.getMarketBySlug(req.getMarketSlug().trim());
+		} catch (Exception e) {
+			throw new ServiceException(ResponseCode.CODE_1285);
+		}
+		if (marketWrapper == null) {
+			throw new ServiceException(ResponseCode.CODE_1285);
+		}
 		JSONObject market = marketWrapper.getJSONObject("market");
 		if (market == null) {
-			throw new ServiceException("Polymarket market data is empty");
+			throw new ServiceException(ResponseCode.CODE_1285);
 		}
 		validateMarketOpen(market);
 
@@ -273,49 +300,61 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		JSONArray outcomePrices = parseJsonArray(market.getString("outcomePrices"), "outcomePrices");
 		JSONArray clobTokenIds = parseJsonArray(market.getString("clobTokenIds"), "clobTokenIds");
 		if (req.getOutcomeIndex() >= outcomes.size() || req.getOutcomeIndex() >= outcomePrices.size() || req.getOutcomeIndex() >= clobTokenIds.size()) {
-			throw new ServiceException("outcomeIndex is out of range");
+			throw new ServiceException(ResponseCode.CODE_1286);
 		}
 		String outcomeName = outcomes.getString(req.getOutcomeIndex());
+		if (StrUtil.isBlank(outcomeName)) {
+			throw new ServiceException(ResponseCode.CODE_1286);
+		}
 		String assetId = clobTokenIds.getString(req.getOutcomeIndex());
 		if (StrUtil.isBlank(assetId)) {
-			throw new ServiceException("Polymarket asset_id/token_id is empty");
+			throw new ServiceException(ResponseCode.CODE_1286);
 		}
-		BigDecimal outcomePrice = outcomePrices.getBigDecimal(req.getOutcomeIndex());
+		BigDecimal outcomePrice;
+		try {
+			outcomePrice = outcomePrices.getBigDecimal(req.getOutcomeIndex());
+		} catch (Exception e) {
+			throw new ServiceException(ResponseCode.CODE_1287);
+		}
 		if (outcomePrice == null || outcomePrice.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("Polymarket outcome price is empty or zero");
+			throw new ServiceException(ResponseCode.CODE_1287);
 		}
 
 		// 步骤4：用户输入的是购买份额，先按结果价格计算USDT成本，再用实时AFI价格反算应扣AFI数量。
 		BigDecimal shareAmount = req.getShareAmount().setScale(SHARE_SCALE, RoundingMode.DOWN);
 		if (shareAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("shareAmount must be greater than zero");
+			throw new ServiceException(ResponseCode.CODE_1294);
 		}
-		BigDecimal afiPrice = bizCommonService.getAfiPrice().setScale(MONEY_SCALE, RoundingMode.DOWN);
+		BigDecimal rawAfiPrice = bizCommonService.getAfiPrice();
+		if (rawAfiPrice == null) {
+			throw new ServiceException(ResponseCode.CODE_1288);
+		}
+		BigDecimal afiPrice = rawAfiPrice.setScale(MONEY_SCALE, RoundingMode.DOWN);
 		if (afiPrice.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("AFI price must be greater than zero");
+			throw new ServiceException(ResponseCode.CODE_1288);
 		}
 		if (outcomePrice.compareTo(BigDecimal.ONE) > 0) {
-			throw new ServiceException("Polymarket outcome price cannot be greater than 1");
+			throw new ServiceException(ResponseCode.CODE_1287);
 		}
 		BigDecimal afiUsdtAmount = shareAmount.multiply(outcomePrice).setScale(MONEY_SCALE, RoundingMode.DOWN);
 		if (afiUsdtAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("AFI USDT value must be greater than zero");
+			throw new ServiceException(ResponseCode.CODE_1287);
 		}
 		// AFI数量向上保留6位，避免除法舍入导致实际扣款低于购买份额所需USDT成本。
 		BigDecimal afiAmount = afiUsdtAmount.divide(afiPrice, MONEY_SCALE, RoundingMode.UP);
 		if (afiAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("Calculated AFI amount must be greater than zero");
+			throw new ServiceException(ResponseCode.CODE_1287);
 		}
 		BigDecimal minAfiAmount = getMinAfiOrderAmount();
 		if (afiAmount.compareTo(minAfiAmount) < 0) {
-			throw new ServiceException("按当前价格折算后，至少需要 " + minAfiAmount.stripTrailingZeros().toPlainString() + " AFI 下单");
+			throw new ServiceException(ResponseCode.CODE_1291);
 		}
 
 		// 步骤5：组装快照，后续报价直接返回，正式下单会把这些字段落到订单表。
 		MarketPriceSnapshot snapshot = new MarketPriceSnapshot();
 		snapshot.marketWrapperJson = marketWrapper.toJSONString();
 		snapshot.market = market;
-		snapshot.marketSlug = market.getString("slug");
+		snapshot.marketSlug = StrUtil.blankToDefault(market.getString("slug"), req.getMarketSlug().trim());
 		snapshot.marketId = market.getString("id");
 		snapshot.conditionId = market.getString("conditionId");
 		snapshot.marketQuestion = market.getString("question");
@@ -345,13 +384,33 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 */
 	private void validateRequest(PolymarketOrderReq req) {
 		if (req == null || StrUtil.isBlank(req.getMarketSlug())) {
-			throw new ServiceException("marketSlug cannot be blank");
+			throw new ServiceException(ResponseCode.CODE_1294);
 		}
 		if (req.getOutcomeIndex() == null || req.getOutcomeIndex() < 0) {
-			throw new ServiceException("outcomeIndex must be non-negative");
+			throw new ServiceException(ResponseCode.CODE_1294);
 		}
 		if (req.getShareAmount() == null || req.getShareAmount().compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("shareAmount must be greater than zero");
+			throw new ServiceException(ResponseCode.CODE_1294);
+		}
+	}
+
+	/**
+	 * 校验当前用户是否已经购买过同一个Polymarket市场。
+	 *
+	 * <p>当前业务临时限制为“同一用户同一marketSlug只能下一笔正常订单”，不区分Yes/No或多结果选项；
+	 * 数据库唯一索引用于并发兜底，这里负责在进入价格查询和扣款前给前端明确业务提示。</p>
+	 *
+	 * @param marketSlug Polymarket市场slug，来自下单请求
+	 * @param userId 当前App用户ID
+	 */
+	private void validateUserMarketNotOrdered(String marketSlug, Long userId) {
+		boolean exists = polymarketOrderService.lambdaQuery()
+			.eq(PolymarketOrder::getUserId, userId)
+			.eq(PolymarketOrder::getMarketSlug, marketSlug.trim())
+			.eq(PolymarketOrder::getDeleted, 0)
+			.exists();
+		if (exists) {
+			throw new ServiceException(ResponseCode.CODE_1297);
 		}
 	}
 
@@ -364,16 +423,16 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 */
 	private void validateMarketOpen(JSONObject market) {
 		if (Boolean.TRUE.equals(market.getBoolean("closed")) || Boolean.FALSE.equals(market.getBoolean("active"))) {
-			throw new ServiceException("Polymarket market is closed or inactive");
+			throw new ServiceException(ResponseCode.CODE_1289);
 		}
 		Boolean acceptingOrders = market.getBoolean("acceptingOrders");
 		if (Boolean.FALSE.equals(acceptingOrders)) {
-			throw new ServiceException("Polymarket market is not accepting orders");
+			throw new ServiceException(ResponseCode.CODE_1289);
 		}
 		Date endTime = parseEndTime(market);
 		if (endTime != null && endTime.getTime() - System.currentTimeMillis() < MIN_SECONDS_BEFORE_END * 1000L) {
 			// 短周期Up/Down市场波动很快，结束前最后5秒禁止内部下单，避免价格快照和结算结果贴得过近。
-			throw new ServiceException("Polymarket market will end within " + MIN_SECONDS_BEFORE_END + " seconds");
+			throw new ServiceException(ResponseCode.CODE_1290);
 		}
 	}
 
@@ -410,6 +469,8 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			.endTime(snapshot.endTime)
 			.status(STATUS_PENDING)
 			.payoutUsdtAmount(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN))
+			.payoutAfiPrice(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN))
+			.payoutAfiAmount(BigDecimal.ZERO.setScale(SHARE_SCALE, RoundingMode.DOWN))
 			.orderSnapshotJson(snapshot.marketWrapperJson)
 			.deleted(0)
 			.build();
@@ -446,6 +507,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			.totalUsdtAmount(snapshot.afiUsdtAmount)
 			.totalShareAmount(snapshot.shareAmount)
 			.totalPayoutUsdtAmount(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN))
+			.totalPayoutAfiAmount(BigDecimal.ZERO.setScale(SHARE_SCALE, RoundingMode.DOWN))
 			.marketSnapshotJson(snapshot.marketWrapperJson)
 			.deleted(0)
 			.build();
@@ -470,33 +532,88 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	}
 
 	/**
-	 * 在订单事务提交后刷新Polymarket WebSocket订阅。
+	 * 在订单事务提交后尝试刷新Polymarket WebSocket订阅。
 	 *
-	 * <p>新市场下单成功后，市场表已经写入完整asset_ids_json；事务提交后刷新订阅，避免WebSocket只在启动或重连时订阅。
-	 * 刷新失败不会回滚订单，Quartz仍会兜底派发到期市场。</p>
+	 * <p>市场聚合表和订单在同一个事务内写入，提交后再做Redis SETNX去重，确保新市场第一次下单后能尽快进入
+	 * market_resolved监听；同一个marketSlug后续订单不再重复触发全量订阅刷新。</p>
+	 *
+	 * @param snapshot 下单时的市场快照，用于获取marketSlug和endTime计算Redis过期时间
 	 */
-	private void refreshWebSocketSubscribeAfterCommit() {
+	private void refreshWebSocketSubscribeAfterCommit(MarketPriceSnapshot snapshot) {
+		if (snapshot == null || StrUtil.isBlank(snapshot.marketSlug)) {
+			return;
+		}
 		// 只刷新订阅，不发奖、不修改市场状态；真正结算仍由市场派发和processSettlingMarket兜底复核。
 		// 放在afterCommit是为了保证刷新订阅时，市场表已经能查到本次下单写入的asset_ids_json。
 		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
 			@Override
 			public void afterCommit() {
-				submitWebSocketRefreshTask();
+				submitWebSocketRefreshTask(snapshot);
 			}
 		});
 	}
 
 	/**
-	 * 使用项目统一虚拟线程池异步刷新Polymarket WebSocket订阅。
+	 * 使用项目统一虚拟线程池异步执行Redis去重和WebSocket订阅刷新。
 	 *
-	 * <p>刷新订阅是轻量级实时性增强动作，不能阻塞下单主流程；失败只记录在WebSocket客户端内部日志中，
-	 * 不影响订单创建结果，也不承担发奖职责。</p>
+	 * <p>刷新订阅是轻量级实时性增强动作，不能阻塞下单主流程。Redis异常或WebSocket当前不可用都不影响订单创建；
+	 * WebSocket重连全量订阅和Quartz到期扫描仍然是兜底。</p>
+	 *
+	 * @param snapshot 下单时的市场快照
 	 */
-	private void submitWebSocketRefreshTask() {
+	private void submitWebSocketRefreshTask(MarketPriceSnapshot snapshot) {
 		ExecutorRegionKit.getExecutorRegion().getUserVirtualThreadExecutor(1)
 			.executeTry(() -> {
+				if (!markMarketSubscribeRefreshNeeded(snapshot)) {
+					return;
+				}
 				polymarketWebSocketClient.refreshSubscribeAfterOrderCreated();
 			});
+	}
+
+	/**
+	 * 用Redis SETNX判断该marketSlug是否已经触发过WebSocket订阅刷新。
+	 *
+	 * <p>Redis这里只是减少重复刷新，不作为市场是否存在、是否结算的依据。Redis key丢失最多导致后续订单多刷新一次，
+	 * 不会影响资金、订单和结算状态。</p>
+	 *
+	 * @param snapshot 下单时的市场快照
+	 * @return true表示本次拿到首次刷新资格；false表示已刷新过或Redis不可用
+	 */
+	private boolean markMarketSubscribeRefreshNeeded(MarketPriceSnapshot snapshot) {
+		String redisKey = RedisConstant.POLYMARKET_WS_SUBSCRIBED_MARKET + snapshot.marketSlug;
+		long ttlSeconds = calculateSubscribeRefreshTtlSeconds(snapshot.endTime);
+		try {
+			Boolean success = xmsRedis.getRedisTemplate()
+				.opsForValue()
+				.setIfAbsent(redisKey, "1", ttlSeconds, TimeUnit.SECONDS);
+			if (Boolean.TRUE.equals(success)) {
+				log.info("Polymarket市场首次触发WebSocket订阅刷新，marketSlug={}, ttlSeconds={}", snapshot.marketSlug, ttlSeconds);
+				return true;
+			}
+			log.info("Polymarket市场已触发过WebSocket订阅刷新，本次跳过，marketSlug={}", snapshot.marketSlug);
+			return false;
+		} catch (Exception e) {
+			log.warn("Polymarket市场WebSocket订阅刷新Redis去重失败，marketSlug={}, error={}", snapshot.marketSlug, e.getMessage());
+			return false;
+		}
+	}
+
+	/**
+	 * 计算WebSocket订阅去重key的过期时间。
+	 *
+	 * <p>有结束时间时保留到市场结束后7天，方便结算排查且避免Redis长期堆积；没有结束时间时使用默认30天。</p>
+	 *
+	 * @param endTime Polymarket市场结束时间，可能为空
+	 * @return Redis key过期秒数
+	 */
+	private long calculateSubscribeRefreshTtlSeconds(Date endTime) {
+		if (endTime == null) {
+			return WS_SUBSCRIBED_MARKET_DEFAULT_TTL_SECONDS;
+		}
+		long secondsUntilEnd = (endTime.getTime() - System.currentTimeMillis()) / 1000L;
+		long ttlSeconds = secondsUntilEnd + WS_SUBSCRIBED_MARKET_AFTER_END_TTL_SECONDS;
+		return ttlSeconds > 0 ? ttlSeconds : WS_SUBSCRIBED_MARKET_AFTER_END_TTL_SECONDS;
 	}
 
 	/**
@@ -525,9 +642,19 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	 */
 	private JSONArray parseJsonArray(String json, String fieldName) {
 		if (StrUtil.isBlank(json)) {
-			throw new ServiceException("Polymarket " + fieldName + " is empty");
+			throw new ServiceException(ResponseCode.CODE_1286);
 		}
-		return JSONArray.parseArray(json);
+		try {
+			JSONArray array = JSONArray.parseArray(json);
+			if (array == null || array.isEmpty()) {
+				throw new ServiceException(ResponseCode.CODE_1286);
+			}
+			return array;
+		} catch (ServiceException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new ServiceException(ResponseCode.CODE_1286);
+		}
 	}
 
 	/**
@@ -563,7 +690,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			try {
 				return java.sql.Date.valueOf(endDate);
 			} catch (Exception e) {
-				throw new ServiceException("Polymarket endDate format is invalid");
+				throw new ServiceException(ResponseCode.CODE_1294);
 			}
 		}
 	}

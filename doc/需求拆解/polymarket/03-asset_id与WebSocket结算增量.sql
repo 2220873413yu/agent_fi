@@ -5,6 +5,15 @@
 
 SET @schema_name := DATABASE();
 
+-- 字典：Polymarket猜中后实际发放AFI，更新旧的“兑付USDT”文案。
+UPDATE sys_dict_data
+SET dict_label = 'Polymarket猜中兑付AFI',
+    update_by = 'admin',
+    update_time = sysdate(),
+    remark = 'Polymarket猜中后按结算AFI价格发放等值AFI'
+WHERE dict_type = 't_user_money_log_source_type'
+  AND dict_value = '41';
+
 -- 订单表：保存用户选择结果对应的asset_id/token_id，后续可用于按WebSocket结果定位用户选择。
 SET @column_exists := (
   SELECT COUNT(1)
@@ -17,6 +26,62 @@ SET @sql := IF(
   @column_exists = 0,
   'ALTER TABLE t_polymarket_order ADD COLUMN asset_id varchar(100) DEFAULT NULL COMMENT ''用户选择结果对应的Polymarket asset_id/token_id快照'' AFTER outcome_name',
   'SELECT ''t_polymarket_order.asset_id already exists'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 订单表：结算时使用的AFI/USDT价格快照，中奖后按该价格把USDT等值换算成AFI发放。
+SET @column_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = @schema_name
+    AND table_name = 't_polymarket_order'
+    AND column_name = 'payout_afi_price'
+);
+SET @sql := IF(
+  @column_exists = 0,
+  'ALTER TABLE t_polymarket_order ADD COLUMN payout_afi_price decimal(20,6) NOT NULL DEFAULT ''0.000000'' COMMENT ''结算时AFI/USDT价格快照'' AFTER payout_usdt_amount',
+  'SELECT ''t_polymarket_order.payout_afi_price already exists'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 订单表：中奖后实际发放到用户AFI钱包valid_num2的数量。
+SET @column_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = @schema_name
+    AND table_name = 't_polymarket_order'
+    AND column_name = 'payout_afi_amount'
+);
+SET @sql := IF(
+  @column_exists = 0,
+  'ALTER TABLE t_polymarket_order ADD COLUMN payout_afi_amount decimal(24,8) NOT NULL DEFAULT ''0.00000000'' COMMENT ''实际发放AFI数量'' AFTER payout_afi_price',
+  'SELECT ''t_polymarket_order.payout_afi_amount already exists'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 订单表：临时限制同一用户同一Polymarket市场只能下一笔正常订单。
+-- 建唯一索引前可先执行以下SQL排查历史重复数据；如有结果，需要先人工处理后再建索引。
+-- SELECT user_id, market_slug, deleted, COUNT(*)
+-- FROM t_polymarket_order
+-- GROUP BY user_id, market_slug, deleted
+-- HAVING COUNT(*) > 1;
+SET @index_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.statistics
+  WHERE table_schema = @schema_name
+    AND table_name = 't_polymarket_order'
+    AND index_name = 'uk_user_market_slug'
+);
+SET @sql := IF(
+  @index_exists = 0,
+  'ALTER TABLE t_polymarket_order ADD UNIQUE KEY uk_user_market_slug (user_id, market_slug, deleted)',
+  'SELECT ''t_polymarket_order.uk_user_market_slug already exists'''
 );
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
@@ -84,6 +149,23 @@ SET @sql := IF(
   @index_exists = 0,
   'ALTER TABLE t_polymarket_order ADD KEY idx_asset_id (asset_id)',
   'SELECT ''t_polymarket_order.idx_asset_id already exists'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 市场表：记录市场维度实际总发放AFI数量，USDT等值仍保存在total_payout_usdt_amount用于对账。
+SET @column_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = @schema_name
+    AND table_name = 't_polymarket_market'
+    AND column_name = 'total_payout_afi_amount'
+);
+SET @sql := IF(
+  @column_exists = 0,
+  'ALTER TABLE t_polymarket_market ADD COLUMN total_payout_afi_amount decimal(24,8) NOT NULL DEFAULT ''0.00000000'' COMMENT ''市场实际总发放AFI数量'' AFTER total_payout_usdt_amount',
+  'SELECT ''t_polymarket_market.total_payout_afi_amount already exists'''
 );
 PREPARE stmt FROM @sql;
 EXECUTE stmt;

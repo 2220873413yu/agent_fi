@@ -115,6 +115,18 @@ public class XmsTask {
 		log.info("dispatched Polymarket local markets, updated={}", count);
 	}
 
+	/**
+	 * 重投递长时间卡在结算中的Polymarket市场。
+	 *
+	 * <p>该任务用于修复市场已经被抢占为结算中，但队列消息未投递、服务重启或消费者异常导致无人继续处理的场景。
+	 * 只重投递update_time距离当前时间超过10分钟的数据，避免上一轮消费者还在处理时重复投递。</p>
+	 */
+	public void redispatchStuckPolymarketMarkets() {
+		log.info("redispatch stuck Polymarket settling markets");
+		int count = polymarketOrderService.redispatchStuckSettlingMarkets(100);
+		log.info("redispatched stuck Polymarket settling markets, count={}", count);
+	}
+
 
 	/**
 	 * 查询没有处理的节点订单

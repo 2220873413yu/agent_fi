@@ -29,6 +29,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="resultOutcomeIndex" column="result_outcome_index"/>
         <result property="resultOutcomeName" column="result_outcome_name"/>
         <result property="payoutUsdtAmount" column="payout_usdt_amount"/>
+        <result property="payoutAfiPrice" column="payout_afi_price"/>
+        <result property="payoutAfiAmount" column="payout_afi_amount"/>
         <result property="settleTime" column="settle_time"/>
         <result property="orderSnapshotJson" column="order_snapshot_json"/>
         <result property="settleSnapshotJson" column="settle_snapshot_json"/>
@@ -42,7 +44,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select id, order_no, user_id, account, event_slug, event_title, market_slug, market_id, condition_id,
                market_question, outcome_index, outcome_name, asset_id, afi_amount, afi_price, afi_usdt_amount, outcome_price,
                share_amount, max_payout_usdt, end_time, status, result_outcome_index, result_outcome_name,
-               payout_usdt_amount, settle_time, order_snapshot_json, settle_snapshot_json, create_time, update_time,
+               payout_usdt_amount, payout_afi_price, payout_afi_amount, settle_time, order_snapshot_json, settle_snapshot_json, create_time, update_time,
                remark, deleted
         from t_polymarket_order
     </sql>

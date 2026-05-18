@@ -82,6 +82,11 @@ public interface RedisConstant {
 	String CAPTCHA_OORT_PRICE = REDIS_PREFIX + "oort:price:";
 
 	/**
+	 * Polymarket市场WebSocket订阅刷新去重key前缀，后面拼接marketSlug。
+	 */
+	String POLYMARKET_WS_SUBSCRIBED_MARKET = REDIS_PREFIX + "polymarket:ws:subscribed:market:";
+
+	/**
 	 * 分布式锁前缀名集合
 	 */
 	interface LockConstant {
@@ -117,6 +122,10 @@ public interface RedisConstant {
 		 * 购买节点
 		 */
 		String XMS_NODE_APPLY = REDIS_LOCK + "xmsNodeApply";
+		/**
+		 * Polymarket内部下单锁，按用户ID串行化扣款和订单创建。
+		 */
+		String POLYMARKET_ORDER_CREATE = REDIS_LOCK + "polymarket:order:create";
 		String XMS_WITHDRAW_CHECK = REDIS_LOCK + "xmsWithdrawCheck:";
 	}
 

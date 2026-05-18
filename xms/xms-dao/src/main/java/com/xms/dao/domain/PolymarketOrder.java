@@ -144,13 +144,23 @@ public class PolymarketOrder extends BaseEntity {
 	@ApiModelProperty(value = "赢家结果")
 	private String resultOutcomeName;
 
-	/** 实际兑付到用户valid_num1的USDT金额。 */
-	@Excel(name = "兑付USDT", sort = 23)
-	@ApiModelProperty(value = "兑付USDT")
+	/** 中奖应兑付的USDT等值金额，不是实际入账币种。 */
+	@Excel(name = "兑付USDT等值", sort = 23)
+	@ApiModelProperty(value = "中奖应兑付的USDT等值金额")
 	private BigDecimal payoutUsdtAmount;
 
+	/** 结算时使用的AFI/USDT价格快照。 */
+	@Excel(name = "结算AFI价格", sort = 24)
+	@ApiModelProperty(value = "结算时AFI/USDT价格快照")
+	private BigDecimal payoutAfiPrice;
+
+	/** 实际发放到用户valid_num2的AFI数量。 */
+	@Excel(name = "兑付AFI", sort = 25)
+	@ApiModelProperty(value = "实际发放到AFI钱包validNum2的数量")
+	private BigDecimal payoutAfiAmount;
+
 	/** 结算时间。 */
-	@Excel(name = "结算时间", sort = 24, dateFormat = "yyyy-MM-dd HH:mm:ss")
+	@Excel(name = "结算时间", sort = 26, dateFormat = "yyyy-MM-dd HH:mm:ss")
 	@ApiModelProperty(value = "结算时间")
 	private Date settleTime;
 

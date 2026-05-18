@@ -21,7 +21,9 @@ CREATE TABLE IF NOT EXISTS `t_polymarket_order` (
   `status` int NOT NULL DEFAULT 0 COMMENT '订单状态 0待结算 1已猜中 2未猜中 3待人工复核 4已作废/已退款',
   `result_outcome_index` int DEFAULT NULL COMMENT '赢家结果下标',
   `result_outcome_name` varchar(100) DEFAULT NULL COMMENT '赢家结果名称',
-  `payout_usdt_amount` decimal(24,8) NOT NULL DEFAULT '0.00000000' COMMENT '兑付USDT',
+  `payout_usdt_amount` decimal(24,8) NOT NULL DEFAULT '0.00000000' COMMENT '中奖应兑付USDT等值',
+  `payout_afi_price` decimal(20,6) NOT NULL DEFAULT '0.000000' COMMENT '结算时AFI/USDT价格快照',
+  `payout_afi_amount` decimal(24,8) NOT NULL DEFAULT '0.00000000' COMMENT '实际发放AFI数量',
   `settle_time` datetime DEFAULT NULL COMMENT '结算时间',
   `order_snapshot_json` longtext COMMENT '下单时Polymarket市场快照JSON',
   `settle_snapshot_json` longtext COMMENT '结算时Polymarket市场快照JSON',
@@ -55,7 +57,8 @@ CREATE TABLE IF NOT EXISTS `t_polymarket_market` (
   `total_afi_amount` decimal(20,6) NOT NULL DEFAULT '0.000000' COMMENT '市场总下单AFI',
   `total_usdt_amount` decimal(20,6) NOT NULL DEFAULT '0.000000' COMMENT '市场总下单等值USDT',
   `total_share_amount` decimal(24,8) NOT NULL DEFAULT '0.00000000' COMMENT '市场总购买份额',
-  `total_payout_usdt_amount` decimal(24,8) NOT NULL DEFAULT '0.00000000' COMMENT '市场总兑付USDT',
+  `total_payout_usdt_amount` decimal(24,8) NOT NULL DEFAULT '0.00000000' COMMENT '市场中奖应兑付USDT等值',
+  `total_payout_afi_amount` decimal(24,8) NOT NULL DEFAULT '0.00000000' COMMENT '市场实际总发放AFI数量',
   `last_check_time` datetime DEFAULT NULL COMMENT '上次查询Polymarket结果时间',
   `settle_time` datetime DEFAULT NULL COMMENT '市场结算完成时间',
   `market_snapshot_json` longtext COMMENT '最新Polymarket市场快照JSON',
@@ -119,7 +122,7 @@ SELECT 40, 'Polymarket下单扣减AFI', '40', 't_user_money_log_source_type', ''
 WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_user_money_log_source_type' AND dict_value = '40');
 
 INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
-SELECT 41, 'Polymarket猜中兑付USDT', '41', 't_user_money_log_source_type', '', 'success', 'N', '0', 'admin', sysdate(), ''
+SELECT 41, 'Polymarket猜中兑付AFI', '41', 't_user_money_log_source_type', '', 'success', 'N', '0', 'admin', sysdate(), ''
 WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type = 't_user_money_log_source_type' AND dict_value = '41');
 
 INSERT INTO t_sys_para (para_code, para_value, para_desc, visible, create_time, active_flag, remark)

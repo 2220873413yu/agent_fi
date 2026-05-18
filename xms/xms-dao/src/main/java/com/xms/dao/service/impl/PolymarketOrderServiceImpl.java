@@ -7,8 +7,10 @@ import cn.hutool.http.HttpUtil;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.xms.common.constant.Constants;
 import com.xms.common.constant.ConstantType;
 import com.xms.common.exception.ServiceException;
+import com.xms.common.notify.AsyncPolymarketMarketSettleService;
 import com.xms.common.result.ResponseCode;
 import com.xms.common.utils.uuid.IDUtils;
 import com.xms.dao.domain.PolymarketMarket;
@@ -18,12 +20,15 @@ import com.xms.dao.mapper.PolymarketOrderMapper;
 import com.xms.dao.service.IPolymarketMarketService;
 import com.xms.dao.service.IPolymarketOrderService;
 import com.xms.dao.service.UserWalletService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
@@ -48,15 +53,26 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 	private static final int MAX_SETTLE_LIMIT = 500;
 	private static final int REQUEST_TIMEOUT_MS = 5000;
 	private static final int MONEY_SCALE = 6;
+	private static final int SHARE_SCALE = 8;
+	private static final int STUCK_SETTLING_MINUTES = 10;
 	private static final String GAMMA_MARKET_SLUG_URL = "https://gamma-api.polymarket.com/markets/slug/";
 
 	private final UserWalletService userWalletService;
 	private final IPolymarketMarketService polymarketMarketService;
+	private final AsyncPolymarketMarketSettleService asyncPolymarketMarketSettleService;
+	private final Environment environment;
+	private final String lqBaseUrl;
 
 	public PolymarketOrderServiceImpl(UserWalletService userWalletService,
-									  IPolymarketMarketService polymarketMarketService) {
+									  IPolymarketMarketService polymarketMarketService,
+									  AsyncPolymarketMarketSettleService asyncPolymarketMarketSettleService,
+									  Environment environment,
+									  @Value("${lq.baseUrl}") String lqBaseUrl) {
 		this.userWalletService = userWalletService;
 		this.polymarketMarketService = polymarketMarketService;
+		this.asyncPolymarketMarketSettleService = asyncPolymarketMarketSettleService;
+		this.environment = environment;
+		this.lqBaseUrl = lqBaseUrl;
 	}
 
 	/**
@@ -103,6 +119,42 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 			}
 		}
 		return updated;
+	}
+
+	/**
+	 * 重投递长时间处于结算中的Polymarket市场。
+	 *
+	 * <p>该方法用于兜底修复“市场已经被WebSocket或Quartz抢占为结算中，但队列消息未投递或消费者未执行”的数据。
+	 * 只处理update_time距离当前时间超过10分钟的市场，避免上一轮消费者仍在处理时重复投递。</p>
+	 *
+	 * @param limit 本批最多重投递的市场数量
+	 * @return 实际重投递的市场数量
+	 */
+	@Override
+	public int redispatchStuckSettlingMarkets(Integer limit) {
+		Date thresholdTime = buildStuckSettlingThresholdTime();
+		// 步骤1：只扫描结算中且更新时间超过10分钟的市场，数据库状态仍是兜底准绳。
+		List<PolymarketMarket> stuckMarkets = polymarketMarketService.lambdaQuery()
+			.eq(PolymarketMarket::getStatus, MARKET_STATUS_SETTLING)
+			.eq(PolymarketMarket::getDeleted, 0)
+			.le(PolymarketMarket::getUpdateTime, thresholdTime)
+			.orderByAsc(PolymarketMarket::getUpdateTime)
+			.last("limit " + normalizeLimit(limit))
+			.list();
+		if (CollectionUtil.isEmpty(stuckMarkets)) {
+			return 0;
+		}
+
+		int redispatched = 0;
+		for (PolymarketMarket market : stuckMarkets) {
+			if (StrUtil.isBlank(market.getMarketSlug())) {
+				continue;
+			}
+			// 步骤2：不改市场状态、不直接发奖，只把marketSlug重新投递到统一延迟队列。
+			asyncPolymarketMarketSettleService.sendMarketSettleMessage(market.getMarketSlug().trim());
+			redispatched++;
+		}
+		return redispatched;
 	}
 
 	/**
@@ -192,24 +244,37 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 			.list();
 
 		BigDecimal totalPayout = BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN);
+		BigDecimal totalPayoutAfi = BigDecimal.ZERO.setScale(SHARE_SCALE, RoundingMode.DOWN);
 		List<UserMoney> walletIncrements = new ArrayList<>();
 		Date settleTime = new Date();
+		BigDecimal payoutAfiPrice;
+		try {
+			// 步骤5：结算发奖改为等值AFI，先锁定本次结算使用的AFI/USDT实时价格快照。
+			payoutAfiPrice = loadSettlementAfiPrice();
+		} catch (Exception e) {
+			return markMarketNeedReview(market, marketSnapshot, e.getMessage(), now);
+		}
 		for (PolymarketOrder order : pendingOrders) {
 			order.setResultOutcomeIndex(result.winnerIndex);
 			order.setResultOutcomeName(result.winnerName);
 			order.setSettleSnapshotJson(marketSnapshot.toJSONString());
 			order.setSettleTime(settleTime);
 			order.setUpdateTime(settleTime);
+			order.setPayoutAfiPrice(payoutAfiPrice);
 			if (order.getOutcomeIndex().equals(result.winnerIndex)) {
-				// 猜中订单按shareAmount兑付USDT到validNum1，钱包流水来源使用订单号追踪。
+				// 猜中订单保留USDT等值，并按结算AFI价格换算成AFI发到validNum2。
+				BigDecimal payoutAfiAmount = calculatePayoutAfiAmount(order.getShareAmount(), payoutAfiPrice);
 				order.setStatus(ORDER_STATUS_WON);
 				order.setPayoutUsdtAmount(order.getShareAmount());
+				order.setPayoutAfiAmount(payoutAfiAmount);
 				totalPayout = totalPayout.add(order.getShareAmount());
+				totalPayoutAfi = totalPayoutAfi.add(payoutAfiAmount);
 				walletIncrements.add(buildPayoutWalletIncrement(order));
 			} else {
 				// 猜错订单只更新订单状态，不产生钱包入账。
 				order.setStatus(ORDER_STATUS_LOST);
 				order.setPayoutUsdtAmount(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN));
+				order.setPayoutAfiAmount(BigDecimal.ZERO.setScale(SHARE_SCALE, RoundingMode.DOWN));
 			}
 		}
 
@@ -230,6 +295,7 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 		market.setResultOutcomeName(result.winnerName);
 		market.setWinningAssetId(result.winnerAssetId);
 		market.setTotalPayoutUsdtAmount(totalPayout.setScale(MONEY_SCALE, RoundingMode.DOWN));
+		market.setTotalPayoutAfiAmount(totalPayoutAfi.setScale(SHARE_SCALE, RoundingMode.DOWN));
 		market.setLastCheckTime(now);
 		market.setSettleTime(settleTime);
 		market.setMarketSnapshotJson(marketSnapshot.toJSONString());
@@ -241,7 +307,7 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 	/**
 	 * 将待结算市场派发为结算中。
 	 *
-	 * <p>当前只更新数据库状态并保留延迟队列TODO；后续接入队列后，应在状态抢占成功后发送marketSlug消息。</p>
+	 * <p>状态抢占成功后投递marketSlug到延迟队列，由消费者统一调用processSettlingMarket完成复核和发奖。</p>
 	 *
 	 * @param marketSlug Polymarket市场slug
 	 * @return true表示成功从待结算抢占为结算中
@@ -252,28 +318,80 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 		}
 		boolean dispatched = polymarketMarketService.markSettling(marketSlug.trim());
 		if (dispatched) {
-			// TODO 后续接入Redisson延迟队列后，在这里发送marketSlug结算消息。
-			// redissonDelayHandler.add(new RedissonDelayOrder<>(marketSlug.trim(), 1L, SysConstant.THIRTY, marketSlug.trim(), RedisConstant.StreamMsgConstant.DELAY_ORDER_TIMEOUT_QUEUE));
+			// 市场已经从待结算抢占为结算中，后续由延迟队列消费者统一处理订单结算和钱包入账。
+			asyncPolymarketMarketSettleService.sendMarketSettleMessage(marketSlug.trim());
 		}
 		return dispatched;
 	}
 
 	/**
-	 * 组装猜中订单的USDT钱包入账增量。
+	 * 组装猜中订单的AFI钱包入账增量。
+	 *
+	 * <p>这里不直接调用单笔钱包变更，而是收集UserMoney增量后批量落库，避免同一市场订单较多时产生大量单笔更新。
+	 * 入账金额使用订单上已计算好的payoutAfiAmount，USDT等值和AFI价格快照只用于对账。</p>
 	 *
 	 * @param order 已确认猜中的Polymarket订单
-	 * @return 可用于批量更新钱包的USDT增量
+	 * @return 可用于批量更新钱包的AFI增量
 	 */
 	private UserMoney buildPayoutWalletIncrement(PolymarketOrder order) {
 		UserMoney userMoney = new UserMoney();
 		userMoney.setId(order.getUserId());
-		userMoney.setValidNum1(order.getShareAmount());
-		userMoney.setGtId(IDUtils.getSnowflake(ConstantType.user_money_coin_type.type_1).nextIdStr());
+		userMoney.setValidNum2(order.getPayoutAfiAmount());
+		userMoney.setGtId(IDUtils.getSnowflake(ConstantType.user_money_coin_type.type_2).nextIdStr());
 		userMoney.setSourceCode(order.getOrderNo());
 		userMoney.setSourceType(ConstantType.user_money_log_source_type.type_41);
 		userMoney.setSourceId(order.getUserId());
 		userMoney.setUpdateTime(new Date());
 		return userMoney;
+	}
+
+	/**
+	 * 获取Polymarket结算发奖使用的AFI/USDT实时价格。
+	 *
+	 * <p>发奖入口位于DAO模块，不能依赖App层BizCommonService，因此这里按同一个 `/chain/price` 上游口径读取AFI价格；
+	 * dev-home环境沿用本地固定价0.5，避免本地调试依赖外部行情。</p>
+	 *
+	 * @return AFI/USDT价格，单位USDT
+	 */
+	private BigDecimal loadSettlementAfiPrice() {
+		String profile = environment.getProperty(Constants.ACTIVE_PROFILES_PROPERTY);
+		if (Constants.ACTIVE_PROPERTY_DEV_HOME.equalsIgnoreCase(profile)) {
+			return new BigDecimal("0.5").setScale(MONEY_SCALE, RoundingMode.DOWN);
+		}
+		try {
+			HttpResponse response = HttpUtil.createGet(lqBaseUrl + "/chain/price").timeout(REQUEST_TIMEOUT_MS).execute();
+			JSONObject jsonObject = JSON.parseObject(response.body());
+			if (!"200".equals(jsonObject.getString("code"))) {
+				throw new ServiceException(ResponseCode.CODE_1288);
+			}
+			JSONObject data = jsonObject.getJSONObject("data");
+			BigDecimal price = data == null ? null : data.getBigDecimal("afi");
+			if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+				throw new ServiceException(ResponseCode.CODE_1288);
+			}
+			return price.setScale(MONEY_SCALE, RoundingMode.DOWN);
+		} catch (ServiceException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new ServiceException(ResponseCode.CODE_1288);
+		}
+	}
+
+	/**
+	 * 将中奖USDT等值按结算AFI价格换算成实际发放AFI数量。
+	 *
+	 * <p>AFI发放保留8位并向下取整，避免精度舍入导致超发；USDT等值仍保存在订单payoutUsdtAmount用于对账。</p>
+	 *
+	 * @param payoutUsdtAmount 中奖应兑付USDT等值
+	 * @param payoutAfiPrice 结算时AFI/USDT价格
+	 * @return 实际发放AFI数量
+	 */
+	private BigDecimal calculatePayoutAfiAmount(BigDecimal payoutUsdtAmount, BigDecimal payoutAfiPrice) {
+		if (payoutUsdtAmount == null || payoutUsdtAmount.compareTo(BigDecimal.ZERO) <= 0
+			|| payoutAfiPrice == null || payoutAfiPrice.compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException(ResponseCode.CODE_1288);
+		}
+		return payoutUsdtAmount.divide(payoutAfiPrice, SHARE_SCALE, RoundingMode.DOWN);
 	}
 
 	/**
@@ -378,6 +496,19 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 			return DEFAULT_SETTLE_LIMIT;
 		}
 		return Math.min(limit, MAX_SETTLE_LIMIT);
+	}
+
+	/**
+	 * 计算结算中市场重投递的时间阈值。
+	 *
+	 * <p>固定使用当前时间往前10分钟，避免刚进入结算中的市场还在消费者处理时被重复投递。</p>
+	 *
+	 * @return 当前时间减10分钟后的阈值时间
+	 */
+	private Date buildStuckSettlingThresholdTime() {
+		Calendar calendar = Calendar.getInstance();
+		calendar.add(Calendar.MINUTE, -STUCK_SETTLING_MINUTES);
+		return calendar.getTime();
 	}
 
 	/**

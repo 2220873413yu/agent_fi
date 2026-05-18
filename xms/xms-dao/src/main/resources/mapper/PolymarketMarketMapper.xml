@@ -25,6 +25,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="totalUsdtAmount" column="total_usdt_amount"/>
         <result property="totalShareAmount" column="total_share_amount"/>
         <result property="totalPayoutUsdtAmount" column="total_payout_usdt_amount"/>
+        <result property="totalPayoutAfiAmount" column="total_payout_afi_amount"/>
         <result property="lastCheckTime" column="last_check_time"/>
         <result property="settleTime" column="settle_time"/>
         <result property="marketSnapshotJson" column="market_snapshot_json"/>
@@ -38,7 +39,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select id, market_slug, market_id, condition_id, event_slug, event_title, market_question, end_time, status,
                asset_ids_json, outcomes_json, uma_resolution_status, result_outcome_index, result_outcome_name,
                winning_asset_id, order_count, total_afi_amount, total_usdt_amount, total_share_amount,
-               total_payout_usdt_amount, last_check_time, settle_time, market_snapshot_json, create_time, update_time,
+               total_payout_usdt_amount, total_payout_afi_amount, last_check_time, settle_time, market_snapshot_json, create_time, update_time,
                remark, deleted
         from t_polymarket_market
     </sql>
@@ -64,11 +65,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         insert into t_polymarket_market (
             market_slug, market_id, condition_id, event_slug, event_title, market_question, asset_ids_json,
             outcomes_json, end_time, status, order_count, total_afi_amount, total_usdt_amount, total_share_amount,
-            total_payout_usdt_amount, market_snapshot_json, create_time, update_time, remark, deleted
+            total_payout_usdt_amount, total_payout_afi_amount, market_snapshot_json, create_time, update_time, remark, deleted
         ) values (
             #{marketSlug}, #{marketId}, #{conditionId}, #{eventSlug}, #{eventTitle}, #{marketQuestion}, #{assetIdsJson},
             #{outcomesJson}, #{endTime}, #{status}, #{orderCount}, #{totalAfiAmount}, #{totalUsdtAmount}, #{totalShareAmount},
-            #{totalPayoutUsdtAmount}, #{marketSnapshotJson}, #{createTime}, #{updateTime}, #{remark}, #{deleted}
+            #{totalPayoutUsdtAmount}, #{totalPayoutAfiAmount}, #{marketSnapshotJson}, #{createTime}, #{updateTime}, #{remark}, #{deleted}
         )
         on duplicate key update
             market_id = values(market_id),

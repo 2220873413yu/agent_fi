@@ -2,6 +2,7 @@ package com.xms.app.client;
 
 import cn.hutool.core.collection.CollectionUtil;
 import com.alibaba.fastjson2.JSONArray;
+import com.xms.common.notify.AsyncPolymarketMarketSettleService;
 import com.xms.dao.domain.PolymarketMarket;
 import com.xms.dao.service.IPolymarketMarketService;
 import io.netty.channel.Channel;
@@ -32,6 +33,7 @@ public class LongLiveClientStart {
 	private static final int SUBSCRIBE_LIMIT = 500;
 
 	private final IPolymarketMarketService polymarketMarketService;
+	private final AsyncPolymarketMarketSettleService asyncPolymarketMarketSettleService;
 	private volatile Channel activeChannel;
 
 	/**
@@ -139,7 +141,7 @@ public class LongLiveClientStart {
 	/**
 	 * 派发Polymarket已开奖市场进入结算中。
 	 *
-	 * <p>WebSocket只负责触发状态抢占，不直接发奖、不写钱包。后续接入延迟队列后，在抢占成功处投递marketSlug。</p>
+	 * <p>WebSocket只负责触发状态抢占和投递结算队列，不直接发奖、不写钱包。真正结算由消费者调用processSettlingMarket完成。</p>
 	 *
 	 * @param slug Polymarket市场slug，可为空
 	 * @param winningAssetId 赢家asset_id/token_id，可为空
@@ -157,7 +159,8 @@ public class LongLiveClientStart {
 		if (dispatched) {
 			log.info("Polymarket市场已由WebSocket派发为结算中，marketSlug={}, winningAssetId={}, winningOutcome={}",
 				market.getMarketSlug(), winningAssetId, winningOutcome);
-			// TODO 后续接入Redisson延迟队列后，在这里投递marketSlug，让消费者统一调用processSettlingMarket发奖。
+			// WebSocket路径和Quartz路径共用同一个派发服务，消费者统一复核Gamma API后再发奖。
+			asyncPolymarketMarketSettleService.sendMarketSettleMessage(market.getMarketSlug());
 		}
 	}
 

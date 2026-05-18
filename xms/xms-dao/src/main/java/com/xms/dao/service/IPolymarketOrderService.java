@@ -28,6 +28,17 @@ public interface IPolymarketOrderService extends XmsDataService<PolymarketOrder>
 	int settlePendingOrders(Integer limit);
 
 	/**
+	 * 重投递长时间停留在结算中的Polymarket市场。
+	 *
+	 * <p>用于修复市场已经抢占为结算中，但队列消息未投递、服务重启或消费者异常导致无人继续处理的场景。
+	 * 该方法只补投递队列，不直接发奖。</p>
+	 *
+	 * @param limit 本批最多重投递的市场数量
+	 * @return 实际重投递的市场数量
+	 */
+	int redispatchStuckSettlingMarkets(Integer limit);
+
+	/**
 	 * 派发或处理单个市场。
 	 *
 	 * @param marketSlug Polymarket市场slug

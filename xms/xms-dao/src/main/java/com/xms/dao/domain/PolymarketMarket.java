@@ -124,17 +124,22 @@ public class PolymarketMarket extends BaseEntity {
 	private BigDecimal totalShareAmount;
 
 	/** 市场总兑付USDT。 */
-	@Excel(name = "总兑付USDT", sort = 17)
-	@ApiModelProperty(value = "市场总兑付USDT")
+	@Excel(name = "总兑付USDT等值", sort = 17)
+	@ApiModelProperty(value = "市场中奖应兑付USDT等值合计")
 	private BigDecimal totalPayoutUsdtAmount;
 
+	/** 市场实际总发放AFI数量。 */
+	@Excel(name = "总兑付AFI", sort = 18)
+	@ApiModelProperty(value = "市场实际总发放AFI数量")
+	private BigDecimal totalPayoutAfiAmount;
+
 	/** 上次检查Polymarket结果的时间。 */
-	@Excel(name = "上次检查时间", sort = 18, dateFormat = "yyyy-MM-dd HH:mm:ss")
+	@Excel(name = "上次检查时间", sort = 19, dateFormat = "yyyy-MM-dd HH:mm:ss")
 	@ApiModelProperty(value = "上次检查时间")
 	private Date lastCheckTime;
 
 	/** 市场结算完成时间。 */
-	@Excel(name = "结算时间", sort = 19, dateFormat = "yyyy-MM-dd HH:mm:ss")
+	@Excel(name = "结算时间", sort = 20, dateFormat = "yyyy-MM-dd HH:mm:ss")
 	@ApiModelProperty(value = "结算完成时间")
 	private Date settleTime;
 

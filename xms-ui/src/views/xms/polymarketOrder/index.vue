@@ -61,7 +61,9 @@
       <el-table-column label="等值USDT" align="center" prop="afiUsdtAmount" width="110" />
       <el-table-column label="成交价" align="center" prop="outcomePrice" width="90" />
       <el-table-column label="份额" align="center" prop="shareAmount" width="120" />
-      <el-table-column label="兑付USDT" align="center" prop="payoutUsdtAmount" width="110" />
+      <el-table-column label="兑付USDT等值" align="center" prop="payoutUsdtAmount" width="120" />
+      <el-table-column label="结算AFI价" align="center" prop="payoutAfiPrice" width="110" />
+      <el-table-column label="兑付AFI" align="center" prop="payoutAfiAmount" width="120" />
       <el-table-column label="状态" align="center" prop="status" width="110">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.t_polymarket_order_status" :value="scope.row.status" />
@@ -128,6 +130,15 @@
         </el-form-item>
         <el-form-item label="赢家结果">
           <el-input v-model="form.resultOutcomeName" />
+        </el-form-item>
+        <el-form-item label="兑付USDT等值">
+          <el-input v-model="form.payoutUsdtAmount" disabled />
+        </el-form-item>
+        <el-form-item label="结算AFI价格">
+          <el-input v-model="form.payoutAfiPrice" disabled />
+        </el-form-item>
+        <el-form-item label="兑付AFI">
+          <el-input v-model="form.payoutAfiAmount" disabled />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="3" />

@@ -16,6 +16,21 @@ SET @schema_name := DATABASE();
 
 SET @sql := (
     SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE t_polymarket_order ADD COLUMN order_snapshot_json longtext COMMENT ''下单时Polymarket市场快照JSON'' AFTER settle_time',
+        'SELECT 1'
+    )
+    FROM information_schema.columns
+    WHERE table_schema = @schema_name
+      AND table_name = 't_polymarket_order'
+      AND column_name = 'order_snapshot_json'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql := (
+    SELECT IF(
         COUNT(*) > 0,
         'ALTER TABLE t_polymarket_order DROP INDEX uk_user_market_slug',
         'SELECT 1'

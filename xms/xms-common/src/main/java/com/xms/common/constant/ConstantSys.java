@@ -152,9 +152,14 @@ public class ConstantSys {
 	public static final String PURE_STATIC_RATE_AFTER_RETURN_PERCENT = "PURE_STATIC_RATE_AFTER_RETURN_PERCENT";
 
 	/**
-	 * Polymarket内部下单最低AFI数量。
+	 * Polymarket内部下单最低AFI数量，历史兼容参数。
 	 */
 	public static final String POLYMARKET_MIN_ORDER_AFI_AMOUNT = "POLYMARKET_MIN_ORDER_AFI_AMOUNT";
+
+	/**
+	 * Polymarket内部下单最低购买份额/token数量。
+	 */
+	public static final String POLYMARKET_MIN_ORDER_SHARE_AMOUNT = "POLYMARKET_MIN_ORDER_SHARE_AMOUNT";
 
 	/**
 	 * Polymarket内部交易手续费比例，单位%。

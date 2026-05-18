@@ -17,8 +17,8 @@ import java.math.BigDecimal;
 @ApiModel(value = "PolymarketOrderConfigDto", description = "Polymarket内部下单配置")
 public class PolymarketOrderConfigDto {
 
-	@ApiModelProperty(value = "按当前价格折算后的最低下单AFI数量，单位AFI", example = "10")
-	private BigDecimal minAfiAmount;
+	@ApiModelProperty(value = "最低购买份额/token数量，单位为所选结果份额", example = "10")
+	private BigDecimal minShareAmount;
 
 	@ApiModelProperty(value = "市场结束前禁止下单秒数，单位秒", example = "5")
 	private Integer minSecondsBeforeEnd;

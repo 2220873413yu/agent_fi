@@ -136,16 +136,16 @@ public class PolymarketController {
 	/**
 	 * 查询Polymarket内部下单页面配置。
 	 *
-	 * <p>前端用这里的值对齐后端强校验，例如最低AFI下单数量、结束前最后几秒禁用下单，避免页面能点但接口拒绝。</p>
+	 * <p>前端用这里的值对齐后端强校验，例如最低购买份额、结束前最后几秒禁用下单，避免页面能点但接口拒绝。</p>
 	 *
-	 * @return 最低AFI下单数量、结束前禁用秒数和App端Authorization前缀
+	 * @return 最低购买份额、结束前禁用秒数和App端Authorization前缀
 	 */
-	@ApiOperation(value = "Polymarket内部订单配置", notes = "返回内部下单页面配置，包括最低折算AFI数量、结束前禁止下单秒数和App请求头前缀。")
+	@ApiOperation(value = "Polymarket内部订单配置", notes = "返回内部下单页面配置，包括最低购买份额/token数量、结束前禁止下单秒数和App请求头前缀。")
 	@Anonymous
 	@GetMapping("/orders/config")
 	public ResultPista<PolymarketOrderConfigDto> orderConfig() {
 		return ResultPista.data(PolymarketOrderConfigDto.builder()
-			.minAfiAmount(polymarketOrderAppService.getMinAfiOrderAmount())
+			.minShareAmount(polymarketOrderAppService.getMinOrderShareAmount())
 			.minSecondsBeforeEnd(5)
 			.authorizationPrefix("App ")
 			.build());

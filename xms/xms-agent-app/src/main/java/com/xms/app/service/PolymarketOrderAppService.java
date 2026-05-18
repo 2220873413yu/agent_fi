@@ -25,11 +25,11 @@ public interface PolymarketOrderAppService {
 	PolymarketOrderQuoteDto quote(PolymarketOrderReq req, Long userId);
 
 	/**
-	 * 读取Polymarket内部订单最低AFI下单数量。
+	 * 读取Polymarket内部订单最低购买份额/token数量。
 	 *
-	 * @return 系统参数中的最低AFI数量；参数缺失或非法时返回服务兜底值
+	 * @return 系统参数中的最低购买份额；参数缺失或非法时返回服务兜底值
 	 */
-	BigDecimal getMinAfiOrderAmount();
+	BigDecimal getMinOrderShareAmount();
 
 	/**
 	 * 创建平台内部Polymarket订单。

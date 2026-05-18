@@ -144,6 +144,10 @@ INSERT INTO t_sys_para (para_code, para_value, para_desc, visible, create_time, 
 SELECT 'POLYMARKET_MIN_ORDER_AFI_AMOUNT', '10', 'Polymarket内部下单最低AFI数量', '0', sysdate(), 1, 'Polymarket内部订单参数'
 WHERE NOT EXISTS (SELECT 1 FROM t_sys_para WHERE para_code = 'POLYMARKET_MIN_ORDER_AFI_AMOUNT');
 
+INSERT INTO t_sys_para (para_code, para_value, para_desc, visible, create_time, active_flag, remark)
+SELECT 'POLYMARKET_MIN_ORDER_SHARE_AMOUNT', '10', 'Polymarket内部下单最低购买份额/token数量', '0', sysdate(), 1, 'Polymarket内部订单参数'
+WHERE NOT EXISTS (SELECT 1 FROM t_sys_para WHERE para_code = 'POLYMARKET_MIN_ORDER_SHARE_AMOUNT');
+
 INSERT INTO sys_job (job_name, job_group, invoke_target, cron_expression, misfire_policy, concurrent, status, create_by, create_time, remark)
 SELECT 'Polymarket内部市场派发', 'DEFAULT', 'xmsTask.settlePolymarketOrders', '0/10 * * * * ?', '3', '1', '0', 'admin', sysdate(), '每10秒扫描已结束的Polymarket市场并派发为结算中'
 WHERE NOT EXISTS (SELECT 1 FROM sys_job WHERE invoke_target = 'xmsTask.settlePolymarketOrders');

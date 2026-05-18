@@ -548,7 +548,7 @@
           <div class="field">
             <label for="shareAmountInput">购买份额</label>
             <input id="shareAmountInput" type="number" min="0.000001" step="0.000001" value="100">
-            <div id="minAfiHint" class="muted">最低下单数量加载中...</div>
+            <div id="minShareHint" class="muted">最低购买份额加载中...</div>
           </div>
         </div>
 
@@ -603,7 +603,7 @@
     section: 'crypto',
     selected: null,
     lastQuote: null,
-    minAfiAmount: 10,
+    minShareAmount: 10,
     minSecondsBeforeEnd: 5
   };
 
@@ -622,7 +622,7 @@
   const statusMetric = document.getElementById('statusMetric');
   const tokenInput = document.getElementById('tokenInput');
   const shareAmountInput = document.getElementById('shareAmountInput');
-  const minAfiHint = document.getElementById('minAfiHint');
+  const minShareHint = document.getElementById('minShareHint');
   const selectedBox = document.getElementById('selectedBox');
   const quoteBtn = document.getElementById('quoteBtn');
   const createBtn = document.getElementById('createBtn');
@@ -744,17 +744,17 @@
   async function loadOrderConfig() {
     try {
       const config = await requestJson('/api/polymarket/orders/config');
-      const minAfiAmount = Number(config.minAfiAmount);
-      if (Number.isFinite(minAfiAmount) && minAfiAmount > 0) {
-        state.minAfiAmount = minAfiAmount;
+      const minShareAmount = Number(config.minShareAmount);
+      if (Number.isFinite(minShareAmount) && minShareAmount > 0) {
+        state.minShareAmount = minShareAmount;
       }
       const minSecondsBeforeEnd = Number(config.minSecondsBeforeEnd);
       if (Number.isFinite(minSecondsBeforeEnd) && minSecondsBeforeEnd >= 0) {
         state.minSecondsBeforeEnd = minSecondsBeforeEnd;
       }
-      minAfiHint.textContent = `按当前价格折算后，购买成本最低：${formatNumber(state.minAfiAmount)} AFI`;
+      minShareHint.textContent = `最低购买份额：${formatNumber(state.minShareAmount, 8)} 个token`;
     } catch (error) {
-      minAfiHint.textContent = `按当前价格折算后，购买成本最低：${formatNumber(state.minAfiAmount)} AFI（配置读取失败，使用页面兜底）`;
+      minShareHint.textContent = `最低购买份额：${formatNumber(state.minShareAmount, 8)} 个token（配置读取失败，使用页面兜底）`;
     }
   }
 
@@ -1095,6 +1095,9 @@
     const shareAmount = Number(shareAmountInput.value);
     if (!Number.isFinite(shareAmount) || shareAmount <= 0) {
       throw new Error('请输入大于 0 的购买份额。');
+    }
+    if (shareAmount < state.minShareAmount) {
+      throw new Error(`最低购买份额为 ${formatNumber(state.minShareAmount, 8)} 个token。`);
     }
     if (!state.selected.assetId) {
       throw new Error('当前市场结果缺少assetId，请刷新市场后再下单。');

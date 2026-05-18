@@ -67,7 +67,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	private static final int BIZ_TYPE_UP_DOWN = 3;
 	private static final String UP_DOWN_SLUG_MARK = "-updown-5m-";
 	private static final BigDecimal PERCENT_DIVISOR = new BigDecimal("100");
-	private static final BigDecimal DEFAULT_MIN_ORDER_AFI_AMOUNT = new BigDecimal("10");
+	private static final BigDecimal DEFAULT_MIN_ORDER_SHARE_AMOUNT = new BigDecimal("10");
 	private static final long WS_SUBSCRIBED_MARKET_DEFAULT_TTL_SECONDS = TimeUnit.DAYS.toSeconds(30);
 	private static final long WS_SUBSCRIBED_MARKET_AFTER_END_TTL_SECONDS = TimeUnit.DAYS.toSeconds(7);
 
@@ -140,23 +140,27 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	}
 
 	/**
-	 * 从系统参数读取最低AFI下单数量。
+	 * 从系统参数读取最低购买份额/token数量。
 	 *
-	 * <p>参数缺失、空值、非数字或小于等于0时，使用默认值10 AFI，避免配置异常导致任意小额下单。</p>
+	 * <p>参数缺失、空值、非数字或小于等于0时，使用默认值10份额，避免配置异常导致任意小额下单。
+	 * 这里限制的是用户输入的shareAmount，不再按实时价格折算后的AFI成本校验。</p>
 	 *
-	 * @return 最低AFI下单数量
+	 * @return 最低购买份额/token数量
 	 */
 	@Override
-	public BigDecimal getMinAfiOrderAmount() {
-		String value = sysParaServiceImpl.getValue(ConstantSys.POLYMARKET_MIN_ORDER_AFI_AMOUNT);
+	public BigDecimal getMinOrderShareAmount() {
+		String value = sysParaServiceImpl.getValue(ConstantSys.POLYMARKET_MIN_ORDER_SHARE_AMOUNT);
 		if (StrUtil.isBlank(value)) {
-			return DEFAULT_MIN_ORDER_AFI_AMOUNT;
+			value = sysParaServiceImpl.getValue(ConstantSys.POLYMARKET_MIN_ORDER_AFI_AMOUNT);
+		}
+		if (StrUtil.isBlank(value)) {
+			return DEFAULT_MIN_ORDER_SHARE_AMOUNT;
 		}
 		try {
-			BigDecimal minAmount = new BigDecimal(value.trim()).setScale(MONEY_SCALE, RoundingMode.DOWN);
-			return minAmount.compareTo(BigDecimal.ZERO) > 0 ? minAmount : DEFAULT_MIN_ORDER_AFI_AMOUNT;
+			BigDecimal minAmount = new BigDecimal(value.trim()).setScale(SHARE_SCALE, RoundingMode.DOWN);
+			return minAmount.compareTo(BigDecimal.ZERO) > 0 ? minAmount : DEFAULT_MIN_ORDER_SHARE_AMOUNT;
 		} catch (NumberFormatException e) {
-			return DEFAULT_MIN_ORDER_AFI_AMOUNT;
+			return DEFAULT_MIN_ORDER_SHARE_AMOUNT;
 		}
 	}
 
@@ -451,8 +455,8 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		BigDecimal actualFeeRatio = calculateActualFeeRatio(feeRatio, feeReliefRatio);
 		BigDecimal feeAfiAmount = calculateFeeAfiAmount(afiAmount, actualFeeRatio);
 		BigDecimal totalPayAfiAmount = afiAmount.add(feeAfiAmount).setScale(MONEY_SCALE, RoundingMode.UP);
-		BigDecimal minAfiAmount = getMinAfiOrderAmount();
-		if (afiAmount.compareTo(minAfiAmount) < 0) {
+		BigDecimal minShareAmount = getMinOrderShareAmount();
+		if (shareAmount.compareTo(minShareAmount) < 0) {
 			throw new ServiceException(ResponseCode.CODE_1291);
 		}
 
@@ -513,7 +517,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	/**
 	 * 校验报价/下单请求参数。
 	 *
-	 * <p>这里只校验本地必填和购买份额大于0；最低AFI数量需要先按实时价格折算，在价格快照计算阶段校验。</p>
+	 * <p>这里只校验本地必填和购买份额大于0；最低购买份额在价格快照计算阶段统一读取系统参数后校验。</p>
 	 *
 	 * @param req 报价或下单请求
 	 */

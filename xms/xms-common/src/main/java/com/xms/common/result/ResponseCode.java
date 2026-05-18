@@ -165,7 +165,7 @@ public enum ResponseCode {
 	CODE_1288(1288, "AFI价格异常", "AFI price error"),
 	CODE_1289(1289, "Polymarket市场已关闭或不可下单", "Polymarket market is closed or unavailable"),
 	CODE_1290(1290, "Polymarket市场即将结束，暂不可下单", "Polymarket market is about to end"),
-	CODE_1291(1291, "Polymarket下单金额低于最低限制", "Polymarket order amount is below the minimum limit"),
+	CODE_1291(1291, "Polymarket购买份额低于最低限制", "Polymarket share amount is below the minimum limit"),
 	CODE_1292(1292, "Polymarket内部订单保存失败", "Polymarket internal order save failed"),
 	CODE_1293(1293, "Polymarket市场聚合写入失败", "Polymarket market aggregate write failed"),
 	CODE_1294(1294, "Polymarket订单参数异常", "Polymarket order parameter error"),

@@ -103,16 +103,16 @@ public class XmsTask {
 	}
 
 	/**
-	 * 结算Polymarket平台内部订单。
+	 * 派发Polymarket平台内部市场结算。
 	 *
-	 * <p>该方法由RuoYi定时任务调用。它扫描已到结束时间的待结算订单，查询Polymarket最终结果；
-	 * 猜中订单兑付USDT到用户validNum1，结果不明确的订单转入待人工复核。</p>
+	 * <p>该方法由RuoYi定时任务调用。当前只扫描已到结束时间的待结算市场，并把状态改为结算中；
+	 * Redisson延迟队列发送暂留TODO，真正订单结算由后续队列消费者或后台手动按钮触发。</p>
 	 */
 	public void settlePolymarketOrders() {
-		log.info("settle Polymarket local orders");
-		// 每次任务最多处理100笔，避免单次Quartz任务执行时间过长。
+		log.info("dispatch Polymarket local markets");
+		// 每次任务最多派发100个市场，避免单次Quartz任务执行时间过长。
 		int count = polymarketOrderService.settlePendingOrders(100);
-		log.info("settled Polymarket local orders, updated={}", count);
+		log.info("dispatched Polymarket local markets, updated={}", count);
 	}
 
 

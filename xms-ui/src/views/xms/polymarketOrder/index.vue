@@ -45,7 +45,7 @@
           icon="el-icon-check"
           size="mini"
           @click="handleSettlePending"
-        >处理待结算</el-button>
+        >处理待结算市场</el-button>
       </el-col>
       <right-toolbar :show-search.sync="showSearch" @queryTable="getList" />
     </el-row>
@@ -224,7 +224,7 @@ export default {
     },
     handleSettlePending() {
       settlePendingPolymarketOrder(100).then(response => {
-        this.$modal.msgSuccess(`处理完成：${response.data || 0} 条`)
+        this.$modal.msgSuccess(`处理完成：${response.data || 0} 个市场`)
         this.getList()
       })
     }

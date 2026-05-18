@@ -1,7 +1,8 @@
 package com.xms.app.service.impl;
 
-import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.StrUtil;
+import com.xms.common.config.redis.delayqueue.RedissonDelayHandler;
+import com.xms.common.config.redis.delayqueue.RedissonDelayOrder;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.xms.app.entity.dto.PolymarketOrderDto;
@@ -13,13 +14,17 @@ import com.xms.app.service.PolymarketService;
 import com.xms.common.config.redis.lock.RedisLock;
 import com.xms.common.constant.ConstantSys;
 import com.xms.common.constant.ConstantType;
+import com.xms.common.constant.RedisConstant;
+import com.xms.common.constant.SysConstant;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.exception.ServiceException;
 import com.xms.common.result.ResponseCode;
 import com.xms.common.utils.uuid.IDUtils;
+import com.xms.dao.domain.PolymarketMarket;
 import com.xms.dao.domain.PolymarketOrder;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.entity.domain.UserMoney;
+import com.xms.dao.service.IPolymarketMarketService;
 import com.xms.dao.service.IPolymarketOrderService;
 import com.xms.dao.service.ISysParaService;
 import com.xms.dao.service.IUserMoneyService;
@@ -28,6 +33,8 @@ import com.xms.dao.service.UserWalletService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -46,38 +53,40 @@ import java.util.stream.Collectors;
 public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService {
 
 	private static final int STATUS_PENDING = 0;
-	private static final int STATUS_WON = 1;
-	private static final int STATUS_LOST = 2;
-	private static final int STATUS_NEED_REVIEW = 3;
 	private static final int MIN_SECONDS_BEFORE_END = 5;
 	private static final int MONEY_SCALE = 6;
 	private static final int SHARE_SCALE = 8;
-	private static final int DEFAULT_SETTLE_LIMIT = 100;
-	private static final int MAX_SETTLE_LIMIT = 500;
+	private static final int MARKET_SETTLE_DELAY_SECONDS_AFTER_END = 30;
 	private static final BigDecimal DEFAULT_MIN_ORDER_AFI_AMOUNT = new BigDecimal("10");
 
 	private final PolymarketService polymarketService;
 	private final BizCommonService bizCommonService;
 	private final IPolymarketOrderService polymarketOrderService;
+	private final IPolymarketMarketService polymarketMarketService;
 	private final IUserMoneyService userMoneyService;
 	private final UserWalletService userWalletService;
 	private final UserInfoService userInfoService;
 	private final ISysParaService sysParaServiceImpl;
+	private final RedissonDelayHandler redissonDelayHandler;
 
 	public PolymarketOrderAppServiceImpl(PolymarketService polymarketService,
 										 BizCommonService bizCommonService,
 										 IPolymarketOrderService polymarketOrderService,
+										 IPolymarketMarketService polymarketMarketService,
 										 IUserMoneyService userMoneyService,
 										 UserWalletService userWalletService,
 										 UserInfoService userInfoService,
-										 ISysParaService sysParaServiceImpl) {
+										 ISysParaService sysParaServiceImpl,
+										 RedissonDelayHandler redissonDelayHandler) {
 		this.polymarketService = polymarketService;
 		this.bizCommonService = bizCommonService;
 		this.polymarketOrderService = polymarketOrderService;
+		this.polymarketMarketService = polymarketMarketService;
 		this.userMoneyService = userMoneyService;
 		this.userWalletService = userWalletService;
 		this.userInfoService = userInfoService;
 		this.sysParaServiceImpl = sysParaServiceImpl;
+		this.redissonDelayHandler = redissonDelayHandler;
 	}
 
 	/**
@@ -165,6 +174,12 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		if (!polymarketOrderService.save(order)) {
 			throw new ServiceException(ResponseCode.CODE_1002);
 		}
+		// 步骤5：同事务累加市场级聚合金额，结算任务后续按市场批量处理订单。
+		if (!polymarketMarketService.upsertOrderAggregate(buildMarketAggregate(snapshot))) {
+			throw new ServiceException("Polymarket market aggregate update failed");
+		}
+		// 步骤6：事务提交后投递市场延迟结算消息；数据库市场状态仍由Quartz兜底扫描。
+		sendMarketSettleDelayAfterCommit(snapshot);
 		return ResultPista.data(toDto(order, false));
 	}
 
@@ -215,108 +230,18 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	}
 
 	/**
-	 * 批量结算已到期的待结算订单。
+	 * 派发市场级Polymarket结算。
 	 *
-	 * <p>只自动处理Polymarket已经resolved且outcomePrices明确为0/1的市场；争议、50/50、字段缺失或接口异常都进入待人工复核，
-	 * 避免错误兑付用户资产。</p>
+	 * <p>App侧不再保留订单轮询结算实现，统一委托DAO层按市场状态派发；真正订单结算由后台手动入口或后续延迟队列处理。</p>
 	 *
-	 * @param limit 本批最多处理的订单数
-	 * @return 被更新为已猜中、未猜中或待复核的订单数量
+	 * @param limit 本批最多派发的市场数
+	 * @return 成功改为结算中的市场数量
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public int settlePendingOrders(Integer limit) {
-		int pageSize = normalizeSettleLimit(limit);
-		// 步骤1：按结束时间扫描待结算订单，每批限制数量，避免一次任务处理过多。
-		List<PolymarketOrder> pendingOrders = polymarketOrderService.lambdaQuery()
-			.eq(PolymarketOrder::getStatus, STATUS_PENDING)
-			.eq(PolymarketOrder::getDeleted, 0)
-			.le(PolymarketOrder::getEndTime, new Date())
-			.orderByAsc(PolymarketOrder::getId)
-			.last("limit " + pageSize)
-			.list();
-		if (CollectionUtil.isEmpty(pendingOrders)) {
-			return 0;
-		}
-
-		int updated = 0;
-		for (PolymarketOrder order : pendingOrders) {
-			// 步骤2：逐笔读取Polymarket最终结果并结算；失败或不明确的订单进入人工复核。
-			if (settleOneOrder(order)) {
-				updated++;
-			}
-		}
-		return updated;
-	}
-
-	/**
-	 * 结算单笔待结算订单。
-	 *
-	 * <p>猜中时按订单份额兑付USDT到validNum1；猜错时兑付0；结果不明确时转待人工复核。</p>
-	 *
-	 * @param order 待结算订单
-	 * @return true表示订单状态发生变化
-	 */
-	private boolean settleOneOrder(PolymarketOrder order) {
-		JSONObject marketWrapper;
-		JSONObject market;
-		SettlementResult result;
-		try {
-			// 步骤1：按订单marketSlug实时查询Polymarket市场结果快照。
-			marketWrapper = polymarketService.getMarketBySlug(order.getMarketSlug());
-			market = marketWrapper.getJSONObject("market");
-			// 步骤2：只接受UMA已resolved且outcomePrices明确0/1的结果。
-			result = resolveWinner(market);
-		} catch (Exception e) {
-			return markNeedReview(order, order.getSettleSnapshotJson(), e.getMessage());
-		}
-		if (!result.resolved) {
-			return markNeedReview(order, marketWrapper.toJSONString(), result.reason);
-		}
-
-		Date now = new Date();
-		order.setResultOutcomeIndex(result.winnerIndex);
-		order.setResultOutcomeName(result.winnerName);
-		order.setSettleSnapshotJson(marketWrapper.toJSONString());
-		order.setSettleTime(now);
-		order.setUpdateTime(now);
-		if (order.getOutcomeIndex().equals(result.winnerIndex)) {
-			// 步骤3A：用户选中的结果是赢家，按shareAmount兑付USDT钱包validNum1。
-			order.setStatus(STATUS_WON);
-			order.setPayoutUsdtAmount(order.getShareAmount());
-			int rows = userWalletService.handerUserMoney(order.getShareAmount(), order.getOrderNo(), order.getUserId(), order.getUserId(),
-				ConstantType.user_money_log_source_type.type_41, ConstantType.user_money_coin_type.type_1);
-			if (rows != 1) {
-				throw new ServiceException(ResponseCode.CODE_1015);
-			}
-		} else {
-			// 步骤3B：用户未猜中，只更新订单状态，不产生钱包入账。
-			order.setStatus(STATUS_LOST);
-			order.setPayoutUsdtAmount(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN));
-		}
-		// 步骤4：最后更新订单结算结果；如果更新失败，前面的钱包入账会随事务回滚。
-		if (!polymarketOrderService.updateById(order)) {
-			throw new ServiceException("Polymarket order update failed");
-		}
-		return true;
-	}
-
-	/**
-	 * 将订单标记为待人工复核。
-	 *
-	 * <p>当Polymarket结果不明确、接口失败或字段缺失时，不自动兑付，保存原因和快照供后台人工处理。</p>
-	 *
-	 * @param order 待处理订单
-	 * @param snapshotJson 最近一次结算市场快照，可为空
-	 * @param reason 进入复核的原因
-	 * @return true表示订单更新成功
-	 */
-	private boolean markNeedReview(PolymarketOrder order, String snapshotJson, String reason) {
-		order.setStatus(STATUS_NEED_REVIEW);
-		order.setSettleSnapshotJson(snapshotJson);
-		order.setRemark(StrUtil.subPre(StrUtil.blankToDefault(reason, "Polymarket settlement needs review"), 255));
-		order.setUpdateTime(new Date());
-		return polymarketOrderService.updateById(order);
+		// App侧不再维护一套订单轮询结算逻辑，统一委托DAO层的市场级派发逻辑，避免两套规则不一致。
+		return polymarketOrderService.settlePendingOrders(limit);
 	}
 
 	/**
@@ -430,41 +355,6 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	}
 
 	/**
-	 * 从Polymarket resolved市场快照中解析赢家结果。
-	 *
-	 * <p>自动结算只接受唯一一个价格为1、其他价格为0的结果；其他情况都返回未明确原因，进入人工复核。</p>
-	 *
-	 * @param market Polymarket市场详情
-	 * @return 解析后的赢家结果；无法自动判断时返回未明确原因
-	 */
-	private SettlementResult resolveWinner(JSONObject market) {
-		if (market == null) {
-			return SettlementResult.unresolved("empty market");
-		}
-		if (!"resolved".equalsIgnoreCase(market.getString("umaResolutionStatus"))) {
-			return SettlementResult.unresolved("market is not resolved");
-		}
-		JSONArray outcomes = parseJsonArray(market.getString("outcomes"), "outcomes");
-		JSONArray prices = parseJsonArray(market.getString("outcomePrices"), "outcomePrices");
-		int winnerIndex = -1;
-		for (int i = 0; i < prices.size(); i++) {
-			BigDecimal price = prices.getBigDecimal(i);
-			if (price != null && price.compareTo(BigDecimal.ONE) == 0) {
-				if (winnerIndex >= 0) {
-					return SettlementResult.unresolved("multiple winning outcomes");
-				}
-				winnerIndex = i;
-			} else if (price == null || price.compareTo(BigDecimal.ZERO) != 0) {
-				return SettlementResult.unresolved("outcome price is not clear 0/1");
-			}
-		}
-		if (winnerIndex < 0 || winnerIndex >= outcomes.size()) {
-			return SettlementResult.unresolved("winner outcome not found");
-		}
-		return SettlementResult.resolved(winnerIndex, outcomes.getString(winnerIndex));
-	}
-
-	/**
 	 * 根据价格快照构建待入库的内部订单。
 	 *
 	 * @param orderNo 平台内部订单号
@@ -502,6 +392,83 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		order.setCreateTime(now);
 		order.setUpdateTime(now);
 		return order;
+	}
+
+	/**
+	 * 根据下单快照构建市场聚合增量。
+	 *
+	 * <p>该对象用于按marketSlug插入或累加市场表，只统计市场总下单次数和总金额，不统计每个outcome的金额。</p>
+	 *
+	 * @param snapshot 下单时市场和价格快照
+	 * @return 可直接upsert的市场聚合增量
+	 */
+	private PolymarketMarket buildMarketAggregate(MarketPriceSnapshot snapshot) {
+		Date now = new Date();
+		PolymarketMarket market = PolymarketMarket.builder()
+			.marketSlug(snapshot.marketSlug)
+			.marketId(snapshot.marketId)
+			.conditionId(snapshot.conditionId)
+			.eventSlug(snapshot.eventSlug)
+			.eventTitle(snapshot.eventTitle)
+			.marketQuestion(snapshot.marketQuestion)
+			.endTime(snapshot.endTime)
+			.status(STATUS_PENDING)
+			.orderCount(1)
+			.totalAfiAmount(snapshot.afiAmount)
+			.totalUsdtAmount(snapshot.afiUsdtAmount)
+			.totalShareAmount(snapshot.shareAmount)
+			.totalPayoutUsdtAmount(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN))
+			.marketSnapshotJson(snapshot.marketWrapperJson)
+			.deleted(0)
+			.build();
+		market.setCreateTime(now);
+		market.setUpdateTime(now);
+		return market;
+	}
+
+	/**
+	 * 在订单事务提交后投递市场结算延迟消息。
+	 *
+	 * <p>延迟队列只是触发器；即使消息丢失，后台Quartz仍会扫描市场表兜底结算。没有结束时间的市场不投递延迟消息。</p>
+	 *
+	 * @param snapshot 下单时市场和结束时间快照
+	 */
+	private void sendMarketSettleDelayAfterCommit(MarketPriceSnapshot snapshot) {
+		if (snapshot.endTime == null || StrUtil.isBlank(snapshot.marketSlug)) {
+			return;
+		}
+		long delaySeconds = calculateMarketSettleDelaySeconds(snapshot.endTime);
+		Runnable sender = () -> redissonDelayHandler.add(new RedissonDelayOrder<>(
+			snapshot.marketSlug,
+			delaySeconds,
+			SysConstant.THIRTY,
+			snapshot.marketSlug,
+			RedisConstant.StreamMsgConstant.DELAY_ORDER_TIMEOUT_QUEUE
+		));
+		if (TransactionSynchronizationManager.isSynchronizationActive()) {
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+				@Override
+				public void afterCommit() {
+					sender.run();
+				}
+			});
+		} else {
+			sender.run();
+		}
+	}
+
+	/**
+	 * 计算市场延迟结算消息的延迟秒数。
+	 *
+	 * <p>目标时间是市场结束时间后30秒；如果下单时已经接近结束，则至少延迟1秒，避免立刻在当前事务中消费。</p>
+	 *
+	 * @param endTime 市场结束时间
+	 * @return 延迟秒数
+	 */
+	private long calculateMarketSettleDelaySeconds(Date endTime) {
+		long targetMillis = endTime.getTime() + MARKET_SETTLE_DELAY_SECONDS_AFTER_END * 1000L;
+		long delayMillis = targetMillis - System.currentTimeMillis();
+		return Math.max(1L, delayMillis / 1000L);
 	}
 
 	/**
@@ -574,19 +541,6 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 	}
 
 	/**
-	 * 归一化待结算任务批次大小。
-	 *
-	 * @param limit 请求处理数量
-	 * @return 限制后的处理数量
-	 */
-	private int normalizeSettleLimit(Integer limit) {
-		if (limit == null || limit <= 0) {
-			return DEFAULT_SETTLE_LIMIT;
-		}
-		return Math.min(limit, MAX_SETTLE_LIMIT);
-	}
-
-	/**
 	 * 报价和创建订单共用的计算快照。
 	 */
 	private static class MarketPriceSnapshot {
@@ -609,28 +563,4 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		private Date endTime;
 	}
 
-	/**
-	 * Polymarket结果解析后的结算判断。
-	 */
-	private static class SettlementResult {
-		private final boolean resolved;
-		private final int winnerIndex;
-		private final String winnerName;
-		private final String reason;
-
-		private SettlementResult(boolean resolved, int winnerIndex, String winnerName, String reason) {
-			this.resolved = resolved;
-			this.winnerIndex = winnerIndex;
-			this.winnerName = winnerName;
-			this.reason = reason;
-		}
-
-		private static SettlementResult resolved(int winnerIndex, String winnerName) {
-			return new SettlementResult(true, winnerIndex, winnerName, null);
-		}
-
-		private static SettlementResult unresolved(String reason) {
-			return new SettlementResult(false, -1, null, reason);
-		}
-	}
 }

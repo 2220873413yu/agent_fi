@@ -96,12 +96,12 @@ public class PolymarketOrderController extends BaseController {
 	}
 
 	/**
-	 * 手动触发待结算订单处理。
+	 * 手动触发待结算市场处理。
 	 *
-	 * <p>用于后台临时补跑或排查定时任务。正常情况下由Quartz任务自动调用。</p>
+	 * <p>用于后台临时补跑或排查定时任务。当前结算以市场为单位，方法会扫描到期市场并批量处理其下订单。</p>
 	 *
-	 * @param limit 本次最多处理的待结算订单数
-	 * @return 被更新的订单数量
+	 * @param limit 本次最多处理的待结算市场数
+	 * @return 被更新的市场数量
 	 */
 	@PreAuthorize("@ss.hasPermi('xms:polymarketOrder:edit')")
 	@Log(title = "Polymarket订单结算", businessType = BusinessType.UPDATE)

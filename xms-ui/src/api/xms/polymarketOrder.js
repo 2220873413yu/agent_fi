@@ -26,7 +26,7 @@ export function updatePolymarketOrder(data) {
   })
 }
 
-// 触发Polymarket待结算订单处理
+// 触发Polymarket待结算市场处理
 export function settlePendingPolymarketOrder(limit) {
   return request({
     url: '/xms/polymarketOrder/settlePending',

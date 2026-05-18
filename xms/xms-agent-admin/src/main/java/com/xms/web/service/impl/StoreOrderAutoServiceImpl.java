@@ -54,6 +54,18 @@ public class StoreOrderAutoServiceImpl implements StoreOrderAutoService {
 
 	@Autowired
 	private ISwapOrderService swapOrderService;
+
+	@Autowired
+	private IPolymarketOrderService polymarketOrderService;
+
+	/**
+	 * 处理Redisson延迟队列到期消息。
+	 *
+	 * <p>该入口是后台统一延迟任务分发器。Polymarket使用bizType=30，消息到期后只按marketSlug触发市场级结算；
+	 * 真正是否能结算由市场表状态和Polymarket resolved结果共同决定。</p>
+	 *
+	 * @param order 延迟队列消息，orderId用于承载业务主键
+	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public void hanlerOrder(RedissonDelayOrder order) {
@@ -68,9 +80,27 @@ public class StoreOrderAutoServiceImpl implements StoreOrderAutoService {
 			}else if(order.getBizType().equals(4)){
 				//激活订单过期关闭
 				task4(order);
+			}else if(order.getBizType().equals(SysConstant.THIRTY)){
+				// Polymarket市场结束后的延迟触发；状态抢占和批量兑付在订单服务里完成。
+				task30(order);
 			}
 		}
 
+	}
+
+	/**
+	 * 触发Polymarket市场级结算。
+	 *
+	 * <p>该方法预留给后续Redisson延迟队列真正启用时使用。消费者只处理已经被派发为结算中的市场。</p>
+	 *
+	 * @param order 延迟消息，orderId为Polymarket marketSlug
+	 */
+	private void task30(RedissonDelayOrder order) {
+		if (StrUtil.isBlank(order.getOrderId())) {
+			log.warn("Polymarket市场结算延迟消息缺少marketSlug: {}", order);
+			return;
+		}
+		polymarketOrderService.processSettlingMarket(order.getOrderId());
 	}
 
 	private void task4(RedissonDelayOrder order) {

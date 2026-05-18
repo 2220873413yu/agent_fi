@@ -59,10 +59,10 @@ public interface PolymarketOrderAppService {
 	PolymarketOrderDto detail(String orderNo, Long userId);
 
 	/**
-	 * 结算已到结束时间的待结算订单。
+	 * 派发已到结束时间的待结算市场。
 	 *
-	 * @param limit 本次最多处理的订单数
-	 * @return 被更新为终态或待复核的订单数
+	 * @param limit 本次最多派发的市场数
+	 * @return 成功改为结算中的市场数
 	 */
 	int settlePendingOrders(Integer limit);
 }

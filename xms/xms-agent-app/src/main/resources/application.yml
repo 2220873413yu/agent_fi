@@ -101,7 +101,7 @@ xms:
 
 # 密钥勿写入仓库：本地/CI 设置环境变量 OPENAI_API_KEY，或在 application-dev.yml（且勿提交真实值）
 ai:
-  apiKey: ${OPENAI_API_KEY:}
+  apiKey: ""
   apiUrl: https://api.openai.com/v1
-  model: gpt-4o-mini  # 识图须用带 vision 的模型
+  model: gpt-5.5  # 识图须用带 vision 的模型
   timeout: 60000

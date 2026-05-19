@@ -38,6 +38,7 @@ public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> 
 	private final CountDownLatch latch;
 	private final TcpClient webSocketClient;
 	private final LongLiveClientStart clientStart;
+	private volatile long lastLargeMessageLogTime;
 
 	public WebSocketClientHandler(CountDownLatch latch, TcpClient webSocketClient, LongLiveClientStart clientStart) {
 		this.latch = latch;
@@ -153,6 +154,8 @@ public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> 
 		if (content == null || content.trim().isEmpty()) {
 			return;
 		}
+		// 临时观测大帧来源：只记录长度和事件摘要，不打印完整JSON，避免日志被盘口快照撑爆。
+		logLargeMessageSummary(content);
 		try {
 			Object parsed = JSON.parse(content);
 			if (parsed instanceof JSONArray) {
@@ -174,6 +177,70 @@ public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> 
 	 * 按事件类型分发Polymarket事件。
 	 *
 	 * <p>只有market_resolved触发内部市场派发；其他事件暂时不改变数据库状态。</p>
+	 *
+	 * @param event Polymarket事件对象
+	 */
+	/**
+	 * 记录Polymarket WebSocket大消息摘要。
+	 *
+	 * <p>该日志用于临时确认超过默认64KB的消息类型。日志只抽取事件类型、asset_id、bids/asks数量和字节数，
+	 * 不输出完整盘口内容，避免大量订单簿快照进一步放大日志IO。</p>
+	 *
+	 * @param content Polymarket原始文本帧内容
+	 */
+	private void logLargeMessageSummary(String content) {
+		int bytes = content.getBytes(CharsetUtil.UTF_8).length;
+		if (bytes < 64 * 1024) {
+			return;
+		}
+		long now = System.currentTimeMillis();
+		if (now - lastLargeMessageLogTime < 1000L) {
+			return;
+		}
+		lastLargeMessageLogTime = now;
+		try {
+			Object parsed = JSON.parse(content);
+			if (parsed instanceof JSONArray) {
+				JSONArray array = (JSONArray) parsed;
+				log.info("Polymarket WebSocket收到大消息，bytes={}, arraySize={}, firstEvent={}",
+					bytes, array.size(), array.isEmpty() ? null : eventSummary(array.getJSONObject(0)));
+				return;
+			}
+			if (parsed instanceof JSONObject) {
+				log.info("Polymarket WebSocket收到大消息，bytes={}, event={}", bytes, eventSummary((JSONObject) parsed));
+				return;
+			}
+		} catch (Exception e) {
+			log.info("Polymarket WebSocket收到大消息，bytes={}, parseError={}", bytes, e.getMessage());
+			return;
+		}
+		log.info("Polymarket WebSocket收到大消息，bytes={}", bytes);
+	}
+
+	/**
+	 * 提取Polymarket事件的轻量摘要。
+	 *
+	 * @param event Polymarket WebSocket事件对象
+	 * @return 包含类型、asset和盘口档位数量的摘要
+	 */
+	private String eventSummary(JSONObject event) {
+		if (event == null) {
+			return null;
+		}
+		JSONArray bids = event.getJSONArray("bids");
+		JSONArray asks = event.getJSONArray("asks");
+		String eventType = firstNotBlank(event.getString("event_type"), event.getString("eventType"), event.getString("type"));
+		String assetId = firstNotBlank(event.getString("asset_id"), event.getString("assetId"));
+		return "type=" + eventType
+			+ ", assetId=" + assetId
+			+ ", bids=" + (bids == null ? 0 : bids.size())
+			+ ", asks=" + (asks == null ? 0 : asks.size());
+	}
+
+	/**
+	 * 按事件类型分发Polymarket事件。
+	 *
+	 * <p>只有market_resolved触发内部市场派发；其他价格或盘口类事件只用于观察，不改变数据库状态。</p>
 	 *
 	 * @param event Polymarket事件对象
 	 */

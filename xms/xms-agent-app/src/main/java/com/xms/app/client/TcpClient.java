@@ -51,6 +51,7 @@ public class TcpClient {
 
 	private static final String WSS_PREFIX = "wss";
 	private static final String WS_PREFIX = "ws";
+	private static final int MAX_FRAME_PAYLOAD_LENGTH = 1024 * 1024;
 
 	private final String uri;
 	private final CountDownLatch latch;
@@ -167,7 +168,7 @@ public class TcpClient {
 		log.info("Polymarket WebSocket通道开启成功");
 		HttpHeaders httpHeaders = new DefaultHttpHeaders();
 		WebSocketClientHandshaker handshaker = WebSocketClientHandshakerFactory.newHandshaker(
-			tcpURI, WebSocketVersion.V13, null, true, httpHeaders);
+			tcpURI, WebSocketVersion.V13, null, true, httpHeaders, MAX_FRAME_PAYLOAD_LENGTH);
 		WebSocketClientHandler handler = (WebSocketClientHandler) channel.pipeline().get("websocketHandler");
 		log.info("Polymarket WebSocket开始握手");
 		handshaker.handshake(channel);

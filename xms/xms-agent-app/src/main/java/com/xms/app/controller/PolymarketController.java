@@ -1,5 +1,6 @@
 package com.xms.app.controller;
 
+import com.alibaba.fastjson.JSONObject;
 import com.xms.app.entity.dto.PolymarketEventListDto;
 import com.xms.app.entity.dto.PolymarketMarketDetailDto;
 import com.xms.app.entity.dto.PolymarketOrderConfigDto;
@@ -100,6 +101,29 @@ public class PolymarketController {
 												@ApiParam(value = "当前5分钟窗口之后查询几个窗口", defaultValue = "6")
 												@RequestParam(defaultValue = "6") Integer after) {
 		return ResultPista.data(polymarketService.listCryptoUpDownEvents(coins, before, after));
+	}
+
+	/**
+	 * 查询加密货币5分钟Up/Down短周期事件的Polymarket原始全量数据。
+	 *
+	 * <p>该接口只用于调试和排查上游字段，会保留tags、series、markets、eventMetadata等原始大字段；
+	 * 前端业务展示仍应优先使用 {@code /crypto/updown} 精简接口，正式下单也仍以后端实时市场详情为准。</p>
+	 *
+	 * @param coins 逗号分隔币种，支持btc、eth、sol、xrp
+	 * @param before 当前5分钟窗口之前的窗口数量
+	 * @param after 当前5分钟窗口之后的窗口数量
+	 * @return Polymarket原始Up/Down事件集合，并补充本地调试字段
+	 */
+	@ApiOperation(value = "Polymarket加密货币Up/Down原始全量事件", notes = "按币种和当前5分钟窗口组装 Up/Down 市场slug并查询Polymarket Gamma API，返回上游原始event全字段，包括tags、series、markets、eventMetadata等；仅供调试排查，不建议前端业务页面直接使用。")
+	@Anonymous
+	@GetMapping("/crypto/updown/raw")
+	public ResultPista<JSONObject> cryptoUpDownRaw(@ApiParam(value = "逗号分隔币种，支持btc、eth、sol、xrp", defaultValue = "btc,eth,sol")
+												   @RequestParam(defaultValue = "btc,eth,sol") String coins,
+												   @ApiParam(value = "当前5分钟窗口之前查询几个窗口", defaultValue = "2")
+												   @RequestParam(defaultValue = "2") Integer before,
+												   @ApiParam(value = "当前5分钟窗口之后查询几个窗口", defaultValue = "6")
+												   @RequestParam(defaultValue = "6") Integer after) {
+		return ResultPista.data(polymarketService.listRawCryptoUpDownEvents(coins, before, after));
 	}
 
 //	/**

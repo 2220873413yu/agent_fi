@@ -185,6 +185,56 @@ public class PolymarketServiceImpl implements PolymarketService {
 	}
 
 	/**
+	 * 查询加密货币5分钟Up/Down短周期事件的Polymarket原始全量数据。
+	 *
+	 * <p>该方法用于调试上游字段，不裁剪tags、series、markets、feeSchedule等大字段；仅在外层和每个event上补充本地调试字段，
+	 * 方便定位本次请求的币种、时间窗口和Gamma来源URL。</p>
+	 *
+	 * @param coins 逗号分隔的币种，支持btc、eth、sol、xrp
+	 * @param before 当前时间窗口之前查询几个5分钟窗口
+	 * @param after 当前时间窗口之后查询几个5分钟窗口
+	 * @return Polymarket原始Up/Down事件集合，并带本地调试字段
+	 */
+	@Override
+	public JSONObject listRawCryptoUpDownEvents(String coins, Integer before, Integer after) {
+		List<String> normalizedCoins = normalizeUpDownCoins(coins);
+		int previousWindows = normalizeWindowCount(before, DEFAULT_UP_DOWN_BEFORE);
+		int futureWindows = normalizeWindowCount(after, DEFAULT_UP_DOWN_AFTER);
+		long currentWindow = floorToFiveMinuteWindow(Instant.now().getEpochSecond());
+		JSONArray events = new JSONArray();
+
+		for (String coin : normalizedCoins) {
+			for (int i = -previousWindows; i <= futureWindows; i++) {
+				// 按Polymarket固定slug规则逐个拉取原始event，未发布窗口跳过，不影响其它币种和窗口。
+				long windowStart = currentWindow + i * UP_DOWN_WINDOW_SECONDS;
+				String slug = coin + "-updown-5m-" + windowStart;
+				String sourceUrl = GAMMA_BASE_URL + "/events/slug/" + slug;
+				try {
+					Object event = fetchJson(sourceUrl);
+					if (event instanceof JSONObject) {
+						JSONObject rawEvent = (JSONObject) event;
+						rawEvent.put("coin", coin.toUpperCase(Locale.ROOT));
+						rawEvent.put("windowStartUnix", windowStart);
+						rawEvent.put("windowEndUnix", windowStart + UP_DOWN_WINDOW_SECONDS);
+						rawEvent.put("sourceUrl", sourceUrl);
+						events.add(rawEvent);
+					}
+				} catch (ServiceException ignored) {
+					// 原始调试接口也允许未来窗口尚未发布，保持和精简Up/Down接口一致的容错行为。
+				}
+			}
+		}
+
+		JSONObject result = baseResponse("crypto-updown", null, GAMMA_BASE_URL + "/events/slug/{coin}-updown-5m-{timestamp}");
+		result.put("coins", normalizedCoins.stream().map(item -> item.toUpperCase(Locale.ROOT)).collect(Collectors.toList()));
+		result.put("before", previousWindows);
+		result.put("after", futureWindows);
+		result.put("count", events.size());
+		result.put("events", events);
+		return result;
+	}
+
+	/**
 	 * 实时读取Gamma事件列表并裁剪成前端列表需要的精简结构。
 	 *
 	 * @param section 本地板块名称，当前支持crypto和sports

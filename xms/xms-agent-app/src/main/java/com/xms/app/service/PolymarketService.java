@@ -36,6 +36,19 @@ public interface PolymarketService {
 	PolymarketUpDownListDto listCryptoUpDownEvents(String coins, Integer before, Integer after);
 
 	/**
+	 * 查询加密货币5分钟Up/Down短周期事件的Polymarket原始全量数据。
+	 *
+	 * <p>该方法面向调试接口，会保留上游event完整字段，并额外补充coin、窗口Unix秒和sourceUrl等本地排查字段；
+	 * 前端业务列表仍使用精简DTO方法，正式报价/下单仍实时读取market详情。</p>
+	 *
+	 * @param coins 逗号分隔的币种，支持btc、eth、sol、xrp
+	 * @param before 当前5分钟窗口之前要查询的窗口数量
+	 * @param after 当前5分钟窗口之后要查询的窗口数量
+	 * @return 原始Up/Down事件集合包装对象，并带本地调试字段
+	 */
+	JSONObject listRawCryptoUpDownEvents(String coins, Integer before, Integer after);
+
+	/**
 	 * 按公开slug查询一个Polymarket市场精简详情。
 	 *
 	 * <p>该方法供前端刷新市场详情使用，返回字段已经裁剪并带5秒Redis缓存，不作为下单价格快照。</p>

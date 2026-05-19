@@ -133,38 +133,38 @@ public class PolymarketController {
 		return ResultPista.data(polymarketService.getMarketBySlug(slug));
 	}
 
-	/**
-	 * 查询Polymarket内部下单页面配置。
-	 *
-	 * <p>前端用这里的值对齐后端强校验，例如最低购买份额、结束前最后几秒禁用下单，避免页面能点但接口拒绝。</p>
-	 *
-	 * @return 最低购买份额、结束前禁用秒数和App端Authorization前缀
-	 */
-	@ApiOperation(value = "Polymarket内部订单配置", notes = "返回内部下单页面配置，包括最低购买份额/token数量、结束前禁止下单秒数和App请求头前缀。")
-	@Anonymous
-	@GetMapping("/orders/config")
-	public ResultPista<PolymarketOrderConfigDto> orderConfig() {
-		return ResultPista.data(PolymarketOrderConfigDto.builder()
-			.minShareAmount(polymarketOrderAppService.getMinOrderShareAmount())
-			.minSecondsBeforeEnd(5)
-			.authorizationPrefix("App ")
-			.build());
-	}
+//	/**
+//	 * 查询Polymarket内部下单页面配置。
+//	 *
+//	 * <p>前端用这里的值对齐后端强校验，例如最低购买份额、结束前最后几秒禁用下单，避免页面能点但接口拒绝。</p>
+//	 *
+//	 * @return 最低购买份额、结束前禁用秒数和App端Authorization前缀
+//	 */
+//	@ApiOperation(value = "Polymarket内部订单配置", notes = "返回内部下单页面配置，包括最低购买份额/token数量、结束前禁止下单秒数和App请求头前缀。")
+//	@Anonymous
+//	@GetMapping("/orders/config")
+//	public ResultPista<PolymarketOrderConfigDto> orderConfig() {
+//		return ResultPista.data(PolymarketOrderConfigDto.builder()
+//			.minShareAmount(polymarketOrderAppService.getMinOrderShareAmount())
+//			.minSecondsBeforeEnd(5)
+//			.authorizationPrefix("App ")
+//			.build());
+//	}
 
-	/**
-	 * 预览平台内部Polymarket订单报价。
-	 *
-	 * <p>只实时读取AFI价格、Polymarket outcome价格和用户节点手续费减免，计算等值USDT、购买成本AFI、外扣手续费和最大兑付；不会扣钱包、不会写订单。</p>
-	 *
-	 * @param req 报价参数：marketSlug、assetId、shareAmount、bizType
-	 * @return 报价快照，金额单位包括购买成本AFI、手续费AFI、实际总扣款AFI和USDT
-	 */
-	@ApiOperation(value = "Polymarket内部订单报价", notes = "请求体字段为marketSlug、assetId、shareAmount、bizType。assetId来自事件列表或市场详情的assetIds；后端实时读取AFI价格、Polymarket outcome价格和用户节点手续费减免，按购买份额反算购买成本AFI、外扣手续费AFI和实际总扣款AFI，不扣钱包、不写订单。")
-	@PostMapping("/orders/quote")
-	public ResultPista<PolymarketOrderQuoteDto> quote(@ApiParam(value = "报价请求体：marketSlug市场slug，assetId选择结果token，shareAmount购买份额，bizType业务类型1加密2体育3Up/Down", required = true)
-													  @Valid @RequestBody PolymarketOrderReq req) {
-		return ResultPista.data(polymarketOrderAppService.quote(req, SecurityUtils.getLoginAppUser().getUserId()));
-	}
+//	/**
+//	 * 预览平台内部Polymarket订单报价。
+//	 *
+//	 * <p>只实时读取AFI价格、Polymarket outcome价格和用户节点手续费减免，计算等值USDT、购买成本AFI、外扣手续费和最大兑付；不会扣钱包、不会写订单。</p>
+//	 *
+//	 * @param req 报价参数：marketSlug、assetId、shareAmount、bizType
+//	 * @return 报价快照，金额单位包括购买成本AFI、手续费AFI、实际总扣款AFI和USDT
+//	 */
+//	@ApiOperation(value = "Polymarket内部订单报价", notes = "请求体字段为marketSlug、assetId、shareAmount、bizType。assetId来自事件列表或市场详情的assetIds；后端实时读取AFI价格、Polymarket outcome价格和用户节点手续费减免，按购买份额反算购买成本AFI、外扣手续费AFI和实际总扣款AFI，不扣钱包、不写订单。")
+//	@PostMapping("/orders/quote")
+//	public ResultPista<PolymarketOrderQuoteDto> quote(@ApiParam(value = "报价请求体：marketSlug市场slug，assetId选择结果token，shareAmount购买份额，bizType业务类型1加密2体育3Up/Down", required = true)
+//													  @Valid @RequestBody PolymarketOrderReq req) {
+//		return ResultPista.data(polymarketOrderAppService.quote(req, SecurityUtils.getLoginAppUser().getUserId()));
+//	}
 
 	/**
 	 * 为当前App用户创建平台内部Polymarket订单。
@@ -198,17 +198,17 @@ public class PolymarketController {
 		return ResultPista.data(polymarketOrderAppService.myOrders(lastId, bizType, SecurityUtils.getLoginAppUser().getUserId()));
 	}
 
-	/**
-	 * 查询当前App用户的一笔Polymarket内部订单详情。
-	 *
-	 * @param orderNo 平台内部订单号
-	 * @return 订单详情
-	 */
-	@ApiOperation(value = "Polymarket内部订单详情", notes = "按平台内部订单号查询当前App登录用户的一笔Polymarket内部订单详情。")
-	@GetMapping("/orders/{orderNo}")
-	public ResultPista<PolymarketOrderDto> orderDetail(@ApiParam(value = "平台内部订单号", required = true)
-													   @PathVariable String orderNo) {
-		return ResultPista.data(polymarketOrderAppService.detail(orderNo, SecurityUtils.getLoginAppUser().getUserId()));
-	}
+//	/**
+//	 * 查询当前App用户的一笔Polymarket内部订单详情。
+//	 *
+//	 * @param orderNo 平台内部订单号
+//	 * @return 订单详情
+//	 */
+//	@ApiOperation(value = "Polymarket内部订单详情", notes = "按平台内部订单号查询当前App登录用户的一笔Polymarket内部订单详情。")
+//	@GetMapping("/orders/{orderNo}")
+//	public ResultPista<PolymarketOrderDto> orderDetail(@ApiParam(value = "平台内部订单号", required = true)
+//													   @PathVariable String orderNo) {
+//		return ResultPista.data(polymarketOrderAppService.detail(orderNo, SecurityUtils.getLoginAppUser().getUserId()));
+//	}
 
 }

@@ -463,7 +463,7 @@
         </el-form-item>
 
         <el-form-item label="钱包地址" prop="account">
-          <el-input v-model="form.account" type="textarea"/>
+          <el-input v-model="form.account" type="textarea" :disabled="true"/>
         </el-form-item>
 
         <el-form-item label="真实等级">

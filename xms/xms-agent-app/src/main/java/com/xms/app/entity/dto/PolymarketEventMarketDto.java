@@ -103,6 +103,7 @@ public class PolymarketEventMarketDto {
 	 */
 	@ApiModelProperty(value = "市场结束时间，ISO时间字符串")
 	private String endDate;
+	private String groupItemTitle;
 
 	/**
 	 * 市场是否活跃。

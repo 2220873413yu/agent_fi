@@ -10,6 +10,8 @@ import com.xms.app.entity.dto.PolymarketEventDto;
 import com.xms.app.entity.dto.PolymarketEventListDto;
 import com.xms.app.entity.dto.PolymarketEventMarketDto;
 import com.xms.app.entity.dto.PolymarketMarketDetailDto;
+import com.xms.app.entity.dto.PolymarketUpDownEventDto;
+import com.xms.app.entity.dto.PolymarketUpDownListDto;
 import com.xms.app.service.PolymarketService;
 import com.xms.common.config.redis.XmsRedis;
 import com.xms.common.exception.ServiceException;
@@ -144,12 +146,12 @@ public class PolymarketServiceImpl implements PolymarketService {
 	 * @return Up/Down事件集合，包含原始事件、币种、窗口开始/结束Unix秒和来源URL
 	 */
 	@Override
-	public JSONObject listCryptoUpDownEvents(String coins, Integer before, Integer after) {
+	public PolymarketUpDownListDto listCryptoUpDownEvents(String coins, Integer before, Integer after) {
 		List<String> normalizedCoins = normalizeUpDownCoins(coins);
 		int previousWindows = normalizeWindowCount(before, DEFAULT_UP_DOWN_BEFORE);
 		int futureWindows = normalizeWindowCount(after, DEFAULT_UP_DOWN_AFTER);
 		long currentWindow = floorToFiveMinuteWindow(Instant.now().getEpochSecond());
-		JSONArray events = new JSONArray();
+		List<PolymarketUpDownEventDto> events = new ArrayList<>();
 
 		for (String coin : normalizedCoins) {
 			for (int i = -previousWindows; i <= futureWindows; i++) {
@@ -160,12 +162,10 @@ public class PolymarketServiceImpl implements PolymarketService {
 				try {
 					Object event = fetchJson(sourceUrl);
 					if (event instanceof JSONObject) {
-						JSONObject eventObject = (JSONObject) event;
-						eventObject.put("coin", coin.toUpperCase(Locale.ROOT));
-						eventObject.put("windowStartUnix", windowStart);
-						eventObject.put("windowEndUnix", windowStart + UP_DOWN_WINDOW_SECONDS);
-						eventObject.put("sourceUrl", sourceUrl);
-						events.add(eventObject);
+						PolymarketUpDownEventDto upDownEvent = toSimpleUpDownEvent((JSONObject) event, coin, windowStart);
+						if (upDownEvent != null) {
+							events.add(upDownEvent);
+						}
 					}
 				} catch (ServiceException ignored) {
 					// 部分未来窗口Polymarket可能尚未发布，跳过即可，不能因为单个slug不存在导致整个模块白屏。
@@ -173,13 +173,15 @@ public class PolymarketServiceImpl implements PolymarketService {
 			}
 		}
 
-		JSONObject result = baseResponse("crypto-updown", null, GAMMA_BASE_URL + "/events/slug/{coin}-updown-5m-{timestamp}");
-		result.put("coins", normalizedCoins);
-		result.put("before", previousWindows);
-		result.put("after", futureWindows);
-		result.put("count", events.size());
-		result.put("events", events);
-		return result;
+		return PolymarketUpDownListDto.builder()
+			.section("crypto-updown")
+			.coins(normalizedCoins.stream().map(item -> item.toUpperCase(Locale.ROOT)).collect(Collectors.toList()))
+			.before(previousWindows)
+			.after(futureWindows)
+			.count(events.size())
+			.fetchedAt(LocalDateTime.now().toString())
+			.events(events)
+			.build();
 	}
 
 	/**
@@ -192,6 +194,91 @@ public class PolymarketServiceImpl implements PolymarketService {
 	 * @param sourceUrl 本次Gamma请求地址
 	 * @return 精简事件列表，不包含Polymarket原始大字段
 	 */
+	/**
+	 * 将Polymarket原始Up/Down事件裁剪成前端可直接展示和下单选择的扁平结构。
+	 *
+	 * <p>Up/Down事件通常只有一个可交易market；如果上游暂未返回market或assetId数组缺失，则跳过该窗口，避免前端展示不可下单数据。</p>
+	 *
+	 * @param event Gamma按slug返回的原始Up/Down事件
+	 * @param coin 当前查询币种，小写入参
+	 * @param windowStart 5分钟窗口开始Unix秒
+	 * @return 精简后的Up/Down窗口；缺少可下单market或assetId时返回null
+	 */
+	private PolymarketUpDownEventDto toSimpleUpDownEvent(JSONObject event, String coin, long windowStart) {
+		// 步骤1：Up/Down只取第一个market作为可交易市场，列表不透传原始markets数组。
+		JSONObject market = firstMarket(event);
+		if (market == null) {
+			return null;
+		}
+		List<String> assetIds = toStringList(parseJsonArrayField(market, "clobTokenIds"));
+		if (assetIds.isEmpty()) {
+			return null;
+		}
+
+		// 步骤2：把起始比较价从eventMetadata中提到顶层，方便前端展示Up/Down判断规则。
+		JSONObject eventMetadata = event.getJSONObject("eventMetadata");
+		BigDecimal priceToBeat = resolveUpDownPriceToBeat(eventMetadata, event, market);
+
+		return PolymarketUpDownEventDto.builder()
+			.coin(coin.toUpperCase(Locale.ROOT))
+			.title(event.getString("title"))
+			.eventSlug(event.getString("slug"))
+			.marketSlug(market.getString("slug"))
+			.startTime(firstNotBlank(market.getString("eventStartTime"), event.getString("startTime")))
+			.endTime(firstNotBlank(market.getString("endDate"), event.getString("endDate")))
+			.windowStartUnix(windowStart)
+			.windowEndUnix(windowStart + UP_DOWN_WINDOW_SECONDS)
+			.priceToBeat(priceToBeat)
+			.outcomes(toStringList(parseJsonArrayField(market, "outcomes")))
+			.outcomePrices(toStringList(parseJsonArrayField(market, "outcomePrices")))
+			.assetIds(assetIds)
+			.bestBid(getBigDecimal(market, "bestBid"))
+			.bestAsk(getBigDecimal(market, "bestAsk"))
+			.lastTradePrice(getBigDecimal(market, "lastTradePrice"))
+			.volume24hr(getBigDecimal(market, "volume24hr"))
+			.liquidity(getBigDecimal(market, "liquidity"))
+			.active(market.getBoolean("active"))
+			.closed(market.getBoolean("closed"))
+			.acceptingOrders(market.getBoolean("acceptingOrders"))
+			.umaResolutionStatus(market.getString("umaResolutionStatus"))
+			.orderMinSize(getBigDecimal(market, "orderMinSize"))
+			.conditionId(market.getString("conditionId"))
+			.questionId(market.getString("questionID"))
+			.build();
+	}
+
+	/**
+	 * 实时读取Gamma事件列表并裁剪成前端列表需要的精简结构。
+	 *
+	 * @param section 本地板块名称，当前支持crypto和sports
+	 * @param tagId Gamma tag_id
+	 * @param limit 分页数量
+	 * @param offset 分页偏移量
+	 * @param sourceUrl 本次Gamma请求地址
+	 * @return 精简事件列表，不包含Polymarket原始大字段
+	 */
+	/**
+	 * 读取Up/Down窗口的起始比较价格。
+	 *
+	 * <p>Polymarket常见位置是eventMetadata.priceToBeat；这里兼容event顶层和market顶层的priceToBeat，
+	 * 但不会用bestBid、bestAsk或outcomePrices推导，因为那些是交易价格，不是标的资产起始价格。</p>
+	 *
+	 * @param event Gamma返回的Up/Down事件对象
+	 * @param market 事件下的第一个market对象
+	 * @return 起始比较价格；上游未返回时为null
+	 */
+	private BigDecimal resolveUpDownPriceToBeat(JSONObject eventMetadata, JSONObject event, JSONObject market) {
+		BigDecimal metadataPrice = eventMetadata == null ? null : getBigDecimal(eventMetadata, "priceToBeat");
+		if (metadataPrice != null) {
+			return metadataPrice;
+		}
+		BigDecimal eventPrice = getBigDecimal(event, "priceToBeat");
+		if (eventPrice != null) {
+			return eventPrice;
+		}
+		return getBigDecimal(market, "priceToBeat");
+	}
+
 	private PolymarketEventListDto loadSimpleEvents(String section, Integer tagId, Integer limit, Integer offset, String sourceUrl) {
 		JSONArray rawEvents = fetchJsonArray(sourceUrl);
 		List<PolymarketEventDto> events = new ArrayList<>();
@@ -314,6 +401,7 @@ public class PolymarketServiceImpl implements PolymarketService {
 			.volume24hr(getBigDecimal(market, "volume24hr"))
 			.liquidity(getBigDecimal(market, "liquidity"))
 			.endDate(market.getString("endDate"))
+			.groupItemTitle(market.getString("groupItemTitle"))
 			.active(market.getBoolean("active"))
 			.closed(market.getBoolean("closed"))
 			.acceptingOrders(market.getBoolean("acceptingOrders"))
@@ -336,6 +424,34 @@ public class PolymarketServiceImpl implements PolymarketService {
 		}
 		Object first = events.get(0);
 		return first instanceof JSONObject ? (JSONObject) first : null;
+	}
+
+	/**
+	 * 从Polymarket事件中取第一个market。
+	 *
+	 * <p>Up/Down短周期事件当前只需要展示和下单第一个市场；没有market时跳过该窗口。</p>
+	 *
+	 * @param event Gamma返回的事件对象
+	 * @return 第一个market对象；不存在时返回null
+	 */
+	private JSONObject firstMarket(JSONObject event) {
+		JSONArray markets = event.getJSONArray("markets");
+		if (markets == null || markets.isEmpty()) {
+			return null;
+		}
+		Object first = markets.get(0);
+		return first instanceof JSONObject ? (JSONObject) first : null;
+	}
+
+	/**
+	 * 返回第一个非空字符串。
+	 *
+	 * @param first 优先值
+	 * @param second 兜底值
+	 * @return 优先非空字符串；都为空时返回null
+	 */
+	private String firstNotBlank(String first, String second) {
+		return StrUtil.isNotBlank(first) ? first : second;
 	}
 
 	/**

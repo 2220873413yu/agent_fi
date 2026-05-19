@@ -1004,7 +1004,7 @@
     sectionMetric.textContent = 'Up/Down';
     countMetric.textContent = data.count;
     volumeMetric.textContent = formatNumber(events.reduce((sum, event) => sum + numberValue(event.volume24hr || event.volume), 0), 2);
-    meta.innerHTML = `section=crypto-updown<br>coins=${escapeHtml((data.coins || []).join(','))}<br>fetchedAt=${escapeHtml(data.fetchedAt)}<br><br>${escapeHtml(data.sourceUrl)}`;
+    meta.innerHTML = `section=crypto-updown<br>coins=${escapeHtml((data.coins || []).join(','))}<br>before=${escapeHtml(data.before)} after=${escapeHtml(data.after)}<br>fetchedAt=${escapeHtml(data.fetchedAt)}`;
     eventList.innerHTML = events.length
       ? `<div class="updown-board">${Object.keys(grouped).map((coin) => renderCoinSection(coin, grouped[coin])).join('')}</div>`
       : '<div class="panel empty">暂无 Up/Down 短周期事件</div>';
@@ -1024,29 +1024,45 @@
   }
 
   function renderUpDownCard(event) {
-    const market = Array.isArray(event.markets) && event.markets.length ? event.markets[0] : null;
-    if (!market) {
-      return '';
-    }
+    const market = {
+      id: event.marketSlug,
+      question: event.title,
+      slug: event.marketSlug,
+      outcomes: event.outcomes,
+      outcomePrices: event.outcomePrices,
+      assetIds: event.assetIds,
+      bestBid: event.bestBid,
+      bestAsk: event.bestAsk,
+      lastTradePrice: event.lastTradePrice,
+      volume24hr: event.volume24hr,
+      liquidity: event.liquidity,
+      endDate: event.endTime,
+      active: event.active,
+      closed: event.closed,
+      acceptingOrders: event.acceptingOrders,
+      umaResolutionStatus: event.umaResolutionStatus
+    };
     const tradeState = marketTradeState(event, market);
-    const start = parseTime(market.eventStartTime || event.startTime || event.startDate);
-    const end = parseTime(market.endDate || event.endDate);
+    const start = parseTime(event.startTime);
+    const end = parseTime(event.endTime);
     const isLive = start && end && Date.now() >= start.getTime() && Date.now() < end.getTime();
     const outcomes = toArray(market.outcomes);
     const prices = toArray(market.outcomePrices);
-    const key = market.slug || event.slug;
+    const key = market.slug || event.eventSlug;
     window.__markets[key] = market;
-    const actionButtons = outcomes.map((outcome, outcomeIndex) => renderOutcomeButton(event, market, outcome, outcomeIndex, prices[outcomeIndex], tradeState)).join('');
+    const choiceEvent = { ...event, slug: event.eventSlug || event.marketSlug };
+    const actionButtons = outcomes.map((outcome, outcomeIndex) => renderOutcomeButton(choiceEvent, market, outcome, outcomeIndex, prices[outcomeIndex], tradeState)).join('');
     return `
       <article class="panel updown-card ${isLive ? 'live' : ''} ${tradeState.disabled ? 'closed' : ''}">
         <div class="updown-head">
           <div>
             <div class="updown-time">${formatWindow(start, end)}</div>
-            <div class="slug">${escapeHtml(market.slug || event.slug || '')}</div>
+            <div class="slug">${escapeHtml(market.slug || event.eventSlug || '')}</div>
           </div>
           <span class="pill ${tradeState.tone}">${escapeHtml(isLive && !tradeState.disabled ? '进行中' : tradeState.label)}</span>
         </div>
         <div class="muted">${escapeHtml(event.title || market.question || '')}</div>
+        <div class="kv"><span>起始价</span><strong>${formatPriceToBeat(event.priceToBeat)}</strong></div>
         <div class="kv"><span>倒计时</span><strong>${countdownText(start, end)}</strong></div>
         <div class="kv"><span>成交量</span><span>${formatNumber(market.volume24hr || market.volume, 2)}</span></div>
         <div class="kv"><span>流动性</span><span>${formatNumber(market.liquidity, 2)}</span></div>
@@ -1082,6 +1098,10 @@
     const minutes = Math.floor(seconds / 60);
     const restSeconds = seconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(restSeconds).padStart(2, '0')}`;
+  }
+
+  function formatPriceToBeat(value) {
+    return value === undefined || value === null || value === '' ? '待同步' : formatNumber(value, 6);
   }
 
   function attachOutcomeHandlers() {

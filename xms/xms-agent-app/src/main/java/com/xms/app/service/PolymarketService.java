@@ -3,6 +3,7 @@ package com.xms.app.service;
 import com.alibaba.fastjson.JSONObject;
 import com.xms.app.entity.dto.PolymarketEventListDto;
 import com.xms.app.entity.dto.PolymarketMarketDetailDto;
+import com.xms.app.entity.dto.PolymarketUpDownListDto;
 
 /**
  * Polymarket公开行情代理服务。
@@ -32,7 +33,7 @@ public interface PolymarketService {
 	 * @param after 当前5分钟窗口之后要查询的窗口数量
 	 * @return Up/Down事件列表，保留Polymarket原始字段并补充本地调试字段
 	 */
-	JSONObject listCryptoUpDownEvents(String coins, Integer before, Integer after);
+	PolymarketUpDownListDto listCryptoUpDownEvents(String coins, Integer before, Integer after);
 
 	/**
 	 * 按公开slug查询一个Polymarket市场精简详情。

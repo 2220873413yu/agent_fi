@@ -1,10 +1,10 @@
 package com.xms.app.controller;
 
-import com.alibaba.fastjson.JSONObject;
 import com.xms.app.entity.dto.PolymarketEventListDto;
 import com.xms.app.entity.dto.PolymarketMarketDetailDto;
 import com.xms.app.entity.dto.PolymarketOrderConfigDto;
 import com.xms.app.entity.dto.PolymarketOrderDto;
+import com.xms.app.entity.dto.PolymarketUpDownListDto;
 import com.xms.app.entity.dto.PolymarketOrderQuoteDto;
 import com.xms.app.entity.req.PolymarketOrderReq;
 import com.xms.app.service.PolymarketOrderAppService;
@@ -90,10 +90,10 @@ public class PolymarketController {
 	 * @param after 当前5分钟窗口之后的窗口数量
 	 * @return 当前时间附近的Up/Down事件列表
 	 */
-	@ApiOperation(value = "Polymarket加密货币Up/Down事件", notes = "按币种和当前5分钟窗口组装 Up/Down 市场slug并查询详情，返回 Polymarket 原始市场结构和本地调试字段。")
+	@ApiOperation(value = "Polymarket加密货币Up/Down事件", notes = "按币种和当前5分钟窗口组装 Up/Down 市场slug并查询详情，返回精简DTO；不返回tags、series、feeSchedule等Polymarket原始大字段。")
 	@Anonymous
 	@GetMapping("/crypto/updown")
-	public ResultPista<JSONObject> cryptoUpDown(@ApiParam(value = "逗号分隔币种，支持btc、eth、sol、xrp", defaultValue = "btc,eth,sol")
+	public ResultPista<PolymarketUpDownListDto> cryptoUpDown(@ApiParam(value = "逗号分隔币种，支持btc、eth、sol、xrp", defaultValue = "btc,eth,sol")
 												@RequestParam(defaultValue = "btc,eth,sol") String coins,
 												@ApiParam(value = "当前5分钟窗口之前查询几个窗口", defaultValue = "2")
 												@RequestParam(defaultValue = "2") Integer before,

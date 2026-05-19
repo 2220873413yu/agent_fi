@@ -104,8 +104,9 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 		List<PolymarketMarket> pendingMarkets = polymarketMarketService.lambdaQuery()
 			.eq(PolymarketMarket::getStatus, MARKET_STATUS_PENDING)
 			.eq(PolymarketMarket::getDeleted, 0)
+			.isNotNull(PolymarketMarket::getEndTime)
 			.le(PolymarketMarket::getEndTime, new Date())
-			.orderByAsc(PolymarketMarket::getId)
+			.orderByAsc(PolymarketMarket::getEndTime)
 			.last("limit " + normalizeLimit(limit))
 			.list();
 		if (CollectionUtil.isEmpty(pendingMarkets)) {

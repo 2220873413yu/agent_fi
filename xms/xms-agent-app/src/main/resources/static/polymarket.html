@@ -546,6 +546,14 @@
             <input id="tokenInput" type="password" placeholder="粘贴 App token，裸 token 会自动补 App 前缀">
           </div>
           <div class="field">
+            <label for="signatureInput">Signature</label>
+            <input id="signatureInput" type="text" placeholder="下单签名 signature">
+          </div>
+          <div class="field">
+            <label for="randomNumInput">RandomNum</label>
+            <input id="randomNumInput" type="text" placeholder="签名随机数 randomNum">
+          </div>
+          <div class="field">
             <label for="shareAmountInput">购买份额</label>
             <input id="shareAmountInput" type="number" min="0.000001" step="0.000001" value="100">
             <div id="minShareHint" class="muted">最低购买份额加载中...</div>
@@ -621,6 +629,8 @@
   const volumeMetric = document.getElementById('volumeMetric');
   const statusMetric = document.getElementById('statusMetric');
   const tokenInput = document.getElementById('tokenInput');
+  const signatureInput = document.getElementById('signatureInput');
+  const randomNumInput = document.getElementById('randomNumInput');
   const shareAmountInput = document.getElementById('shareAmountInput');
   const minShareHint = document.getElementById('minShareHint');
   const selectedBox = document.getElementById('selectedBox');
@@ -636,6 +646,8 @@
   const detailJson = document.getElementById('detailJson');
 
   tokenInput.value = localStorage.getItem('polymarketAppAuthorization') || '';
+  signatureInput.value = localStorage.getItem('polymarketSignature') || 'dev-signature';
+  randomNumInput.value = localStorage.getItem('polymarketRandomNum') || String(Date.now());
 
   function setStatus(text, error) {
     statusMetric.textContent = text || '';
@@ -739,6 +751,25 @@
       4: ['已作废', 'danger']
     };
     return map[status] || [`未知 ${status}`, 'warn'];
+  }
+
+  function orderProcessStatusLabel(status) {
+    const map = {
+      0: ['待结算', 'warn'],
+      1: ['已结算', 'ok'],
+      2: ['待人工复核', 'warn'],
+      3: ['已作废/已退款', 'danger']
+    };
+    return map[status] || [`未知 ${status}`, 'warn'];
+  }
+
+  function resolvedStatusLabel(resolvedStatus) {
+    const map = {
+      0: ['未开奖', 'warn'],
+      1: ['赢', 'ok'],
+      2: ['输', 'danger']
+    };
+    return map[resolvedStatus] || [`未知 ${resolvedStatus}`, 'warn'];
   }
 
   async function loadOrderConfig() {
@@ -1102,11 +1133,21 @@
     if (!state.selected.assetId) {
       throw new Error('当前市场结果缺少assetId，请刷新市场后再下单。');
     }
+    const signature = signatureInput.value.trim() || 'dev-signature';
+    const randomNum = randomNumInput.value.trim() || String(Date.now());
+    if (!signature) {
+      throw new Error('请输入下单签名 signature。');
+    }
+    if (!randomNum) {
+      throw new Error('请输入签名随机数 randomNum。');
+    }
     return {
       marketSlug: state.selected.marketSlug,
       assetId: state.selected.assetId,
       shareAmount: shareAmountInput.value,
-      bizType: currentBizType()
+      bizType: currentBizType(),
+      signature,
+      randomNum
     };
   }
 
@@ -1177,10 +1218,11 @@
       return;
     }
     ordersBox.innerHTML = orders.map((order) => {
-      const [label, tone] = statusLabel(order.status);
+      const [label, tone] = orderProcessStatusLabel(order.status);
+      const [resolvedLabel, resolvedTone] = resolvedStatusLabel(order.resolvedStatus);
       return `
         <div class="order-item">
-          <div><span class="pill ${tone}">${label}</span> <strong>${escapeHtml(order.outcomeName || '-')}</strong></div>
+          <div><span class="pill ${tone}">${label}</span> <span class="pill ${resolvedTone}">${resolvedLabel}</span> <strong>${escapeHtml(order.outcomeName || '-')}</strong></div>
           <div class="slug">${escapeHtml(order.orderNo || '')}</div>
           <div class="muted">${escapeHtml(order.marketQuestion || order.marketSlug || '-')}</div>
           <div class="kv"><span>成本AFI</span><strong>${formatNumber(order.afiAmount)} AFI</strong></div>
@@ -1257,6 +1299,8 @@
   orderBizTypeFilter.addEventListener('change', loadMyOrders);
   slugBtn.addEventListener('click', loadMarketBySlug);
   tokenInput.addEventListener('change', () => localStorage.setItem('polymarketAppAuthorization', tokenInput.value.trim()));
+  signatureInput.addEventListener('change', () => localStorage.setItem('polymarketSignature', signatureInput.value.trim()));
+  randomNumInput.addEventListener('change', () => localStorage.setItem('polymarketRandomNum', randomNumInput.value.trim()));
   loadOrderConfig();
   loadEvents();
 </script>

@@ -43,8 +43,9 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 	implements IPolymarketOrderService {
 
 	private static final int ORDER_STATUS_PENDING = 0;
-	private static final int ORDER_STATUS_WON = 1;
-	private static final int ORDER_STATUS_LOST = 2;
+	private static final int ORDER_STATUS_SETTLED = 1;
+	private static final int RESOLVED_STATUS_WON = 1;
+	private static final int RESOLVED_STATUS_LOST = 2;
 	private static final int MARKET_STATUS_PENDING = 0;
 	private static final int MARKET_STATUS_SETTLING = 1;
 	private static final int MARKET_STATUS_COMPLETED = 2;
@@ -262,7 +263,8 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 			if (order.getOutcomeIndex().equals(result.winnerIndex)) {
 				// 猜中订单保留USDT等值，并按结算AFI价格换算成AFI发到validNum2。
 				BigDecimal payoutAfiAmount = calculatePayoutAfiAmount(order.getShareAmount(), payoutAfiPrice);
-				order.setStatus(ORDER_STATUS_WON);
+				order.setStatus(ORDER_STATUS_SETTLED);
+				order.setResolvedStatus(RESOLVED_STATUS_WON);
 				order.setPayoutUsdtAmount(order.getShareAmount());
 				order.setPayoutAfiAmount(payoutAfiAmount);
 				totalPayout = totalPayout.add(order.getShareAmount());
@@ -270,7 +272,8 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 				walletIncrements.add(buildPayoutWalletIncrement(order));
 			} else {
 				// 猜错订单只更新订单状态，不产生钱包入账。
-				order.setStatus(ORDER_STATUS_LOST);
+				order.setStatus(ORDER_STATUS_SETTLED);
+				order.setResolvedStatus(RESOLVED_STATUS_LOST);
 				order.setPayoutUsdtAmount(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN));
 				order.setPayoutAfiAmount(BigDecimal.ZERO.setScale(SHARE_SCALE, RoundingMode.DOWN));
 			}

@@ -159,9 +159,9 @@ public class PolymarketController {
 //	 * @param req 报价参数：marketSlug、assetId、shareAmount、bizType
 //	 * @return 报价快照，金额单位包括购买成本AFI、手续费AFI、实际总扣款AFI和USDT
 //	 */
-//	@ApiOperation(value = "Polymarket内部订单报价", notes = "请求体字段为marketSlug、assetId、shareAmount、bizType。assetId来自事件列表或市场详情的assetIds；后端实时读取AFI价格、Polymarket outcome价格和用户节点手续费减免，按购买份额反算购买成本AFI、外扣手续费AFI和实际总扣款AFI，不扣钱包、不写订单。")
+//	@ApiOperation(value = "Polymarket内部订单报价", notes = "请求体字段为marketSlug、assetId、shareAmount、bizType、signature、randomNum。assetId来自事件列表或市场详情的assetIds；后端实时读取AFI价格、Polymarket outcome价格和用户节点手续费减免，按购买份额反算购买成本AFI、外扣手续费AFI和实际总扣款AFI，不扣钱包、不写订单。")
 //	@PostMapping("/orders/quote")
-//	public ResultPista<PolymarketOrderQuoteDto> quote(@ApiParam(value = "报价请求体：marketSlug市场slug，assetId选择结果token，shareAmount购买份额，bizType业务类型1加密2体育3Up/Down", required = true)
+//	public ResultPista<PolymarketOrderQuoteDto> quote(@ApiParam(value = "报价请求体：marketSlug市场slug，assetId选择结果token，shareAmount购买份额，bizType业务类型1加密2体育3Up/Down，signature签名，randomNum随机数", required = true)
 //													  @Valid @RequestBody PolymarketOrderReq req) {
 //		return ResultPista.data(polymarketOrderAppService.quote(req, SecurityUtils.getLoginAppUser().getUserId()));
 //	}
@@ -171,13 +171,13 @@ public class PolymarketController {
 	 *
 	 * <p>创建时会重新拉取实时价格，不信任前端报价；成功后从用户AFI钱包validNum2扣减购买成本和外扣手续费，并保存订单快照。</p>
 	 *
-	 * @param req 下单参数：marketSlug、assetId、shareAmount、bizType
+	 * @param req 下单参数：marketSlug、assetId、shareAmount、bizType、signature、randomNum
 	 * @return 已创建的内部订单快照
 	 */
-	@ApiOperation(value = "创建Polymarket内部订单", notes = "请求体字段为marketSlug、assetId、shareAmount、bizType。assetId来自事件列表或市场详情的assetIds；创建时重新拉实时价格，按购买份额折算购买成本AFI和外扣手续费AFI，合并扣减用户validNum2，生成平台内部订单。")
+	@ApiOperation(value = "创建Polymarket内部订单", notes = "请求体字段为marketSlug、assetId、shareAmount、bizType、signature、randomNum。assetId来自事件列表或市场详情的assetIds；创建时重新拉实时价格，按购买份额折算购买成本AFI和外扣手续费AFI，合并扣减用户validNum2，生成平台内部订单。")
 	@PostMapping("/orders/create")
 	@RepeatSubmit
-	public ResultPista<PolymarketOrderDto> createOrder(@ApiParam(value = "下单请求体：marketSlug市场slug，assetId选择结果token，shareAmount购买份额，bizType业务类型1加密2体育3Up/Down", required = true)
+	public ResultPista<PolymarketOrderDto> createOrder(@ApiParam(value = "下单请求体：marketSlug市场slug，assetId选择结果token，shareAmount购买份额，bizType业务类型1加密2体育3Up/Down，signature签名，randomNum随机数", required = true)
 													   @Valid @RequestBody PolymarketOrderReq req) {
 		return polymarketOrderAppService.create(req, SecurityUtils.getLoginAppUser().getUserId());
 	}

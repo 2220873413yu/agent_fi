@@ -61,6 +61,7 @@ import static com.xms.app.service.impl.BizUserServiceImpl.checkWallet;
 public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService {
 
 	private static final int STATUS_PENDING = 0;
+	private static final int RESOLVED_STATUS_PENDING = 0;
 	private static final int MIN_SECONDS_BEFORE_END = 5;
 	private static final int MONEY_SCALE = 6;
 	private static final int SHARE_SCALE = 8;
@@ -626,6 +627,7 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 			.maxPayoutUsdt(snapshot.maxPayoutUsdt)
 			.endTime(snapshot.endTime)
 			.status(STATUS_PENDING)
+			.resolvedStatus(RESOLVED_STATUS_PENDING)
 			.payoutUsdtAmount(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN))
 			.payoutAfiPrice(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN))
 			.payoutAfiAmount(BigDecimal.ZERO.setScale(SHARE_SCALE, RoundingMode.DOWN))

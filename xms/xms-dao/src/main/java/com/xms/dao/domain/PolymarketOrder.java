@@ -159,10 +159,15 @@ public class PolymarketOrder extends BaseEntity {
 	@ApiModelProperty(value = "市场结束时间")
 	private Date endTime;
 
-	/** 订单状态：0待结算，1已猜中，2未猜中，3待人工复核，4已作废/已退款。 */
+	/** 订单处理状态：0待结算，1已结算，2待人工复核，3已作废/已退款。 */
 	@Excel(name = "订单状态", sort = 20, dictType = "t_polymarket_order_status")
-	@ApiModelProperty(value = "订单状态 0待结算 1已猜中 2未猜中 3待人工复核 4已作废/已退款")
+	@ApiModelProperty(value = "订单状态 0待结算 1已结算 2待人工复核 3已作废/已退款")
 	private Integer status;
+
+	/** 判定结果：0未开奖，1赢，2输。 */
+	@Excel(name = "判定结果", sort = 21, dictType = "t_polymarket_order_resolved_status")
+	@ApiModelProperty(value = "判定结果 0未开奖 1赢 2输")
+	private Integer resolvedStatus;
 
 	/** 结算后赢家结果下标。 */
 	@Excel(name = "赢家下标", sort = 21)

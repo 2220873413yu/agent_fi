@@ -32,6 +32,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="maxPayoutUsdt" column="max_payout_usdt"/>
         <result property="endTime" column="end_time"/>
         <result property="status" column="status"/>
+        <result property="resolvedStatus" column="resolved_status"/>
         <result property="resultOutcomeIndex" column="result_outcome_index"/>
         <result property="resultOutcomeName" column="result_outcome_name"/>
         <result property="payoutUsdtAmount" column="payout_usdt_amount"/>
@@ -48,7 +49,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select id, order_no, user_id, account, event_slug, event_title, market_slug, biz_type, market_id, condition_id,
                market_question, outcome_index, outcome_name, asset_id, afi_amount, fee_ratio, fee_relief_ratio,
                actual_fee_ratio, fee_afi_amount, total_pay_afi_amount, afi_price, afi_usdt_amount, outcome_price,
-               share_amount, max_payout_usdt, end_time, status, result_outcome_index, result_outcome_name,
+               share_amount, max_payout_usdt, end_time, status, resolved_status, result_outcome_index, result_outcome_name,
                payout_usdt_amount, payout_afi_price, payout_afi_amount, settle_time, order_snapshot_json, create_time, update_time,
                remark
         from t_polymarket_order
@@ -64,6 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="bizType != null"> and biz_type = #{bizType}</if>
             <if test="outcomeName != null and outcomeName != ''"> and outcome_name = #{outcomeName}</if>
             <if test="status != null"> and status = #{status}</if>
+            <if test="resolvedStatus != null"> and resolved_status = #{resolvedStatus}</if>
             <if test="beginCreateTime != null and beginCreateTime != ''"> and create_time &gt;= #{beginCreateTime}</if>
             <if test="endCreateTime != null and endCreateTime != ''"> and create_time &lt;= #{endCreateTime}</if>
             <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''">

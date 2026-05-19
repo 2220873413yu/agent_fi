@@ -30,6 +30,16 @@
           />
         </el-select>
       </el-form-item>
+      <el-form-item label="判定结果" prop="resolvedStatus">
+        <el-select v-model="queryParams.resolvedStatus" placeholder="请选择判定结果" clearable>
+          <el-option
+            v-for="dict in dict.type.t_polymarket_order_resolved_status"
+            :key="dict.value"
+            :label="dict.label"
+            :value="parseInt(dict.value)"
+          />
+        </el-select>
+      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
         <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
@@ -84,6 +94,11 @@
       <el-table-column label="状态" align="center" prop="status" width="110">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.t_polymarket_order_status" :value="scope.row.status" />
+        </template>
+      </el-table-column>
+      <el-table-column label="判定结果" align="center" prop="resolvedStatus" width="110">
+        <template slot-scope="scope">
+          <dict-tag :options="dict.type.t_polymarket_order_resolved_status" :value="scope.row.resolvedStatus" />
         </template>
       </el-table-column>
       <el-table-column label="结束时间" align="center" prop="endTime" width="160">
@@ -142,6 +157,16 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="判定结果" prop="resolvedStatus">
+          <el-select v-model="form.resolvedStatus" style="width: 100%">
+            <el-option
+              v-for="dict in dict.type.t_polymarket_order_resolved_status"
+              :key="dict.value"
+              :label="dict.label"
+              :value="parseInt(dict.value)"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="赢家下标">
           <el-input-number v-model="form.resultOutcomeIndex" :min="0" />
         </el-form-item>
@@ -183,7 +208,7 @@ import { listPolymarketOrder, getPolymarketOrder, updatePolymarketOrder, settleP
 
 export default {
   name: 'PolymarketOrder',
-  dicts: ['t_polymarket_order_status', 't_polymarket_order_biz_type'],
+  dicts: ['t_polymarket_order_status', 't_polymarket_order_biz_type', 't_polymarket_order_resolved_status'],
   data() {
     return {
       loading: true,
@@ -199,7 +224,8 @@ export default {
         userId: null,
         marketSlug: null,
         bizType: null,
-        status: null
+        status: null,
+        resolvedStatus: null
       },
       form: {}
     }

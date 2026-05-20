@@ -43,7 +43,7 @@ public class LongLiveClientStart {
 	 */
 	@Async("asyncVirtualExecutor")
 	public void handerWsMsg() throws Exception {
-		createWsMsg();
+		//createWsMsg();
 	}
 
 	/**
@@ -67,7 +67,7 @@ public class LongLiveClientStart {
 	 * @param channel 已完成WebSocket握手的通道
 	 */
 	public void sendSubscribeMessage(Channel channel) {
-		// 采用全量重订阅：每次从数据库重新加载所有待结算市场asset_id，避免本地订阅状态和数据库不一致。
+		/*// 采用全量重订阅：每次从数据库重新加载所有待结算市场asset_id，避免本地订阅状态和数据库不一致。
 		// 同一个市场多次下单会重复触发刷新，但loadPendingAssetIds会去重；重复开奖事件也由市场状态兜底。
 		if (channel == null || !channel.isActive()) {
 			log.info("Polymarket WebSocket通道不可用，暂不刷新订阅，等待重连或Quartz兜底");
@@ -84,7 +84,7 @@ public class LongLiveClientStart {
 		subscribe.put("type", GlobalConstant.POLYMARKET_MARKET_TYPE);
 		subscribe.put("custom_feature_enabled", true);
 		channel.writeAndFlush(new TextWebSocketFrame(subscribe.toJSONString()));
-		log.info("Polymarket Market Channel订阅已发送，asset数量：{}", assetIds.size());
+		log.info("Polymarket Market Channel订阅已发送，asset{}", assetIds);*/
 	}
 
 	/**

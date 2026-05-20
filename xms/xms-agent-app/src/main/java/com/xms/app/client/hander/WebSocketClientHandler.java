@@ -155,6 +155,7 @@ public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> 
 			return;
 		}
 		// 临时观测大帧来源：只记录长度和事件摘要，不打印完整JSON，避免日志被盘口快照撑爆。
+		log.info("处理之前的数据 content:{}",content);
 		logLargeMessageSummary(content);
 		try {
 			Object parsed = JSON.parse(content);
@@ -169,6 +170,7 @@ public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> 
 				handleEventObject((JSONObject) parsed);
 			}
 		} catch (Exception e) {
+			e.printStackTrace();
 			log.warn("Polymarket WebSocket文本事件解析失败，content={}, error={}", content, e.getMessage());
 		}
 	}

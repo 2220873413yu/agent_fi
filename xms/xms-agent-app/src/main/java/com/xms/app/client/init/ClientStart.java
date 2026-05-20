@@ -28,6 +28,6 @@ public class ClientStart implements ApplicationRunner {
 	@Override
 	public void run(ApplicationArguments args) throws Exception {
 		log.info("开始初始化Polymarket WebSocket订阅客户端");
-		//wsClientStart.handerWsMsg();
+		wsClientStart.handerWsMsg();
 	}
 }

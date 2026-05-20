@@ -73,6 +73,8 @@ public class XmsTask {
 //		asyncTaskServiceImpl.distributePtbInterest100();
 //	}
 
+
+
 	/**
 	 * 任务类型101 每天发放质押奖励
 	 *

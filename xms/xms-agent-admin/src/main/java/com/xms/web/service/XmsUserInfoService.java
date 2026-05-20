@@ -5,6 +5,7 @@ import com.xms.common.core.domain.AjaxResult;
 import com.xms.dao.entity.bo.TeamUsersBo;
 import com.xms.dao.entity.bo.UserInfoReqBo;
 import com.xms.dao.entity.domain.UserInfo;
+import com.xms.dao.entity.dto.UserNetBodyExportDto;
 
 import java.util.List;
 
@@ -61,6 +62,14 @@ public interface XmsUserInfoService
 	 * @return
 	 */
 	List<Tree<Long>> queryNetBody1(String userId);
+
+	/**
+	 * 导出网体关系树页面当前查询口径下的扁平数据。
+	 *
+	 * @param userId 钱包地址，可为空；为空时默认导出1000用户网体
+	 * @return 网体树导出DTO列表
+	 */
+	List<UserNetBodyExportDto> exportNetBody(String userId);
 
 	/**
 	 * 根据id查询用户信息

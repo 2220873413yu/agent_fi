@@ -47,6 +47,7 @@ public class UserInfo extends BaseXmsEntity {
 	@Excel(name = "用户ID", sort = 1)
 	private Long userId;
 
+
 	/**
 	 * 用户编码
 	 */
@@ -186,6 +187,13 @@ public class UserInfo extends BaseXmsEntity {
 	 */
 	@Excel(name = "直推节点业绩(销售额)", sort = 7)
 	private BigDecimal subUmbrellaNodePerformance;
+
+
+	/**
+	 * 后台拨付节点团队业绩(销售额)
+	 */
+	@Excel(name = "后台拨付节点团队业绩(销售额)", sort = 7)
+	private BigDecimal adminUmbrellaNodePerformance;
 
 
 	/**

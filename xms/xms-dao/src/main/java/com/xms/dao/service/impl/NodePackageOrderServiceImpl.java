@@ -170,6 +170,7 @@ public class NodePackageOrderServiceImpl extends XmsDataServiceImpl<NodePackageO
 			userInfoService.lambdaUpdate()
 				.in(UserInfo::getUserId, userInfo.getParentIds())
 				.setSql("node_team_performance = node_team_performance + 1")
+				.setSql("admin_umbrella_node_performance = admin_umbrella_node_performance + "+ nodePackage.getPrice())
 				.update();
 		}
 		return 1;

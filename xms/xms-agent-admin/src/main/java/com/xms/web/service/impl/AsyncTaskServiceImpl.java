@@ -820,7 +820,7 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 			stakeOrderService.callUserLevel(info, userLevelConfigList);
 		}*/
 		List<NodePackageOrder> nodePackageOrders = nodePackageOrderService.lambdaQuery()
-			.eq(NodePackageOrder::getStatus,1)
+			.eq(NodePackageOrder::getSourceType,1)
 			.list();
 		for (NodePackageOrder nodePackageOrder : nodePackageOrders) {
 			UserInfo userInfo = userInfoService.lambdaQuery()
@@ -828,16 +828,10 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 				.one();
 			List<Long> parentIds = userInfo.getParentIds();
 			if(CollectionUtil.isNotEmpty(parentIds)){
-				//直推
-				userInfoService.lambdaUpdate()
-					.eq(UserInfo::getUserId, userInfo.getInviteUserId())
-					.setSql("sub_umbrella_node_performance = sub_umbrella_node_performance + " + nodePackageOrder.getOrderValueUsdt())
-					.update();
-
-				//团队
+				//后台拨付的金额
 				userInfoService.lambdaUpdate()
 					.in(UserInfo::getUserId, parentIds)
-					.setSql("umbrella_node_performance = umbrella_node_performance + " + nodePackageOrder.getOrderValueUsdt())
+					.setSql("admin_umbrella_node_performance = admin_umbrella_node_performance + "+ nodePackageOrder.getOrderValueUsdt())
 					.update();
 			}
 		}

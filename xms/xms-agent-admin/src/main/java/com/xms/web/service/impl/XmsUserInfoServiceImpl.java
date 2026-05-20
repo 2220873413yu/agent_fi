@@ -13,6 +13,7 @@ import com.xms.common.utils.TreeBuildUtils;
 import com.xms.dao.entity.bo.TeamUsersBo;
 import com.xms.dao.entity.bo.UserInfoReqBo;
 import com.xms.dao.entity.domain.UserInfo;
+import com.xms.dao.entity.dto.UserNetBodyExportDto;
 import com.xms.dao.mapper.UserInfoMapper;
 import com.xms.dao.service.UserInfoService;
 import com.xms.system.service.ISysUserService;
@@ -206,8 +207,89 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 		tree.putExtra("nodeTeamPerformance", user.getNodeTeamPerformance());
 		//直推用户数保留给前端判断是否还有子节点
 		tree.putExtra("subNum", user.getSubNum());
+		//增加团队节点支付
+		BigDecimal umbrellaNodePerformance = defaultAmount(user.getUmbrellaNodePerformance());
+		BigDecimal adminUmbrellaNodePerformance = defaultAmount(user.getAdminUmbrellaNodePerformance());
+		tree.putExtra("umbrellaNodePerformance", umbrellaNodePerformance);
+		//增加节点金额(用户购买的+后台拨付的)
+		tree.putExtra("allUmbrellaNodePerformance", umbrellaNodePerformance.add(adminUmbrellaNodePerformance));
 		//团队用户数
 		tree.putExtra("umbrellaNum", user.getUmbrellaNum());
+	}
+
+	/**
+	 * 导出网体树页面当前查询用户下的扁平用户数据。
+	 *
+	 * <p>该方法沿用queryNetBody1的根用户定位和下级查询范围，但返回独立导出DTO，不影响树形接口和用户信息列表导出。
+	 * 导出的团队节点金额=用户购买团队节点支付+后台拨付团队节点业绩。</p>
+	 *
+	 * @param userId 钱包地址，可为空；为空时默认导出1000用户网体
+	 * @return 网体树导出DTO列表
+	 */
+	@Override
+	public List<UserNetBodyExportDto> exportNetBody(String userId) {
+		UserInfo currentUser;
+		if (StrUtil.isBlank(userId)) {
+			currentUser = userInfoMapper.selectById(1000L);
+		} else {
+			currentUser = userInfoService.lambdaQuery()
+				.eq(UserInfo::getAccount, userId)
+				.one();
+		}
+
+		if (currentUser == null) {
+			throw new ServiceException("查询的用户不存在");
+		}
+
+		Map<Integer, String> nodeLevelMap = this.userInfoMapper.selectDictDataByType("t_node_plan_node_level")
+			.stream()
+			.collect(Collectors.toMap(
+				data -> Integer.parseInt(data.getDictValue()),
+				SysDictData::getDictLabel,
+				(existing, replacement) -> existing
+			));
+
+		// 导出页面“所有数据”按后端网体查询范围导出，不依赖前端是否已展开节点。
+		List<UserInfo> userList = userInfoMapper.queryNetBodyChildUser(currentUser.getUserId());
+		userList.addFirst(currentUser);
+		return userList.stream()
+			.map(user -> buildNetBodyExportDto(user, nodeLevelMap))
+			.collect(Collectors.toList());
+	}
+
+	/**
+	 * 将用户信息转换为网体树导出行。
+	 *
+	 * @param user 用户信息
+	 * @param nodeLevelMap 节点等级字典映射
+	 * @return Excel导出行DTO
+	 */
+	private UserNetBodyExportDto buildNetBodyExportDto(UserInfo user, Map<Integer, String> nodeLevelMap) {
+		BigDecimal umbrellaNodePerformance = defaultAmount(user.getUmbrellaNodePerformance());
+		BigDecimal adminUmbrellaNodePerformance = defaultAmount(user.getAdminUmbrellaNodePerformance());
+		UserNetBodyExportDto dto = new UserNetBodyExportDto();
+		dto.setUserId(user.getUserId());
+		dto.setAccount(user.getAccount());
+		dto.setNodeLevel(nodeLevelMap.get(user.getNodeLevel()));
+		dto.setSubNum(user.getSubNum());
+		dto.setUmbrellaNum(user.getUmbrellaNum());
+		dto.setSubNodePerformance(defaultAmount(user.getSubNodePerformance()));
+		dto.setNodeTeamPerformance(defaultAmount(user.getNodeTeamPerformance()));
+		dto.setUmbrellaNodePerformance(umbrellaNodePerformance);
+		dto.setAdminUmbrellaNodePerformance(adminUmbrellaNodePerformance);
+		dto.setAllUmbrellaNodePerformance(umbrellaNodePerformance.add(adminUmbrellaNodePerformance));
+		dto.setCreateTime(user.getCreateTime());
+		return dto;
+	}
+
+	/**
+	 * 金额字段空值兜底为0，避免历史数据为空时导出失败。
+	 *
+	 * @param value 数据库金额字段
+	 * @return 非空金额
+	 */
+	private BigDecimal defaultAmount(BigDecimal value) {
+		return value == null ? BigDecimal.ZERO : value;
 	}
 
 	@Override

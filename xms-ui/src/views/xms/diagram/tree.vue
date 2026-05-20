@@ -16,6 +16,16 @@
                 <el-button slot="append" icon="el-icon-search" @click="handleQuery" />
               </el-input>
             </div>
+            <el-button
+              v-hasPermi="['xms:userinfo:export']"
+              type="warning"
+              plain
+              icon="el-icon-download"
+              size="mini"
+              @click="handleExport"
+            >
+              导出
+            </el-button>
           </div>
         </div>
       </template>
@@ -35,10 +45,14 @@
           <span class="node-info">
             <el-tag size="mini" type="info">ID: {{ data.id }}</el-tag>
             <el-tag v-if="data.level" size="mini" type="warning">节点等级: {{ data.level }}</el-tag>
-            <el-tag size="mini" type="primary">直推节点数量: {{ data.subNodePerformance }}</el-tag>
-            <el-tag size="mini" type="primary">团队节点数量: {{ data.nodeTeamPerformance }}</el-tag>
             <el-tag size="mini" type="danger">直推人数: {{ data.subNum }}</el-tag>
             <el-tag size="mini" type="danger">团队人数: {{ data.umbrellaNum }}</el-tag>
+
+            <el-tag size="mini" type="primary">直推节点数量: {{ data.subNodePerformance }}</el-tag>
+            <el-tag size="mini" type="primary">团队节点数量: {{ data.nodeTeamPerformance }}</el-tag>
+            <el-tag size="mini" type="success">团队节点支付: {{ data.umbrellaNodePerformance }}</el-tag>
+            <el-tag size="mini" type="success">团队节点金额: {{ data.allUmbrellaNodePerformance }}</el-tag>
+
           </span>
         </span>
       </el-tree>
@@ -63,6 +77,12 @@
           </el-descriptions-item>
           <el-descriptions-item label="团队节点数量">
             {{ currentNode.nodeTeamPerformance }}
+          </el-descriptions-item>
+          <el-descriptions-item label="团队节点支付">
+            {{ currentNode.umbrellaNodePerformance }}
+          </el-descriptions-item>
+          <el-descriptions-item label="团队节点金额">
+            {{ currentNode.allUmbrellaNodePerformance }}
           </el-descriptions-item>
           <el-descriptions-item label="直推人数">
             {{ currentNode.subNum }}
@@ -166,6 +186,8 @@ export default {
         level: node.level,
         subNodePerformance: node.subNodePerformance,
         nodeTeamPerformance: node.nodeTeamPerformance,
+        umbrellaNodePerformance: node.umbrellaNodePerformance,
+        allUmbrellaNodePerformance: node.allUmbrellaNodePerformance,
         subNum: node.subNum,
         umbrellaNum: node.umbrellaNum,
         _children: node.children ? node.children.map(child => this.transformNodeData(child)) : []
@@ -190,6 +212,13 @@ export default {
         //this.$message.error('获取网络数据失败');
         this.treeData = [];
       }
+    },
+
+    // 导出当前查询用户对应的完整网体树数据
+    handleExport() {
+      this.download('xms/userinfo/netBodyExport', {
+        userId: this.queryParams.userId
+      }, `网体关系树_${new Date().getTime()}.xlsx`);
     },
 
     // 处理节点点击

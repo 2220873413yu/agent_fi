@@ -12,6 +12,7 @@
         <result column="node_level" property="nodeLevel" />
         <result column="umbrella_node_performance" property="umbrellaNodePerformance" />
         <result column="sub_umbrella_node_performance" property="subUmbrellaNodePerformance" />
+        <result column="admin_umbrella_node_performance" property="adminUmbrellaNodePerformance" />
         <result column="min_game_level" property="minGameLevel" />
         <result column="admin_game_level" property="adminGameLevel" />
         <result column="invite_user_code" property="inviteUserCode" />

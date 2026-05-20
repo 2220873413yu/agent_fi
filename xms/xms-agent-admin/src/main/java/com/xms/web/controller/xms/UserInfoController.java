@@ -16,6 +16,7 @@ import com.xms.dao.domain.*;
 import com.xms.dao.entity.domain.UserRelation;
 import com.xms.dao.entity.bo.UserInfoReqBo;
 import com.xms.dao.entity.domain.UserInfo;
+import com.xms.dao.entity.dto.UserNetBodyExportDto;
 import com.xms.dao.service.*;
 import com.xms.dao.service.impl.UserInfoServiceImpl;
 import com.xms.web.service.XmsUserInfoService;
@@ -157,8 +158,21 @@ public class UserInfoController extends BaseController {
 
 
 	/**
-	 * 查询网体-树结构方法
+	 * 导出网体关系树页面当前查询口径下的所有数据。
 	 *
+	 * <p>该导出使用独立DTO承载页面字段，不复用UserInfo，避免影响用户信息列表导出。</p>
+	 */
+	@PreAuthorize("@ss.hasPermi('xms:userinfo:export')")
+	@Log(title = "网体关系树", businessType = BusinessType.EXPORT)
+	@PostMapping("/netBodyExport")
+	public void netBodyExport(HttpServletResponse response, String userId) {
+		List<UserNetBodyExportDto> list = xmsUserInfoService.exportNetBody(userId);
+		ExcelUtil<UserNetBodyExportDto> util = new ExcelUtil<>(UserNetBodyExportDto.class);
+		util.exportExcel(response, list, "网体关系树数据");
+	}
+
+	/**
+	 * 查询网体-树结构方法
 	 */
 	@GetMapping("/queryNetBody1")
 	public AjaxResult queryNetBody1(@RequestParam(value = "userId",required = false) String userId) {

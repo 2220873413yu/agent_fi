@@ -101,6 +101,11 @@
           <dict-tag :options="dict.type.t_polymarket_order_resolved_status" :value="scope.row.resolvedStatus" />
         </template>
       </el-table-column>
+      <el-table-column label="创建时间" align="center" prop="createTime" width="160">
+        <template slot-scope="scope">
+          <span>{{ parseTime(scope.row.createTime) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="结束时间" align="center" prop="endTime" width="160">
         <template slot-scope="scope">
           <span>{{ parseTime(scope.row.endTime) }}</span>

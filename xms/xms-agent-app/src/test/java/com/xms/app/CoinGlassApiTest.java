@@ -1,6 +1,7 @@
 package com.xms.app;
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.http.HttpResponse;
 import cn.hutool.http.HttpUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
@@ -12,10 +13,23 @@ import cn.hutool.json.JSONUtil;
  */
 public class CoinGlassApiTest {
 
+	//public static void main(String[] args) {
+		//testFundingRateApi();
+	//}
+
 	public static void main(String[] args) {
-		testFundingRateApi();
+
 	}
 
+	/**
+	 *  获取polymarket 事件 closed知道结束事件
+	 */
+	public void test1(){
+		HttpResponse response = HttpUtil.createGet("https://gamma-api.polymarket.com/markets/slug/nba-cle-nyk-2026-05-19-spread-home-6pt5")
+			.timeout(5000)
+			.execute();
+		System.out.println(response.body());
+	}
 	/**
 	 * 测试资金费率API
 	 */
@@ -52,7 +66,7 @@ public class CoinGlassApiTest {
 							System.out.println("USDT/USD保证金模式:");
 							for (int j = 0; j < stablecoinArray.size(); j++) {
 								JSONObject exchangeData = stablecoinArray.getJSONObject(j);
-								System.out.println("  " + exchangeData.getStr("exchange") + 
+								System.out.println("  " + exchangeData.getStr("exchange") +
 									": " + exchangeData.getBigDecimal("funding_rate") + "%" +
 									" (间隔: " + exchangeData.getInt("funding_rate_interval") + "小时)");
 							}
@@ -64,7 +78,7 @@ public class CoinGlassApiTest {
 							System.out.println("币本位保证金模式:");
 							for (int j = 0; j < tokenArray.size(); j++) {
 								JSONObject exchangeData = tokenArray.getJSONObject(j);
-								System.out.println("  " + exchangeData.getStr("exchange") + 
+								System.out.println("  " + exchangeData.getStr("exchange") +
 									": " + exchangeData.getBigDecimal("funding_rate") + "%" +
 									" (间隔: " + exchangeData.getInt("funding_rate_interval") + "小时)");
 							}

@@ -1,6 +1,7 @@
 package com.xms.dao.service.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpResponse;
 import cn.hutool.http.HttpUtil;
@@ -19,12 +20,18 @@ import com.xms.dao.entity.domain.UserMoney;
 import com.xms.dao.mapper.PolymarketOrderMapper;
 import com.xms.dao.service.IPolymarketMarketService;
 import com.xms.dao.service.IPolymarketOrderService;
-import com.xms.dao.service.UserWalletService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -39,6 +46,7 @@ import java.util.List;
  * 然后批量处理该市场下所有待结算订单。</p>
  */
 @Service
+@Slf4j
 public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrderMapper, PolymarketOrder>
 	implements IPolymarketOrderService {
 
@@ -58,22 +66,23 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 	private static final int STUCK_SETTLING_MINUTES = 10;
 	private static final int WALLET_BATCH_SIZE = 1000;
 	private static final String GAMMA_MARKET_SLUG_URL = "https://gamma-api.polymarket.com/markets/slug/";
+	private static final String SQL_VALID_NUM2 = "UPDATE t_user_money SET update_time=?,gt_id=?,valid_num2=valid_num2+?,source_code=?,source_type=?,source_id=? WHERE id=? ";
 
-	private final UserWalletService userWalletService;
 	private final IPolymarketMarketService polymarketMarketService;
 	private final AsyncPolymarketMarketSettleService asyncPolymarketMarketSettleService;
 	private final Environment environment;
+	private final JdbcTemplate jdbcTemplate;
 	private final String lqBaseUrl;
 
-	public PolymarketOrderServiceImpl(UserWalletService userWalletService,
-									  IPolymarketMarketService polymarketMarketService,
+	public PolymarketOrderServiceImpl(IPolymarketMarketService polymarketMarketService,
 									  AsyncPolymarketMarketSettleService asyncPolymarketMarketSettleService,
 									  Environment environment,
+									  JdbcTemplate jdbcTemplate,
 									  @Value("${lq.baseUrl}") String lqBaseUrl) {
-		this.userWalletService = userWalletService;
 		this.polymarketMarketService = polymarketMarketService;
 		this.asyncPolymarketMarketSettleService = asyncPolymarketMarketSettleService;
 		this.environment = environment;
+		this.jdbcTemplate = jdbcTemplate;
 		this.lqBaseUrl = lqBaseUrl;
 	}
 
@@ -360,9 +369,28 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 		if (CollectionUtil.isEmpty(userMoneyList)) {
 			return;
 		}
-		int rows = userWalletService.batchUpdateUserMoney(userMoneyList);
-		if (rows != userMoneyList.size()) {
-			throw new ServiceException(ResponseCode.CODE_1015);
+		int[] rows = jdbcTemplate.batchUpdate(SQL_VALID_NUM2, new BatchPreparedStatementSetter() {
+			@Override
+			public void setValues(PreparedStatement ps, int i) throws SQLException {
+				UserMoney userMoney = userMoneyList.get(i);
+				ps.setTimestamp(1, new Timestamp(userMoney.getUpdateTime().getTime()));
+				ps.setString(2, userMoney.getGtId());
+				ps.setBigDecimal(3, userMoney.getValidNum2());
+				ps.setString(4, userMoney.getSourceCode());
+				ps.setInt(5, userMoney.getSourceType());
+				ps.setLong(6, userMoney.getSourceId());
+				ps.setLong(7, userMoney.getId());
+			}
+
+			@Override
+			public int getBatchSize() {
+				return userMoneyList.size();
+			}
+		});
+		if (ArrayUtil.contains(rows, 0)) {
+			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+			log.error("Polymarket AFI payout batch update failed");
+			throw new ServiceException("Polymarket AFI payout batch update failed");
 		}
 	}
 

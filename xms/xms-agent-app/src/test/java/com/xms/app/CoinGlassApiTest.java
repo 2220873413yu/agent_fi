@@ -17,15 +17,15 @@ public class CoinGlassApiTest {
 		//testFundingRateApi();
 	//}
 
-	public static void main(String[] args) {
-
+	public static void main(String[] args) throws Exception{
+		test1();
 	}
 
 	/**
 	 *  获取polymarket 事件 closed知道结束事件
 	 */
-	public void test1(){
-		HttpResponse response = HttpUtil.createGet("https://gamma-api.polymarket.com/markets/slug/nba-cle-nyk-2026-05-19-spread-home-6pt5")
+	public static void test1(){
+		HttpResponse response = HttpUtil.createGet("https://gamma-api.polymarket.com/markets/slug/btc-updown-5m-1779265500")
 			.timeout(5000)
 			.execute();
 		System.out.println(response.body());

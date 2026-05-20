@@ -312,7 +312,8 @@ public class PolymarketOrderAppServiceImpl implements PolymarketOrderAppService 
 		// 步骤7：事务提交后投递市场延迟结算消息；数据库市场状态仍由Quartz兜底扫描。
 		sendMarketSettleDelayAfterCommit(snapshot);
 		// 步骤8：事务提交后按marketSlug做Redis去重，只有该市场首次触发时才刷新WebSocket订阅。
-		refreshWebSocketSubscribeAfterCommit(snapshot);
+		//暂时不需要重复去订阅
+		//refreshWebSocketSubscribeAfterCommit(snapshot);
 		return ResultPista.data(toDto(order, false));
 	}
 

@@ -235,6 +235,7 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 			marketSnapshot = fetchMarketBySlug(slug);
 			result = resolveWinner(marketSnapshot);
 		} catch (Exception e) {
+			e.printStackTrace();
 			return markMarketNeedReview(market, null, e.getMessage(), now);
 		}
 
@@ -501,6 +502,12 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 		} catch (Exception e) {
 			throw new ServiceException("Polymarket request error: " + e.getMessage());
 		}
+	}
+
+	public static void main(String[] args) {
+		String slug = "bitcoin-above-70k-on-may-19";
+		HttpResponse response = HttpUtil.createGet(GAMMA_MARKET_SLUG_URL + slug).timeout(REQUEST_TIMEOUT_MS).execute();
+		System.out.println(response.body());
 	}
 
 	/**

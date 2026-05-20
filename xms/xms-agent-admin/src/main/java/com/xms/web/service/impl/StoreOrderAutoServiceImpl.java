@@ -69,7 +69,7 @@ public class StoreOrderAutoServiceImpl implements StoreOrderAutoService {
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public void hanlerOrder(RedissonDelayOrder order) {
-		log.info("活期基金延迟到账、任务 order:{},date:{}", order,new Date());
+		log.info("处理Redisson延迟队列到期消息 任务 order:{},date:{}", order,new Date());
 		if(order.getBizType()!=null){
 			if(order.getBizType().equals(2)){
 				//查询用户是否已经支付了节点订单

@@ -63,7 +63,7 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 	private static final int REQUEST_TIMEOUT_MS = 5000;
 	private static final int MONEY_SCALE = 6;
 	private static final int SHARE_SCALE = 8;
-	private static final int STUCK_SETTLING_MINUTES = 10;
+	private static final int STUCK_SETTLING_MINUTES = 1;
 	private static final int WALLET_BATCH_SIZE = 1000;
 	private static final String GAMMA_MARKET_SLUG_URL = "https://gamma-api.polymarket.com/markets/slug/";
 	private static final String SQL_VALID_NUM2 = "UPDATE t_user_money SET update_time=?,gt_id=?,valid_num2=valid_num2+?,source_code=?,source_type=?,source_id=? WHERE id=? ";

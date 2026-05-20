@@ -213,6 +213,7 @@ public class PolymarketServiceImpl implements PolymarketService {
 					Object event = fetchJson(sourceUrl);
 					if (event instanceof JSONObject) {
 						JSONObject rawEvent = (JSONObject) event;
+						normalizeRawUpDownClosed(rawEvent);
 						rawEvent.put("coin", coin.toUpperCase(Locale.ROOT));
 						rawEvent.put("windowStartUnix", windowStart);
 						rawEvent.put("windowEndUnix", windowStart + UP_DOWN_WINDOW_SECONDS);
@@ -268,6 +269,9 @@ public class PolymarketServiceImpl implements PolymarketService {
 		// 步骤2：把起始比较价从eventMetadata中提到顶层，方便前端展示Up/Down判断规则。
 		JSONObject eventMetadata = event.getJSONObject("eventMetadata");
 		BigDecimal priceToBeat = resolveUpDownPriceToBeat(eventMetadata, event, market);
+		String endTime = firstNotBlank(market.getString("endDate"), event.getString("endDate"));
+		Boolean rawClosed = market.getBoolean("closed");
+		boolean closed = Boolean.TRUE.equals(rawClosed) || isEndedByServerTime(endTime);
 
 		return PolymarketUpDownEventDto.builder()
 			.coin(coin.toUpperCase(Locale.ROOT))
@@ -275,7 +279,7 @@ public class PolymarketServiceImpl implements PolymarketService {
 			.eventSlug(event.getString("slug"))
 			.marketSlug(market.getString("slug"))
 			.startTime(firstNotBlank(market.getString("eventStartTime"), event.getString("startTime")))
-			.endTime(firstNotBlank(market.getString("endDate"), event.getString("endDate")))
+			.endTime(endTime)
 			.windowStartUnix(windowStart)
 			.windowEndUnix(windowStart + UP_DOWN_WINDOW_SECONDS)
 			.priceToBeat(priceToBeat)
@@ -288,7 +292,7 @@ public class PolymarketServiceImpl implements PolymarketService {
 			.volume24hr(getBigDecimal(market, "volume24hr"))
 			.liquidity(getBigDecimal(market, "liquidity"))
 			.active(market.getBoolean("active"))
-			.closed(market.getBoolean("closed"))
+			.closed(closed)
 			.acceptingOrders(market.getBoolean("acceptingOrders"))
 			.umaResolutionStatus(market.getString("umaResolutionStatus"))
 			.orderMinSize(getBigDecimal(market, "orderMinSize"))
@@ -327,6 +331,65 @@ public class PolymarketServiceImpl implements PolymarketService {
 			return eventPrice;
 		}
 		return getBigDecimal(market, "priceToBeat");
+	}
+
+	/**
+	 * 使用服务器当前时间兜底判断Up/Down窗口是否已经结束。
+	 *
+	 * <p>Polymarket Gamma的closed和acceptingOrders可能有同步延迟；精简列表给前端展示时，如果endDate已经早于服务器当前UTC时刻，
+	 * 就按已结束处理，避免过期窗口仍显示可下单。endDate为空或格式异常时不兜底，保留上游closed原值。</p>
+	 *
+	 * @param endTime Polymarket返回的结束时间，通常为UTC格式，例如2026-05-20T01:55:00Z
+	 * @return true表示按服务器时间已经结束
+	 */
+	private boolean isEndedByServerTime(String endTime) {
+		if (StrUtil.isBlank(endTime)) {
+			return false;
+		}
+		try {
+			return !Instant.now().isBefore(Instant.parse(endTime));
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	/**
+	 * 修正Up/Down原始接口里的closed字段。
+	 *
+	 * <p>raw接口保留Polymarket原始大字段，但为了避免Gamma closed同步滞后误导调试页面，仍会按服务器当前时间兜底：
+	 * event或market的endDate已经过期时，把对应对象的closed写成true；未过期、endDate缺失或格式异常时不改动。</p>
+	 *
+	 * @param event Gamma按slug返回的原始Up/Down事件
+	 */
+	private void normalizeRawUpDownClosed(JSONObject event) {
+		if (event == null) {
+			return;
+		}
+		String eventEndTime = event.getString("endDate");
+		applyClosedByServerTime(event, eventEndTime);
+		JSONArray markets = event.getJSONArray("markets");
+		if (markets == null) {
+			return;
+		}
+		for (int i = 0; i < markets.size(); i++) {
+			JSONObject market = markets.getJSONObject(i);
+			if (market != null) {
+				applyClosedByServerTime(market, firstNotBlank(market.getString("endDate"), eventEndTime));
+			}
+		}
+	}
+
+	/**
+	 * 按服务器当前时间把单个Polymarket对象标记为已关闭。
+	 *
+	 * @param target event或market对象
+	 * @param endTime UTC结束时间字符串
+	 */
+	private void applyClosedByServerTime(JSONObject target, String endTime) {
+		if (target == null || !isEndedByServerTime(endTime)) {
+			return;
+		}
+		target.put("closed", true);
 	}
 
 	private PolymarketEventListDto loadSimpleEvents(String section, Integer tagId, Integer limit, Integer offset, String sourceUrl) {

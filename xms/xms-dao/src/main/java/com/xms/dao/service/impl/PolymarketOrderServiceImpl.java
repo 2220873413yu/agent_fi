@@ -15,8 +15,7 @@ import com.xms.common.result.ResponseCode;
 import com.xms.common.utils.uuid.IDUtils;
 import com.xms.dao.domain.PolymarketMarket;
 import com.xms.dao.domain.PolymarketOrder;
-import com.xms.dao.entity.vo.UpdateUserWalletVo;
-import com.xms.dao.entity.vo.UserWalletLogVo;
+import com.xms.dao.entity.domain.UserMoney;
 import com.xms.dao.mapper.PolymarketOrderMapper;
 import com.xms.dao.service.IPolymarketMarketService;
 import com.xms.dao.service.IPolymarketOrderService;
@@ -30,7 +29,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -58,6 +56,7 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 	private static final int MONEY_SCALE = 6;
 	private static final int SHARE_SCALE = 8;
 	private static final int STUCK_SETTLING_MINUTES = 10;
+	private static final int WALLET_BATCH_SIZE = 1000;
 	private static final String GAMMA_MARKET_SLUG_URL = "https://gamma-api.polymarket.com/markets/slug/";
 
 	private final UserWalletService userWalletService;
@@ -248,7 +247,7 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 
 		BigDecimal totalPayout = BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN);
 		BigDecimal totalPayoutAfi = BigDecimal.ZERO.setScale(SHARE_SCALE, RoundingMode.DOWN);
-		List<UpdateUserWalletVo> walletIncrements = new ArrayList<>();
+		List<UserMoney> walletIncrements = new ArrayList<>(WALLET_BATCH_SIZE);
 		Date settleTime = new Date();
 		BigDecimal payoutAfiPrice;
 		try {
@@ -273,6 +272,10 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 				totalPayout = totalPayout.add(order.getShareAmount());
 				totalPayoutAfi = totalPayoutAfi.add(payoutAfiAmount);
 				walletIncrements.add(buildPayoutWalletIncrement(order));
+				if (walletIncrements.size() >= WALLET_BATCH_SIZE) {
+					batchUpdateMoneyValid2(walletIncrements);
+					walletIncrements.clear();
+				}
 			} else {
 				// 猜错订单只更新订单状态，不产生钱包入账。
 				order.setStatus(ORDER_STATUS_SETTLED);
@@ -282,12 +285,8 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 			}
 		}
 
-		if (CollectionUtil.isNotEmpty(walletIncrements)) {
-			int rows = userWalletService.handerBatchUserMoney(walletIncrements);
-			if (rows != walletIncrements.size()) {
-				throw new ServiceException(ResponseCode.CODE_1015);
-			}
-		}
+		batchUpdateMoneyValid2(walletIncrements);
+		walletIncrements.clear();
 		if (CollectionUtil.isNotEmpty(pendingOrders) && !updateBatchById(pendingOrders)) {
 			throw new ServiceException("Polymarket order batch update failed");
 		}
@@ -329,27 +328,42 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 	}
 
 	/**
-	 * 组装猜中订单的AFI钱包入账VO。
+	 * 组装猜中订单的AFI钱包入账增量。
 	 *
-	 * <p>这里不直接组装UserMoney，也不直接调用底层批量SQL；结算只收集标准钱包更新VO，
-	 * 由UserWalletService统一转换为钱包增量并批量落库。sourceId使用Polymarket订单ID，便于流水追踪到具体订单。</p>
+	 * <p>这里只收集UserMoney增量，后续由batchUpdateMoneyValid2按1000条分批落库。
+	 * 入账金额使用订单已计算好的payoutAfiAmount；sourceId使用Polymarket订单ID，便于流水追踪到具体订单。</p>
 	 *
 	 * @param order 已确认猜中的Polymarket订单
-	 * @return 可用于批量入账的标准钱包更新VO
+	 * @return 可用于批量更新钱包validNum2的AFI增量
 	 */
-	private UpdateUserWalletVo buildPayoutWalletIncrement(PolymarketOrder order) {
-		UserWalletLogVo walletLog = UserWalletLogVo.builder()
-			.coinType(ConstantType.user_money_coin_type.type_2)
-			.changeBalance(order.getPayoutAfiAmount())
-			.build();
-		return UpdateUserWalletVo.builder()
-			.userId(order.getUserId())
-			.gtId(IDUtils.getSnowflake(ConstantType.user_money_coin_type.type_2).nextIdStr())
-			.sourceCode(order.getOrderNo())
-			.sourceType(ConstantType.user_money_log_source_type.type_41)
-			.sourceId(order.getId())
-			.userWalletLogList(Collections.singletonList(walletLog))
-			.build();
+	private UserMoney buildPayoutWalletIncrement(PolymarketOrder order) {
+		UserMoney userMoney = new UserMoney();
+		userMoney.setId(order.getUserId());
+		userMoney.setValidNum2(order.getPayoutAfiAmount());
+		userMoney.setGtId(IDUtils.getSnowflake(ConstantType.user_money_coin_type.type_2).nextIdStr());
+		userMoney.setSourceCode(order.getOrderNo());
+		userMoney.setSourceType(ConstantType.user_money_log_source_type.type_41);
+		userMoney.setSourceId(order.getId());
+		userMoney.setUpdateTime(order.getSettleTime());
+		return userMoney;
+	}
+
+	/**
+	 * 批量更新中奖订单的AFI钱包validNum2。
+	 *
+	 * <p>该方法只处理已确认中奖订单的AFI入账增量，调用方按1000条分批传入；
+	 * 如果实际更新行数与本批数量不一致，抛出异常让外层事务回滚钱包、订单和市场状态。</p>
+	 *
+	 * @param userMoneyList AFI钱包validNum2增量列表
+	 */
+	private void batchUpdateMoneyValid2(List<UserMoney> userMoneyList) {
+		if (CollectionUtil.isEmpty(userMoneyList)) {
+			return;
+		}
+		int rows = userWalletService.batchUpdateUserMoney(userMoneyList);
+		if (rows != userMoneyList.size()) {
+			throw new ServiceException(ResponseCode.CODE_1015);
+		}
 	}
 
 	/**

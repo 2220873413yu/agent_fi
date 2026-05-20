@@ -74,7 +74,7 @@ public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> 
 		switch (event.state()) {
 			case READER_IDLE:
 				log.info("Polymarket WebSocket读空闲，重新发送订阅");
-				clientStart.sendSubscribeMessage(ctx.channel());
+				//clientStart.sendSubscribeMessage(ctx.channel());
 				break;
 			case WRITER_IDLE:
 				ctx.writeAndFlush(new PingWebSocketFrame());

@@ -21,6 +21,17 @@ public interface UserWalletService {
 	int handerManyUserMoney(List<UserWalletLogVo> userMoneyLogList, String orderNo, Long userId, Long sourceId, Integer bizType);
 
 	/**
+	 * 批量处理多个用户的钱包入账/出账变更。
+	 *
+	 * <p>调用方传入标准钱包更新VO，方法内部统一转换为UserMoney增量并批量落库；
+	 * 适合奖励、结算等多用户批量场景，保留gtId/sourceCode/sourceType/sourceId追踪字段。</p>
+	 *
+	 * @param walletUpdates 标准钱包更新VO集合，每个元素对应一个用户一次钱包变更
+	 * @return 实际更新的钱包行数
+	 */
+	int handerBatchUserMoney(List<UpdateUserWalletVo> walletUpdates);
+
+	/**
 	 * 替代 updateUserMoney 方法，作为与canal中间数据监听配套的更新账户方法
 	 *
 	 * @param reward   金额

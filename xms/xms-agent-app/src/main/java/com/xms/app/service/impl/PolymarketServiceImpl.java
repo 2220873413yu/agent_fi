@@ -42,6 +42,7 @@ public class PolymarketServiceImpl implements PolymarketService {
 	private static final String GAMMA_BASE_URL = "https://gamma-api.polymarket.com";
 	private static final String EVENT_LIST_CACHE_KEY_PREFIX = "polymarket:events:simple:";
 	private static final String MARKET_DETAIL_CACHE_KEY_PREFIX = "polymarket:market:detail:simple:";
+	private static final String RAW_UP_DOWN_CACHE_KEY_PREFIX = "polymarket:updown:raw:";
 	private static final String SECTION_CRYPTO = "crypto";
 	private static final String SECTION_SPORTS = "sports";
 	private static final int CRYPTO_TAG_ID = 21;
@@ -51,6 +52,7 @@ public class PolymarketServiceImpl implements PolymarketService {
 	private static final int SIMPLE_MARKET_LIMIT = 8;
 	private static final long EVENT_LIST_CACHE_SECONDS = 10L;
 	private static final long MARKET_DETAIL_CACHE_SECONDS = 5L;
+	private static final long RAW_UP_DOWN_CACHE_SECONDS = 10L;
 	private static final int REQUEST_TIMEOUT_MS = 5000;
 	private static final long UP_DOWN_WINDOW_SECONDS = 300L;
 	private static final int DEFAULT_UP_DOWN_BEFORE = 2;
@@ -201,6 +203,35 @@ public class PolymarketServiceImpl implements PolymarketService {
 		int previousWindows = normalizeWindowCount(before, DEFAULT_UP_DOWN_BEFORE);
 		int futureWindows = normalizeWindowCount(after, DEFAULT_UP_DOWN_AFTER);
 		long currentWindow = floorToFiveMinuteWindow(Instant.now().getEpochSecond());
+		String cacheKey = RAW_UP_DOWN_CACHE_KEY_PREFIX
+			+ String.join(",", normalizedCoins)
+			+ ":" + previousWindows
+			+ ":" + futureWindows
+			+ ":" + currentWindow;
+
+		// raw接口返回体较大，10秒缓存只用于降低调试页连续刷新时的Gamma请求压力。
+		try {
+			return xmsRedis.get(cacheKey, () -> loadRawCryptoUpDownEvents(normalizedCoins, previousWindows, futureWindows, currentWindow),
+				RAW_UP_DOWN_CACHE_SECONDS, TimeUnit.SECONDS);
+		} catch (Exception e) {
+			log.warn("Polymarket Up/Down原始事件缓存读取失败，改为实时请求Gamma，cacheKey={}", cacheKey, e);
+			return loadRawCryptoUpDownEvents(normalizedCoins, previousWindows, futureWindows, currentWindow);
+		}
+	}
+
+	/**
+	 * 实时拉取Polymarket Up/Down原始事件并补充本地调试字段。
+	 *
+	 * <p>该方法是raw接口缓存未命中时的加载逻辑，会按当前5分钟窗口拼接slug逐个请求Gamma；
+	 * 返回体会保留上游原始大字段，并按服务器时间修正closed调试值。</p>
+	 *
+	 * @param normalizedCoins 已归一化的小写币种列表
+	 * @param previousWindows 当前窗口之前查询的5分钟窗口数量
+	 * @param futureWindows 当前窗口之后查询的5分钟窗口数量
+	 * @param currentWindow 当前5分钟窗口起点Unix秒
+	 * @return Polymarket原始Up/Down事件集合
+	 */
+	private JSONObject loadRawCryptoUpDownEvents(List<String> normalizedCoins, int previousWindows, int futureWindows, long currentWindow) {
 		JSONArray events = new JSONArray();
 
 		for (String coin : normalizedCoins) {

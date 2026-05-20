@@ -1,12 +1,64 @@
 # Polymarket WebSocket事件订阅与解析
 
-## 范围
+## 当前状态
 
-- 本文说明 App 服务如何订阅 Polymarket Market Channel，以及收到事件后如何解析。
-- 当前版本 WebSocket 只作为“市场已开奖”的实时触发器，不直接发奖、不写钱包。
-- 真正发奖仍由统一结算入口 `processSettlingMarket(marketSlug)` 完成，并且会再次查询 Gamma API 复核最终结果。
+- 当前阶段暂时关闭 WebSocket 作为 Polymarket 结算触发源。
+- 结算主路径改为 Quartz 定时扫描到期市场，再由统一结算入口 `processSettlingMarket(marketSlug)` 请求 Gamma API 复核并发奖。
+- 本文保留为后续重新启用 WebSocket 的技术备忘，不代表当前生产/测试环境必须启动订阅。
 
-## 订阅地址
+## 暂停原因
+
+Polymarket Market Channel 按 `asset_id/token_id` 订阅，不是按 `market_slug` 订阅。订阅后并不会只推送 `market_resolved`，还会推送盘口和价格类事件：
+
+```text
+book
+price_change
+best_bid_ask
+last_trade_price
+tick_size_change
+new_market
+market_resolved
+```
+
+其中 `book` 事件包含 `bids/asks` 订单簿快照。订阅市场较多时，一个二选一市场通常有 2 个 asset，多个市场会带来大量 `book` 和价格变化推送，可能导致：
+
+- WebSocket 流量持续偏大。
+- 初始盘口快照消息过大。
+- Netty WebSocket frame 超限，例如超过默认 64KB。
+- 业务只关心开奖，但仍需要接收并解码大量无关行情消息。
+
+因此当前阶段不再依赖 WebSocket 结果推送，避免因行情流量影响结算稳定性。
+
+## 当前结算主路径
+
+```text
+Quartz 定时任务
+        ↓
+扫描 t_polymarket_market
+条件：status=0、deleted=0、end_time <= now
+        ↓
+抢占市场为 status=1 结算中
+        ↓
+投递 marketSlug 到统一结算队列/消费者
+        ↓
+processSettlingMarket(marketSlug)
+        ↓
+重新请求 Polymarket Gamma API
+        ↓
+复核 umaResolutionStatus / outcomePrices / winner
+        ↓
+批量更新订单、写钱包、更新市场状态
+```
+
+Quartz 和消费者职责保持分离：
+
+- Quartz 只发现到期市场并抢占状态，不直接发奖。
+- 消费者统一调用 `processSettlingMarket(marketSlug)`，不信任任何单一触发来源。
+- 如果 Polymarket 到期后尚未开奖，消费者会按现有逻辑回待结算或进入复核兜底。
+
+## WebSocket订阅备忘
+
+如果后续重新启用 WebSocket，订阅地址仍为：
 
 ```text
 wss://ws-subscriptions-clob.polymarket.com/ws/market
@@ -18,52 +70,7 @@ wss://ws-subscriptions-clob.polymarket.com/ws/market
 https://docs.polymarket.com/cn/market-data/websocket/market-channel
 ```
 
-## asset_id来源
-
-- 下单时，后端调用 Gamma API 查询市场详情。
-- 市场详情中的 `clobTokenIds` 是该市场每个结果选项对应的 `asset_id/token_id`。
-- `clobTokenIds` 与 `outcomes` 按下标对应：
-
-```text
-outcomes[0]      -> clobTokenIds[0]
-outcomes[1]      -> clobTokenIds[1]
-outcome_index    -> clobTokenIds[outcome_index]
-```
-
-- 下单后：
-  - 订单表 `t_polymarket_order.asset_id` 保存用户选择的结果资产ID。
-  - 市场表 `t_polymarket_market.asset_ids_json` 保存该市场全部结果资产ID数组。
-  - 市场表 `t_polymarket_market.outcomes_json` 保存该市场全部结果名称数组。
-
-## 为什么订阅asset_id
-
-Polymarket Market Channel 的订阅对象是结果 token，也就是 `asset_id/token_id`，不是我们内部使用的 `market_slug`。
-
-- 一个市场可以有多个结果，每个结果都有自己的 `asset_id/token_id`。
-- 用户买 Yes、No 或多结果里的某个选项，本质上买的是该结果对应的 token。
-- WebSocket 开奖事件可能返回 `slug`，也可能需要通过 `winning_asset_id` 辅助定位市场。
-- 所以市场表必须保存全量 `asset_ids_json`，订单表必须保存用户本单选择的 `asset_id`。
-
-定位关系：
-
-```text
-订阅阶段：t_polymarket_market.asset_ids_json -> WebSocket assets_ids
-开奖阶段：market_resolved.slug -> t_polymarket_market.market_slug
-兜底定位：market_resolved.winning_asset_id -> t_polymarket_market.asset_ids_json
-订单判断：t_polymarket_order.asset_id / outcome_index -> 用户买的结果
-```
-
-## 订阅报文
-
-启动时从 `t_polymarket_market` 查询：
-
-```text
-status = 0 待结算
-deleted = 0
-asset_ids_json 不为空
-```
-
-汇总所有 `asset_id` 后发送订阅：
+订阅报文示例：
 
 ```json
 {
@@ -75,98 +82,44 @@ asset_ids_json 不为空
 
 说明：
 
-- `assets_ids` 是 Polymarket Market Channel 订阅字段。
-- `type=market` 表示订阅市场频道。
-- `custom_feature_enabled=true` 用于接收扩展事件，例如 `market_resolved`。
-- 如果当前没有待结算市场，则保持连接但不发送空订阅。
+- `assets_ids` 是 Polymarket Market Channel 的订阅字段。
+- `custom_feature_enabled=true` 可接收扩展事件，例如 `market_resolved`。
+- 一个二选一市场通常对应 2 个 asset，订阅数量会随着市场数量成倍增长。
 
-## 事件处理策略
+## 重新启用建议
 
-Polymarket Market Channel 可能返回单个 JSON 对象，也可能返回 JSON 数组。处理时统一转成事件对象逐条解析。
+如确实需要 WebSocket 提前触发开奖，建议只作为辅助路径：
 
-当前只处理：
+- 只订阅临近到期市场，例如 `end_time` 接近当前时间的少量市场。
+- 按市场或小批量拆分订阅 asset，避免一次订阅过多 token。
+- `maxFramePayloadLength` 可以适当调大作为兜底，但不能作为长期承载大量 `book` 推送的主要方案。
+- 业务只处理 `market_resolved`，忽略 `book/price_change/best_bid_ask/last_trade_price`。
+- 收到 `market_resolved` 后也只抢占市场并投递 `marketSlug`，不能直接发奖。
+- 最终仍必须由 `processSettlingMarket(marketSlug)` 重新请求 Gamma API 复核结果。
 
-```text
-event_type = market_resolved
-```
+## asset_id关系
 
-其他事件，例如价格变化、订单簿变化、best bid/ask、last trade 等，只记录调试日志，不修改数据库。
-
-## market_resolved解析
-
-`market_resolved` 是当前结算系统关注的核心事件。主要字段：
+Polymarket Market Channel 的订阅对象是结果 token，也就是 `asset_id/token_id`。
 
 ```text
-slug                市场slug
-asset_ids           市场全部结果asset_id
-outcomes            市场全部结果名称
-winning_asset_id    赢家asset_id
-winning_outcome     赢家名称
+outcomes[0]      -> clobTokenIds[0]
+outcomes[1]      -> clobTokenIds[1]
+用户选择结果       -> t_polymarket_order.asset_id
+市场全部结果token  -> t_polymarket_market.asset_ids_json
 ```
 
-解析流程：
+如果 WebSocket 返回 `market_resolved`：
 
 ```text
-收到 market_resolved
-        ↓
-优先读取 slug
-        ↓
-按 t_polymarket_market.market_slug 匹配待结算市场
-        ↓
-如果缺少 slug，则用 winning_asset_id 匹配 asset_ids_json
-        ↓
-匹配到 status=0 的市场后，抢占为 status=1 结算中
-        ↓
-保留延迟队列 TODO，后续由队列消费者调用 processSettlingMarket
+market_resolved.slug              -> t_polymarket_market.market_slug
+market_resolved.winning_asset_id  -> t_polymarket_market.asset_ids_json
 ```
 
-注意：
-
-- WebSocket 只负责发现“这个市场可能已经开奖”，不直接判断用户输赢。
-- 真正发奖前，`processSettlingMarket(marketSlug)` 仍会重新查询 Gamma API 复核 `umaResolutionStatus` 和最终赢家。
-- 复核通过后，再用 `result_outcome_index` 或赢家 token 对订单进行批量结算。
-
-## 状态边界
-
-- WebSocket 只处理 `status=0待结算` 的市场。
-- 如果市场已经是：
-  - `1结算中`
-  - `2结算完成`
-  - `3待人工复核`
-
-则重复事件不再处理。
-
-## 为什么不能直接按WebSocket发奖
-
-WebSocket 是实时消息通道，可能出现断线、重复消息、字段缺失或消息顺序问题。
-
-所以 WebSocket 只做触发，不做最终资产结算。最终发奖时仍需要：
-
-```text
-processSettlingMarket(marketSlug)
-        ↓
-重新查询 Gamma API
-        ↓
-确认 umaResolutionStatus = resolved
-        ↓
-确认 outcomePrices 明确为 0/1
-        ↓
-批量结算订单和钱包
-```
-
-这样 WebSocket 快，Quartz 稳，数据库状态防重复，最终发奖入口只有一套。
-
-## 当前未实现内容
-
-- 暂不实现 Redisson 延迟队列消费者。
-- 暂不真实投递延迟队列消息，只保留中文 TODO。
-- 暂不订阅实时价格用于页面展示。
-- 暂不把 WebSocket 原始事件落库。
+`winning_asset_id` 可作为缺少 slug 时的辅助定位字段，但最终赢家仍以 Gamma API 复核结果为准。
 
 ## 测试点
 
-- 启动 App 后不再连接数海地址，不再发送 `login` 或 `market=WI,WX,WA`。
-- 有待结算市场时，会发送 Polymarket `assets_ids/type/custom_feature_enabled` 订阅。
-- 收到 `market_resolved` 且 `slug` 匹配时，市场从 `0待结算` 改为 `1结算中`。
-- 收到重复 `market_resolved` 时，市场不会重复派发。
-- 收到非结算事件时，不修改市场、不发奖。
+- 当前阶段启动 App 后，不应把 WebSocket 作为结算主路径。
+- Quartz 到期扫描可派发 `end_time <= now` 且 `status=0` 的市场。
+- WebSocket 如后续重新启用，非结算事件不得写库、不得发奖。
+- 即使收到 `market_resolved`，也必须通过 `processSettlingMarket(marketSlug)` 复核后再结算。

@@ -15,7 +15,8 @@ import com.xms.common.result.ResponseCode;
 import com.xms.common.utils.uuid.IDUtils;
 import com.xms.dao.domain.PolymarketMarket;
 import com.xms.dao.domain.PolymarketOrder;
-import com.xms.dao.entity.domain.UserMoney;
+import com.xms.dao.entity.vo.UpdateUserWalletVo;
+import com.xms.dao.entity.vo.UserWalletLogVo;
 import com.xms.dao.mapper.PolymarketOrderMapper;
 import com.xms.dao.service.IPolymarketMarketService;
 import com.xms.dao.service.IPolymarketOrderService;
@@ -29,6 +30,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -246,7 +248,7 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 
 		BigDecimal totalPayout = BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.DOWN);
 		BigDecimal totalPayoutAfi = BigDecimal.ZERO.setScale(SHARE_SCALE, RoundingMode.DOWN);
-		List<UserMoney> walletIncrements = new ArrayList<>();
+		List<UpdateUserWalletVo> walletIncrements = new ArrayList<>();
 		Date settleTime = new Date();
 		BigDecimal payoutAfiPrice;
 		try {
@@ -281,7 +283,7 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 		}
 
 		if (CollectionUtil.isNotEmpty(walletIncrements)) {
-			int rows = userWalletService.batchUpdateUserMoney(walletIncrements);
+			int rows = userWalletService.handerBatchUserMoney(walletIncrements);
 			if (rows != walletIncrements.size()) {
 				throw new ServiceException(ResponseCode.CODE_1015);
 			}
@@ -327,24 +329,27 @@ public class PolymarketOrderServiceImpl extends XmsDataServiceImpl<PolymarketOrd
 	}
 
 	/**
-	 * 组装猜中订单的AFI钱包入账增量。
+	 * 组装猜中订单的AFI钱包入账VO。
 	 *
-	 * <p>这里不直接调用单笔钱包变更，而是收集UserMoney增量后批量落库，避免同一市场订单较多时产生大量单笔更新。
-	 * 入账金额使用订单上已计算好的payoutAfiAmount，USDT等值和AFI价格快照只用于对账。</p>
+	 * <p>这里不直接组装UserMoney，也不直接调用底层批量SQL；结算只收集标准钱包更新VO，
+	 * 由UserWalletService统一转换为钱包增量并批量落库。sourceId使用Polymarket订单ID，便于流水追踪到具体订单。</p>
 	 *
 	 * @param order 已确认猜中的Polymarket订单
-	 * @return 可用于批量更新钱包的AFI增量
+	 * @return 可用于批量入账的标准钱包更新VO
 	 */
-	private UserMoney buildPayoutWalletIncrement(PolymarketOrder order) {
-		UserMoney userMoney = new UserMoney();
-		userMoney.setId(order.getUserId());
-		userMoney.setValidNum2(order.getPayoutAfiAmount());
-		userMoney.setGtId(IDUtils.getSnowflake(ConstantType.user_money_coin_type.type_2).nextIdStr());
-		userMoney.setSourceCode(order.getOrderNo());
-		userMoney.setSourceType(ConstantType.user_money_log_source_type.type_41);
-		userMoney.setSourceId(order.getUserId());
-		userMoney.setUpdateTime(new Date());
-		return userMoney;
+	private UpdateUserWalletVo buildPayoutWalletIncrement(PolymarketOrder order) {
+		UserWalletLogVo walletLog = UserWalletLogVo.builder()
+			.coinType(ConstantType.user_money_coin_type.type_2)
+			.changeBalance(order.getPayoutAfiAmount())
+			.build();
+		return UpdateUserWalletVo.builder()
+			.userId(order.getUserId())
+			.gtId(IDUtils.getSnowflake(ConstantType.user_money_coin_type.type_2).nextIdStr())
+			.sourceCode(order.getOrderNo())
+			.sourceType(ConstantType.user_money_log_source_type.type_41)
+			.sourceId(order.getId())
+			.userWalletLogList(Collections.singletonList(walletLog))
+			.build();
 	}
 
 	/**

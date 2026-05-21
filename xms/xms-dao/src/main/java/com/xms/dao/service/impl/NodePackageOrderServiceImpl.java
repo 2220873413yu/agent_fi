@@ -86,7 +86,7 @@ public class NodePackageOrderServiceImpl extends XmsDataServiceImpl<NodePackageO
 		}
 		List<Long> parentIds = userInfo.getParentIds();
 		if(CollectionUtil.isNotEmpty(parentIds)){
-			BigDecimal p1 = queryOrder.getOrderValueUsdt().add(nodePackage.getPrice());
+			BigDecimal p1 = nodePackage.getPrice().subtract(queryOrder.getOrderValueUsdt());
 			//直推
 			userInfoService.lambdaUpdate()
 				.eq(UserInfo::getUserId, userInfo.getInviteUserId())

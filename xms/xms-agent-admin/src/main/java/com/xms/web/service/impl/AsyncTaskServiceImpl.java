@@ -819,8 +819,13 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 			}
 			stakeOrderService.callUserLevel(info, userLevelConfigList);
 		}*/
+		userInfoService.lambdaUpdate()
+			.set(UserInfo::getUmbrellaNodePerformance, 0)
+			.set(UserInfo::getSubUmbrellaNodePerformance, 0)
+			.set(UserInfo::getAdminUmbrellaNodePerformance, 0)
+			.update();
+		//重新计算业绩
 		List<NodePackageOrder> nodePackageOrders = nodePackageOrderService.lambdaQuery()
-			.eq(NodePackageOrder::getSourceType,1)
 			.list();
 		for (NodePackageOrder nodePackageOrder : nodePackageOrders) {
 			UserInfo userInfo = userInfoService.lambdaQuery()
@@ -828,11 +833,26 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 				.one();
 			List<Long> parentIds = userInfo.getParentIds();
 			if(CollectionUtil.isNotEmpty(parentIds)){
-				//后台拨付的金额
+				//直推业绩
+				userInfoService.lambdaUpdate()
+					.eq(UserInfo::getUserId, userInfo.getInviteUserId())
+					.setSql("sub_umbrella_node_performance = sub_umbrella_node_performance + " + nodePackageOrder.getOrderValueUsdt())
+					.update();
+
+				//修改团队业绩
 				userInfoService.lambdaUpdate()
 					.in(UserInfo::getUserId, parentIds)
-					.setSql("admin_umbrella_node_performance = admin_umbrella_node_performance + "+ nodePackageOrder.getOrderValueUsdt())
+					.setSql("umbrella_node_performance = umbrella_node_performance + " + nodePackageOrder.getOrderValueUsdt())
 					.update();
+
+				if(nodePackageOrder.getSourceType().equals(1)){
+					//后台拨付的金额
+					userInfoService.lambdaUpdate()
+						.in(UserInfo::getUserId, parentIds)
+						.setSql("admin_umbrella_node_performance = admin_umbrella_node_performance + "+ nodePackageOrder.getOrderValueUsdt())
+						.update();
+				}
+
 			}
 		}
 	}

@@ -166,6 +166,14 @@ public interface UserInfoMapper extends BaseMapper<UserInfo> {
 
 	List<UserInfo> queryNetBodyChildUser(@Param("userId")  Long userId);
 
+	/**
+	 * 查询指定用户网体下的全部层级下级用户，用于后台网体树导出。
+	 *
+	 * @param userId 根用户ID
+	 * @return 根用户下所有层级的有效下级用户列表
+	 */
+	List<UserInfo> queryNetBodyAllChildUser(@Param("userId") Long userId);
+
 
 	/**
 	 * 获取用户算力List

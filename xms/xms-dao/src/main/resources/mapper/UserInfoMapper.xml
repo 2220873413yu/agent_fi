@@ -167,6 +167,21 @@
             b.distance ASC
     </select>
 
+    <select id="queryNetBodyAllChildUser" resultMap="UserInfoResult">
+        SELECT
+            a.*
+        FROM
+            t_user_info a
+                INNER JOIN t_user_relation b ON a.user_id = b.pos_user_id
+                and a.deleted = 0
+                AND b.active_flag = 1
+                AND b.par_user_id = #{userId}
+                AND b.distance > 0
+        ORDER BY
+            b.distance ASC,
+            a.user_id ASC
+    </select>
+
 
     <select id="getLimitedParentUserIdList" resultType="long">
         SELECT

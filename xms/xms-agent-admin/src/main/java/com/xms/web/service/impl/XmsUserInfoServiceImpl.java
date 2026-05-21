@@ -250,7 +250,7 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 			));
 
 		// 导出页面“所有数据”按后端网体查询范围导出，不依赖前端是否已展开节点。
-		List<UserInfo> userList = userInfoMapper.queryNetBodyChildUser(currentUser.getUserId());
+		List<UserInfo> userList = userInfoMapper.queryNetBodyAllChildUser(currentUser.getUserId());
 		userList.addFirst(currentUser);
 		return userList.stream()
 			.map(user -> buildNetBodyExportDto(user, nodeLevelMap))

@@ -42,6 +42,7 @@ public class PolymarketServiceImpl implements PolymarketService {
 	private static final String GAMMA_BASE_URL = "https://gamma-api.polymarket.com";
 	private static final String EVENT_LIST_CACHE_KEY_PREFIX = "polymarket:events:simple:";
 	private static final String MARKET_DETAIL_CACHE_KEY_PREFIX = "polymarket:market:detail:simple:";
+	private static final String UP_DOWN_CACHE_KEY_PREFIX = "polymarket:updown:simple:";
 	private static final String RAW_UP_DOWN_CACHE_KEY_PREFIX = "polymarket:updown:raw:";
 	private static final String SECTION_CRYPTO = "crypto";
 	private static final String SECTION_SPORTS = "sports";
@@ -52,6 +53,7 @@ public class PolymarketServiceImpl implements PolymarketService {
 	private static final int SIMPLE_MARKET_LIMIT = 8;
 	private static final long EVENT_LIST_CACHE_SECONDS = 10L;
 	private static final long MARKET_DETAIL_CACHE_SECONDS = 5L;
+	private static final long UP_DOWN_CACHE_SECONDS = 10L;
 	private static final long RAW_UP_DOWN_CACHE_SECONDS = 10L;
 	private static final int REQUEST_TIMEOUT_MS = 5000;
 	private static final long UP_DOWN_WINDOW_SECONDS = 300L;
@@ -153,6 +155,22 @@ public class PolymarketServiceImpl implements PolymarketService {
 		int previousWindows = normalizeWindowCount(before, DEFAULT_UP_DOWN_BEFORE);
 		int futureWindows = normalizeWindowCount(after, DEFAULT_UP_DOWN_AFTER);
 		long currentWindow = floorToFiveMinuteWindow(Instant.now().getEpochSecond());
+		String cacheKey = UP_DOWN_CACHE_KEY_PREFIX
+			+ String.join(",", normalizedCoins)
+			+ ":" + previousWindows
+			+ ":" + futureWindows
+			+ ":" + currentWindow;
+
+		try {
+			return xmsRedis.get(cacheKey, () -> loadSimpleCryptoUpDownEvents(normalizedCoins, previousWindows, futureWindows, currentWindow),
+				UP_DOWN_CACHE_SECONDS, TimeUnit.SECONDS);
+		} catch (Exception e) {
+			log.warn("Polymarket Up/Down精简事件缓存读取失败，改为实时请求Gamma，cacheKey={}", cacheKey, e);
+			return loadSimpleCryptoUpDownEvents(normalizedCoins, previousWindows, futureWindows, currentWindow);
+		}
+	}
+
+	private PolymarketUpDownListDto loadSimpleCryptoUpDownEvents(List<String> normalizedCoins, int previousWindows, int futureWindows, long currentWindow) {
 		List<PolymarketUpDownEventDto> events = new ArrayList<>();
 
 		for (String coin : normalizedCoins) {

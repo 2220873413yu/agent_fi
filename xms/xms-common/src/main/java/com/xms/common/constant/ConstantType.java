@@ -75,26 +75,10 @@ public class ConstantType {
 		public static final int type_5 = 5;
 		public static final int type_6 = 6;
 		public static final int type_7 = 7;
-		public static final int type_8 = 8;
 		public static final int type_9 = 9;
-		public static final int type_10 = 10;
-		public static final int type_11 = 11;
-		public static final int type_12 = 12;
-		public static final int type_13 = 13;
-		public static final int type_14 = 14;
 		public static final int type_15 = 15;
 		public static final int type_16 = 16;
-		public static final int type_17 = 17;
-		public static final int type_18 = 18;
-		public static final int type_19 = 19;
-		public static final int type_20 = 20;
-		public static final int type_21 = 21;
-		public static final int type_22 = 22;
-		public static final int type_23 = 23;
-		public static final int type_24 = 24;
-		public static final int type_25 = 25;
-		public static final int type_26 = 26;
-		//托管静态收益
+		//托管收益
 		public static final int type_27 = 27;
 		//托管直推奖
 		public static final int type_28 = 28;
@@ -166,7 +150,7 @@ public class ConstantType {
 		public static final int type_28 = 28;
 		public static final int type_29 = 29;
 		public static final int type_30 = 30;
-		//托管静态收益
+		//托管收益
 		public static final int type_31 = 31;
 		//托管直推奖
 		public static final int type_32 = 32;
@@ -176,13 +160,13 @@ public class ConstantType {
 		public static final int type_34 = 34;
 		//AFI质押扣减
 		public static final int type_35 = 35;
-		//AFI质押退还
+		//AFI托管退回
 		public static final int type_36 = 36;
 		//托管全球分红
 		public static final int type_37 = 37;
 		//充值
 		public static final int type_38 = 38;
-		//质押退还
+		//托管退回
 		public static final int type_39 = 39;
 		//Polymarket下单扣减AFI
 		public static final int type_40 = 40;

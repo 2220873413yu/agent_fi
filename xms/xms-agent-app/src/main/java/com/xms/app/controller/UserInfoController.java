@@ -1,10 +1,13 @@
 package com.xms.app.controller;
 
 
+import cn.hutool.core.date.DateTime;
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.github.pagehelper.PageInfo;
 import com.xms.app.config.RobotConfig;
 import com.xms.app.entity.dto.CurrentStakeHostingStaticRateDto;
+import com.xms.app.entity.dto.GlobalDividendPoolDto;
 import com.xms.app.entity.dto.MyDirectMemberDto;
 import com.xms.app.entity.dto.MyTeamInfoDto;
 import com.xms.app.entity.vo.*;
@@ -14,9 +17,11 @@ import com.xms.common.constant.Constants;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.core.domain.model.xms.LoginAppUser;
 import com.xms.common.utils.SecurityUtils;
+import com.xms.dao.domain.StakeHostingGlobalDividendPool;
 import com.xms.dao.entity.bo.BatchUserBo;
 import com.xms.dao.entity.bo.UserInfoBo;
 import com.xms.dao.entity.domain.UserInfo;
+import com.xms.dao.service.IStakeHostingGlobalDividendPoolService;
 import com.xms.dao.service.UserInfoService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -28,6 +33,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * 用户信息表 前端控制器
@@ -47,8 +55,35 @@ public class UserInfoController {
 	@Autowired
 	private HttpServletRequest request;
 
+	@Autowired
+	private IStakeHostingGlobalDividendPoolService stakeHostingGlobalDividendPoolService;
 
-
+	/**
+	 * 查询分红池相关信息
+	 * @return
+	 */
+	@ApiOperation(value = "查询分红池相关信息")
+	@GetMapping(value = "/getGlobalDividendPool")
+	public ResultPista<GlobalDividendPoolDto> getGlobalDividendPool() {
+		GlobalDividendPoolDto resp = new GlobalDividendPoolDto();
+		StakeHostingGlobalDividendPool dividendPool = stakeHostingGlobalDividendPoolService.lambdaQuery()
+			.last("limit 1")
+			.one();
+		if(dividendPool!=null){
+			resp.setBalanceAmount(dividendPool.getBalanceAmount());
+		}else{
+			resp.setBalanceAmount(BigDecimal.ZERO);
+		}
+		// 每周日 23:59:59 开奖：未过本周日结束点则返回本周日，否则返回下周日
+		DateTime now = DateUtil.date();
+		DateTime thisSundayEnd = DateUtil.endOfWeek(now, true);
+		Date nextAwardTime = now.before(thisSundayEnd)
+			? thisSundayEnd
+			: DateUtil.endOfWeek(DateUtil.offsetWeek(now, 1), true);
+		resp.setNextAwardTime(nextAwardTime);
+		resp.setCurrentTime(now);
+		return ResultPista.data(resp);
+	}
 
 //	/**
 //	 * 获取算力页面展示数据

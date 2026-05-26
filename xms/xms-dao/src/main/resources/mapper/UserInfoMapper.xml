@@ -212,8 +212,9 @@
             tui.deleted = 0
             <if test="userId != null "> and tui.user_id = #{userId}</if>
             <if test="account != null  and account != ''"> and tui.account like concat('%', #{account}, '%')</if>
+            <if test="remark != null  and remark != ''"> and tui.remark like concat(#{remark}, '%')</if>
             <if test="userCode != null  and userCode != ''"> and tui.user_code = #{userCode}</if>
-            <if test="email != null  and email != ''"> and tui.tr_recharge_address like concat('%', #{email}, '%')</if>
+            <if test="email != null  and email != ''"> and tui.tr_recharge_address like concat(#{email}, '%')</if>
             <if test="gameLevel != null "> and tui.game_level = #{gameLevel}</if>
             <if test="nodeLevel != null "> and tui.node_level = #{nodeLevel}</if>
             <if test="finaGameLevel != null and finaGameLevel != '' ">

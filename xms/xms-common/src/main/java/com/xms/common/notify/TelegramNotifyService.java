@@ -30,6 +30,27 @@ public class TelegramNotifyService {
 		return sendText(defaultChatId, text);
 	}
 
+//	public static void main(String[] args) {
+//		Map<String, Object> paramMap = new HashMap<>();
+//		paramMap.put("chat_id","-1003838698214");
+//		paramMap.put("text", "ssssd");
+//
+//		HttpResponse response = HttpRequest.post(String.format(TELEGRAM_API_TEMPLATE, "8686862918:AAGe6d0IRlm2y3cfpQtPUhnIQeiLS5KeHFU"))
+//			.form(paramMap)
+//			.setConnectionTimeout(5000)
+//			.setReadTimeout(10000)
+//			.execute();
+//
+//		if (!response.isOk()) {
+//			log.error("Telegram消息发送失败, httpStatus:{}, body:{}", response.getStatus(), response.body());
+//		}
+//
+//		JSONObject result = JSONUtil.parseObj(response.body());
+//		boolean ok = result.getBool("ok", false);
+//		if (!ok) {
+//			log.error("Telegram消息发送失败, body:{}", response.body());
+//		}
+//	}
 	public boolean sendText(String chatId, String text) {
 		try {
 			Map<String, Object> paramMap = new HashMap<>();

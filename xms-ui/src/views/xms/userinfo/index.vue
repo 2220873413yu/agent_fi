@@ -41,6 +41,15 @@
         />
       </el-form-item>
 
+      <el-form-item label="备注" label-width="120px" prop="remark">
+        <el-input
+          v-model="queryParams.remark"
+          clearable
+          placeholder="请输入用户备注"
+          @keyup.enter.native="handleQuery"
+        />
+      </el-form-item>
+
       <el-form-item label="结算等级" label-width="120px" prop="finaGameLevel">
         <el-select v-model="queryParams.finaGameLevel" clearable placeholder="请选择">
           <el-option
@@ -231,6 +240,7 @@
         </template>
       </el-table-column>
       <el-table-column align="center" label="用户ID" prop="userId"/>
+      <el-table-column label="备注" align="center" prop="remark" />
 <!--      <el-table-column align="center" label="用户编码" prop="userCode" />-->
 
 <!--      <el-table-column label="昵称" align="center" prop="nickName" />
@@ -535,7 +545,7 @@
           <el-input
             v-model="form.remark"
             :autosize="{ minRows: 3, maxRows: 5 }"
-            maxlength="500"
+            maxlength="10"
             placeholder="请输入后台用户备注"
             show-word-limit
             type="textarea"
@@ -731,6 +741,7 @@ export default {
         account: null,
         mnemonic: null,
         partnerStatus: null,
+        remark: null,
         withdrawalOpenOrClose: null,
         stakeHostingStaticRate: null,
         nodeIdentity: null,

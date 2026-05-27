@@ -158,6 +158,11 @@ public interface RedisConstant {
 		 */
 		String ORDER_DYNAMIC_SETTLEMENT = REDIS_STREAM + "transfer:order:dynamic:settlement";
 
+		/**
+		 * 示例质押订单后置处理队列，独立于正式动态订单结算队列。
+		 */
+		String DEMO_PLEDGE_ORDER = REDIS_STREAM + "demo:pledge:order";
+
 		String DELAY_DEL_CACHE = REDIS_STREAM + "cacheDelQueue";
 
 		String XMS_ASYNC_REWARD = REDIS_STREAM + "XMS_ASYNC_REWARD";

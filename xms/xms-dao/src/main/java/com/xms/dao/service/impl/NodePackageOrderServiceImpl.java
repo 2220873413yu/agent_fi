@@ -77,8 +77,8 @@ public class NodePackageOrderServiceImpl extends XmsDataServiceImpl<NodePackageO
 		//修改用户节点等级、赠送节点信息
 		update = userInfoService.lambdaUpdate()
 			.eq(UserInfo::getUserId, queryOrder.getUserId())
-			.eq(UserInfo::getNodeLevel, queryOrder.getPackageLevel())
-			.set(UserInfo::getNodeLevel, req.getPackageLevel())
+//			.eq(UserInfo::getNodeLevel, queryOrder.getPackageLevel())
+//			.set(UserInfo::getNodeLevel, req.getPackageLevel())
 			.set(UserInfo::getMinGameLevel, req.getPackageLevel())
 			.update();
 		if(!update){
@@ -121,9 +121,9 @@ public class NodePackageOrderServiceImpl extends XmsDataServiceImpl<NodePackageO
 			throw new ServiceException("用户不存在");
 		}
 
-		if(userInfo.getNodeLevel() >0){
-			throw new ServiceException("该用户已拥有节点");
-		}
+//		if(userInfo.getNodeLevel() >0){
+//			throw new ServiceException("该用户已拥有节点");
+//		}
 
 		NodePackage nodePackage = nodePackageService.lambdaQuery()
 			.eq(NodePackage::getLevel, req.getPackageLevel())
@@ -149,8 +149,8 @@ public class NodePackageOrderServiceImpl extends XmsDataServiceImpl<NodePackageO
 
 		boolean update1 = userInfoService.lambdaUpdate()
 			.eq(UserInfo::getUserId, userInfo.getUserId())
-			.eq(UserInfo::getNodeLevel, 0)
-			.set(UserInfo::getNodeLevel, req.getPackageLevel())
+//			.eq(UserInfo::getNodeLevel, 0)
+//			.set(UserInfo::getNodeLevel, req.getPackageLevel())
 			.set(UserInfo::getMinGameLevel, req.getPackageLevel())
 			.update();
 		if (!update1) {

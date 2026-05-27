@@ -192,24 +192,12 @@ public class IndexDataServiceImpl implements IndexDataService {
 
 		CompletableFuture<Void> future4 = CompletableFuture.runAsync(() -> {
 
-
-
-			BigDecimal v28 = BigDecimal.valueOf(userInfoService.lambdaQuery()
-					.eq(UserInfo::getNodeLevel,1)
-				.count());
-
-			BigDecimal v29 = BigDecimal.valueOf(userInfoService.lambdaQuery()
-				.eq(UserInfo::getNodeLevel,2)
-				.count());
-			BigDecimal v30 = BigDecimal.valueOf(userInfoService.lambdaQuery()
-				.eq(UserInfo::getNodeLevel,3)
-				.count());
 			/*BigDecimal v31 = BigDecimal.valueOf(userInfoService.lambdaQuery()
 				.apply("GREATEST(IFNULL(game_level, 0), IFNULL(min_game_level, 0), IFNULL(admin_game_level, 0)) = 4")
 				.count());*/
-			indexDataPanelVo.setV28(v28);
-			indexDataPanelVo.setV29(v29);
-			indexDataPanelVo.setV30(v30);
+			indexDataPanelVo.setV28(BigDecimal.ZERO);
+			indexDataPanelVo.setV29(BigDecimal.ZERO);
+			indexDataPanelVo.setV30(BigDecimal.ZERO);
 			indexDataPanelVo.setV31(BigDecimal.ZERO);
 
 			//提现币种 1:USDT,2:AFI

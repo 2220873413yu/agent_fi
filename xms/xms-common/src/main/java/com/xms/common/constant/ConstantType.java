@@ -106,6 +106,8 @@ public class ConstantType {
 		public static final int type_31 = 31;
 		//节点认购AFI线性释放
 		public static final int type_32 = 32;
+		//示例质押每日收益
+		public static final int type_33 = 33;
 	}
 
 	/**
@@ -191,6 +193,10 @@ public class ConstantType {
 		public static final int type_44 = 44;
 		//节点认购AFI线性释放
 		public static final int type_45 = 45;
+		//示例质押购买扣减USDT
+		public static final int type_46 = 46;
+		//示例质押每日收益USDT
+		public static final int type_47 = 47;
 	}
 
 	//状态(0.待审核,1.审核成功,2.审核驳回,3.提现成功,4.打款失败)

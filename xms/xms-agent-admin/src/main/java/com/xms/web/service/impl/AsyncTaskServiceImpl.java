@@ -819,11 +819,11 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 			}
 			stakeOrderService.callUserLevel(info, userLevelConfigList);
 		}*/
-		userInfoService.lambdaUpdate()
-			.set(UserInfo::getUmbrellaNodePerformance, 0)
-			.set(UserInfo::getSubUmbrellaNodePerformance, 0)
-			.set(UserInfo::getAdminUmbrellaNodePerformance, 0)
-			.update();
+//		userInfoService.lambdaUpdate()
+//			.set(UserInfo::getUmbrellaNodePerformance, 0)
+//			.set(UserInfo::getSubUmbrellaNodePerformance, 0)
+//			.set(UserInfo::getAdminUmbrellaNodePerformance, 0)
+//			.update();
 		//重新计算业绩
 		List<NodePackageOrder> nodePackageOrders = nodePackageOrderService.lambdaQuery()
 			.list();

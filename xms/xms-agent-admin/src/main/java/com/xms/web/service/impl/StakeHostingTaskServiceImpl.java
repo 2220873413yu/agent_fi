@@ -360,7 +360,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		List<StakeHostingGlobalDividendWeightSnapshot> snapshots = new ArrayList<>(users.size());
 		for (UserInfo user : users) {
 			// 3. 本期分红权重只取小区权重上涨部分，下降或持平都保存快照但 dividend_weight 记 0。
-			BigDecimal communityWeight = nvl(user.getGlobalDividendCommunityWeight());
+			BigDecimal communityWeight = BigDecimal.ONE;
+			//BigDecimal communityWeight = nvl(user.getGlobalDividendCommunityWeight());
 			BigDecimal previousCommunityWeight = previousCommunityWeightMap.getOrDefault(user.getUserId(), BigDecimal.ZERO);
 			BigDecimal dividendWeight = communityWeight.subtract(previousCommunityWeight)
 				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
@@ -372,8 +373,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			snapshot.setAccount(user.getAccount());
 			snapshot.setWeekStartTime(weekStartTime);
 			snapshot.setWeekEndTime(weekEndTime);
-			snapshot.setSelfWeight(nvl(user.getGlobalDividendWeight()));
-			snapshot.setUmbrellaWeight(nvl(user.getGlobalDividendUmbrellaWeight()));
+//			snapshot.setSelfWeight(nvl(user.getGlobalDividendWeight()));
+//			snapshot.setUmbrellaWeight(nvl(user.getGlobalDividendUmbrellaWeight()));
 			snapshot.setCommunityWeight(communityWeight);
 			snapshot.setPreviousCommunityWeight(previousCommunityWeight);
 			snapshot.setDividendWeight(dividendWeight);
@@ -1006,9 +1007,9 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 
 		// 用户后台指定收益率最高优先级，单位是%，这里转换为乘数参与订单收益计算。
 		UserInfo user = context.userMap.get(order.getUserId());
-		if (user != null && user.getStakeHostingStaticRate() != null && user.getStakeHostingStaticRate().compareTo(BigDecimal.ZERO) > 0) {
-			return percentToRate(user.getStakeHostingStaticRate());
-		}
+//		if (user != null && user.getStakeHostingStaticRate() != null && user.getStakeHostingStaticRate().compareTo(BigDecimal.ZERO) > 0) {
+//			return percentToRate(user.getStakeHostingStaticRate());
+//		}
 		StakeHostingDailyTeamPerformance snapshot = context.snapshotMap.get(order.getUserId());
 		boolean returnedPrincipal = order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1;
 		if (snapshot == null || Integer.valueOf(RATE_SOURCE_PURE_STATIC).equals(snapshot.getRateSource())) {
@@ -1042,7 +1043,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		String rateSource;
 		String remark;
 		boolean returnedPrincipal = order.getIsReturnPrincipal() != null && order.getIsReturnPrincipal() == 1;
-		if (user != null && user.getStakeHostingStaticRate() != null
+		/*if (user != null && user.getStakeHostingStaticRate() != null
 			&& user.getStakeHostingStaticRate().compareTo(BigDecimal.ZERO) > 0) {
 			finalStaticRate = user.getStakeHostingStaticRate();
 			rateSource = "user_config";
@@ -1061,13 +1062,13 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			finalStaticRate = snapshot.getBaseStaticRate();
 			rateSource = "g7_snapshot";
 			remark = "Business processing remark";
-		}
+		}*/
 		return StakeHostingStaticRateTestDto.builder()
 			.orderId(order.getId())
 			.orderNo(order.getOrderNo())
 			.userId(order.getUserId())
 			.stakeUsdtAmount(order.getStakeUsdtAmount())
-			.stakeHostingStaticRate(user == null ? null : user.getStakeHostingStaticRate())
+			//.stakeHostingStaticRate(user == null ? null : user.getStakeHostingStaticRate())
 			.previousTeamTvl(snapshot == null ? null : snapshot.getPreviousTeamTvl())
 			.currentTeamTvl(snapshot == null ? null : snapshot.getCurrentTeamTvl())
 			.teamNewAmount(snapshot == null ? null : snapshot.getTeamNewAmount())
@@ -1075,9 +1076,9 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.gDay(snapshot == null ? null : snapshot.getGDay())
 			.gSmooth(snapshot == null ? null : snapshot.getGSmooth())
 			.baseStaticRate(snapshot == null ? null : snapshot.getBaseStaticRate())
-			.finalStaticRate(finalStaticRate == null ? null : finalStaticRate.setScale(4, ConstantStatic.roundingModeNew))
-			.rateSource(rateSource)
-			.remark(remark)
+			//.finalStaticRate(finalStaticRate == null ? null : finalStaticRate.setScale(4, ConstantStatic.roundingModeNew))
+			//.rateSource(rateSource)
+			//.remark(remark)
 			.build();
 	}
 
@@ -1545,7 +1546,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	private int effectiveLevel(UserInfo user) {
-		return Math.max(Math.max(defaultLevel(user.getGameLevel()), defaultLevel(user.getMinGameLevel())), defaultLevel(user.getAdminGameLevel()));
+		return user.getGameLevel();
+		//return Math.max(Math.max(defaultLevel(user.getGameLevel()), defaultLevel(user.getMinGameLevel())), defaultLevel(user.getAdminGameLevel()));
 	}
 
 	private int defaultLevel(Integer level) {

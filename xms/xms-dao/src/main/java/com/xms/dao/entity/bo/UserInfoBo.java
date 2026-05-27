@@ -48,10 +48,6 @@ public class UserInfoBo{
 	 */
 	private String inviteUserAccount;
 
-	/**
-	 * 节点等级 0:A0,1:A1,2:A2,3:A3
-	 */
-	private Integer nodeLevel;
 
 	/**
 	 * 团队业绩(节点数量)

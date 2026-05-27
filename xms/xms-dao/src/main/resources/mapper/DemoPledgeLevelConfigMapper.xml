@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.DemoPledgeLevelConfigMapper">
+
+    <resultMap type="DemoPledgeLevelConfig" id="DemoPledgeLevelConfigResult">
+        <result property="id" column="id" />
+        <result property="level" column="level" />
+        <result property="performance" column="performance" />
+        <result property="teamPerformance" column="team_performance" />
+        <result property="communityPerformance" column="community_performance" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <sql id="selectDemoPledgeLevelConfigVo">
+        select id, level, performance, team_performance, community_performance,
+               create_by, create_time, update_by, update_time, remark, deleted
+        from t_demo_pledge_level_config
+    </sql>
+
+    <select id="selectDemoPledgeLevelConfigList" parameterType="DemoPledgeLevelConfig" resultMap="DemoPledgeLevelConfigResult">
+        <include refid="selectDemoPledgeLevelConfigVo"/>
+        <where>
+            <if test="level != null"> and level = #{level}</if>
+            and deleted = 0
+        </where>
+        order by level asc, id desc
+    </select>
+</mapper>

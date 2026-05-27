@@ -395,7 +395,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	 * @param parentIds 直推线权重或质押业绩发生变化的上级用户ID
 	 */
 	private void recalculateGlobalDividendCommunityWeight(List<Long> parentIds) {
-		if (CollectionUtil.isEmpty(parentIds)) {
+		/*if (CollectionUtil.isEmpty(parentIds)) {
 			return;
 		}
 		// 批量读取受影响用户的所有直推，避免每个上级单独查询一次。
@@ -441,7 +441,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 				.set(UserInfo::getGlobalDividendCommunityWeight, communityWeight)
 				.set(UserInfo::getUpdateTime, now)
 				.update();
-		}
+		}*/
 	}
 
 	/**

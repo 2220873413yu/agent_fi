@@ -115,12 +115,12 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 
 		UserInfo updateUser = new UserInfo();
 
-		updateUser.setAdminGameLevel(req.getAdminGameLevel());
+		//updateUser.setAdminGameLevel(req.getAdminGameLevel());
 		updateUser.setUserId(req.getUserId());
-		if (req.getStakeHostingStaticRate() != null && req.getStakeHostingStaticRate().compareTo(BigDecimal.ZERO) < 0) {
-			throw new ServiceException("托管指定静态收益率不能小于0");
-		}
-		updateUser.setStakeHostingStaticRate(req.getStakeHostingStaticRate() == null ? BigDecimal.ZERO : req.getStakeHostingStaticRate());
+		//if (req.getStakeHostingStaticRate() != null && req.getStakeHostingStaticRate().compareTo(BigDecimal.ZERO) < 0) {
+		//	throw new ServiceException("托管指定静态收益率不能小于0");
+		//}
+		//updateUser.setStakeHostingStaticRate(req.getStakeHostingStaticRate() == null ? BigDecimal.ZERO : req.getStakeHostingStaticRate());
 
 		if(StrUtil.isNotBlank(req.getAccount())){
 			updateUser.setAccount(req.getAccount());
@@ -200,19 +200,19 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 		//钱包地址
 		tree.putExtra("account", user.getAccount());
 		//节点等级
-		tree.putExtra("level", nodeLevelMap.get(user.getNodeLevel()));
+		//tree.putExtra("level", nodeLevelMap.get(user.getNodeLevel()));
 		//直推节点数量
-		tree.putExtra("subNodePerformance", user.getSubNodePerformance());
+		//tree.putExtra("subNodePerformance", user.getSubNodePerformance());
 		//团队节点数量
-		tree.putExtra("nodeTeamPerformance", user.getNodeTeamPerformance());
+		//tree.putExtra("nodeTeamPerformance", user.getNodeTeamPerformance());
 		//直推用户数保留给前端判断是否还有子节点
 		tree.putExtra("subNum", user.getSubNum());
 		//增加团队节点支付
-		BigDecimal umbrellaNodePerformance = defaultAmount(user.getUmbrellaNodePerformance());
-		BigDecimal adminUmbrellaNodePerformance = defaultAmount(user.getAdminUmbrellaNodePerformance());
-		tree.putExtra("umbrellaNodePerformance", umbrellaNodePerformance);
+//		BigDecimal umbrellaNodePerformance = defaultAmount(user.getUmbrellaNodePerformance());
+//		BigDecimal adminUmbrellaNodePerformance = defaultAmount(user.getAdminUmbrellaNodePerformance());
+		//tree.putExtra("umbrellaNodePerformance", umbrellaNodePerformance);
 		//增加节点金额(用户购买的+后台拨付的)
-		tree.putExtra("allUmbrellaNodePerformance", umbrellaNodePerformance.add(adminUmbrellaNodePerformance));
+		//tree.putExtra("allUmbrellaNodePerformance", umbrellaNodePerformance.add(adminUmbrellaNodePerformance));
 		//团队用户数
 		tree.putExtra("umbrellaNum", user.getUmbrellaNum());
 	}
@@ -265,19 +265,19 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 	 * @return Excel导出行DTO
 	 */
 	private UserNetBodyExportDto buildNetBodyExportDto(UserInfo user, Map<Integer, String> nodeLevelMap) {
-		BigDecimal umbrellaNodePerformance = defaultAmount(user.getUmbrellaNodePerformance());
-		BigDecimal adminUmbrellaNodePerformance = defaultAmount(user.getAdminUmbrellaNodePerformance());
+		//BigDecimal umbrellaNodePerformance = defaultAmount(user.getUmbrellaNodePerformance());
+		//BigDecimal adminUmbrellaNodePerformance = defaultAmount(user.getAdminUmbrellaNodePerformance());
 		UserNetBodyExportDto dto = new UserNetBodyExportDto();
 		dto.setUserId(user.getUserId());
 		dto.setAccount(user.getAccount());
-		dto.setNodeLevel(nodeLevelMap.get(user.getNodeLevel()));
+		//dto.setNodeLevel(nodeLevelMap.get(user.getNodeLevel()));
 		dto.setSubNum(user.getSubNum());
 		dto.setUmbrellaNum(user.getUmbrellaNum());
-		dto.setSubNodePerformance(defaultAmount(user.getSubNodePerformance()));
-		dto.setNodeTeamPerformance(defaultAmount(user.getNodeTeamPerformance()));
-		dto.setUmbrellaNodePerformance(umbrellaNodePerformance);
-		dto.setAdminUmbrellaNodePerformance(adminUmbrellaNodePerformance);
-		dto.setAllUmbrellaNodePerformance(umbrellaNodePerformance.add(adminUmbrellaNodePerformance));
+//		dto.setSubNodePerformance(defaultAmount(user.getSubNodePerformance()));
+//		dto.setNodeTeamPerformance(defaultAmount(user.getNodeTeamPerformance()));
+//		dto.setUmbrellaNodePerformance(umbrellaNodePerformance);
+//		dto.setAdminUmbrellaNodePerformance(adminUmbrellaNodePerformance);
+//		dto.setAllUmbrellaNodePerformance(umbrellaNodePerformance.add(adminUmbrellaNodePerformance));
 		dto.setCreateTime(user.getCreateTime());
 		return dto;
 	}

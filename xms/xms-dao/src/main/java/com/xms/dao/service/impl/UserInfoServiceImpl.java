@@ -90,9 +90,9 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 		UserInfoBo userInfoBo = new UserInfoBo();
 		userInfoBo.setAccount(userInfo.getAccount());
 		userInfoBo.setUserId(userInfo.getUserId());
-		userInfoBo.setNodeLevel(userInfo.getNodeLevel());
 //		userInfoBo.setUserCode(userInfo.getUserCode());
-		userInfoBo.setGameLevel(maxLevel(userInfo.getGameLevel(), userInfo.getMinGameLevel(), userInfo.getAdminGameLevel()));
+		//userInfoBo.setGameLevel(maxLevel(userInfo.getGameLevel(), userInfo.getMinGameLevel(), userInfo.getAdminGameLevel()));
+		userInfoBo.setGameLevel(userInfo.getGameLevel());
 		if(userInfo.getInviteUserId()!=null){
 			UserInfo inviteUserInfo = lambdaQuery()
 				.eq(UserInfo::getUserId, userInfo.getInviteUserId())
@@ -106,9 +106,6 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 		//userInfoBo.setIsValid(userInfo.getIsValid());
 		userInfoBo.setSubNum(userInfo.getSubNum());
 		userInfoBo.setUmbrellaNum(userInfo.getUmbrellaNum());
-		userInfoBo.setSubNodePerformance(userInfo.getSubNodePerformance());
-		userInfoBo.setNodeTeamPerformance(userInfo.getNodeTeamPerformance());
-		userInfoBo.setOpenAiPaidStatus(userInfo.getOpenAiPaidStatus());
 		//userInfoBo.setUmbrellaPerformance(userInfo.getUmbrellaPerformance());
 		//userInfoBo.setPerformance(userInfo.getPerformance());
 		//userInfoBo.setCommunityPerformance(userInfo.getCommunityPerformance());

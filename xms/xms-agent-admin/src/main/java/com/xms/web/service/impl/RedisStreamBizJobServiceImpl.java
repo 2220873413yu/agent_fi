@@ -106,8 +106,6 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	@Autowired
 	private INodePackageService nodePackageService;
 
-
-
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public Integer handlerDynamicOrderSettlement(List req) {
@@ -471,7 +469,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			UserInfo inviteUserInfo = userInfoService.lambdaQuery()
 				.eq(UserInfo::getUserId, userInfo.getInviteUserId())
 				.one();
-			if(inviteUserInfo.getNodeLevel()>0){
+			/*if(inviteUserInfo.getNodeLevel()>0){
 				NodePackage directReferralPackage = nodePackageService.lambdaQuery()
 					.eq(NodePackage::getId, inviteUserInfo.getNodeLevel())
 					.one();
@@ -502,10 +500,10 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 						rewardRecordService.save(rewardRecordEntity);
 					}
 				}
-			}
+			}*/
 
 			//闂傚倸鐡ㄧ敮瑙勭附閺嵮冃?
-			if(inviteUserInfo.getInviteUserId()!=null){
+			/*if(inviteUserInfo.getInviteUserId()!=null){
 				UserInfo indirectUserInfo = userInfoService.lambdaQuery()
 					.eq(UserInfo::getUserId, inviteUserInfo.getInviteUserId())
 					.one();
@@ -543,7 +541,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 						}
 					}
 				}
-			}
+			}*/
 		}
 
 		// Business processing note.

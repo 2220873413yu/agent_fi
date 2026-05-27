@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.DemoPledgeOrderMapper">
+
+    <resultMap type="DemoPledgeOrder" id="DemoPledgeOrderResult">
+        <result property="id" column="id" />
+        <result property="orderNo" column="order_no" />
+        <result property="userId" column="user_id" />
+        <result property="packageId" column="package_id" />
+        <result property="packageName" column="package_name" />
+        <result property="pledgeUsdtAmount" column="pledge_usdt_amount" />
+        <result property="releaseDays" column="release_days" />
+        <result property="dailyRate" column="daily_rate" />
+        <result property="releasedDays" column="released_days" />
+        <result property="rewardStatus" column="reward_status" />
+        <result property="totalRewardUsdtAmount" column="total_reward_usdt_amount" />
+        <result property="lastRewardDay" column="last_reward_day" />
+        <result property="lastRewardTime" column="last_reward_time" />
+        <result property="status" column="status" />
+        <result property="payTime" column="pay_time" />
+        <result property="processTime" column="process_time" />
+        <result property="finishTime" column="finish_time" />
+        <result property="failReason" column="fail_reason" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <resultMap type="UserInfo" id="DemoPledgeUserInfoResult">
+        <id property="userId" column="user_id" />
+        <result property="inviteUserId" column="invite_user_id" />
+        <result property="performance" column="performance" />
+        <result property="umbrellaPerformance" column="umbrella_performance" />
+        <result property="communityPerformance" column="community_performance" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <sql id="selectDemoPledgeOrderVo">
+        select id, order_no, user_id, package_id, package_name, pledge_usdt_amount,
+               release_days, daily_rate, released_days, reward_status, total_reward_usdt_amount, last_reward_day, last_reward_time,
+               status,
+               pay_time, process_time, finish_time, fail_reason,
+               create_by, create_time, update_by, update_time, remark, deleted
+        from t_demo_pledge_order
+    </sql>
+
+    <select id="selectDemoPledgeOrderList" parameterType="DemoPledgeOrder" resultMap="DemoPledgeOrderResult">
+        <include refid="selectDemoPledgeOrderVo"/>
+        <where>
+            <if test="orderNo != null and orderNo != ''"> and order_no like concat('%', #{orderNo}, '%')</if>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="packageId != null"> and package_id = #{packageId}</if>
+            <if test="status != null"> and status = #{status}</if>
+            and deleted = 0
+        </where>
+        order by id desc
+    </select>
+
+    <update id="increasePersonalPerformance">
+        update t_user_info
+        set performance = performance + #{amount},
+            update_time = now()
+        where user_id = #{userId}
+          and deleted = 0
+    </update>
+
+    <update id="increaseDirectPerformance">
+        update t_user_info
+        set sub_performance = sub_performance + #{amount},
+            update_time = now()
+        where user_id = #{userId}
+          and deleted = 0
+    </update>
+
+    <update id="increaseTeamPerformance">
+        update t_user_info
+        set performance_mining = performance_mining + #{amount},
+            umbrella_performance = umbrella_performance + #{amount},
+            update_time = now()
+        where deleted = 0
+          and user_id in
+          <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+              #{userId}
+          </foreach>
+    </update>
+
+    <select id="selectDirectChildren" resultMap="DemoPledgeUserInfoResult">
+        select user_id, invite_user_id, performance, umbrella_performance, community_performance, deleted
+        from t_user_info
+        where invite_user_id = #{userId}
+          and deleted = 0
+    </select>
+
+    <update id="updateCommunityPerformance">
+        update t_user_info
+        set community_performance = #{communityPerformance},
+            update_time = now()
+        where user_id = #{userId}
+          and deleted = 0
+    </update>
+</mapper>

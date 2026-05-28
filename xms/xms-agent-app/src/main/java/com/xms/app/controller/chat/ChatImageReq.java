@@ -15,5 +15,5 @@ public class ChatImageReq {
 	/**
 	 * 图片URL的干活
 	 */
-    private List<String> images;
+    private String images;
 }

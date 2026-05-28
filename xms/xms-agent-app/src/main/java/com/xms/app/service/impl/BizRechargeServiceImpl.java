@@ -288,12 +288,13 @@ public class BizRechargeServiceImpl implements BizRechargeService {
 			.orderByDesc(RechargeRecord::getId).last(SysConstant.PAGE_LIMIT)
 			.select(BaseEntity::getCreateTime, RechargeRecord::getId,
 				RechargeRecord::getUserId, RechargeRecord::getOrderNo, RechargeRecord::getRechargeAmount,
-				RechargeRecord::getCoinType,
+				RechargeRecord::getCoinType,RechargeRecord::getCreateTime,
 				RechargeRecord::getCoinType, RechargeRecord::getStatus, RechargeRecord::getTxId)
 			.list().stream().map(item->{
 				RechargeRecordDto dto = new RechargeRecordDto();
 				dto.setId(item.getId());
 				dto.setUserId(item.getUserId());
+				dto.setCreateTime(item.getCreateTime());
 				dto.setOrderNo(item.getOrderNo());
 				dto.setCoinType(item.getCoinType());
 				dto.setRechargeAmount(item.getRechargeAmount());

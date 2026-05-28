@@ -141,12 +141,12 @@
 <!--          <el-form-item label="用户ID" prop="id">
             <el-input v-model="form.id" placeholder="请输入用户ID" :disabled="true" />
           </el-form-item>-->
-          <el-form-item label="用户昵称" prop="account">
+          <el-form-item label="钱包地址" prop="account">
             <el-input v-model="form.account" :disabled="true" placeholder="请输入" />
           </el-form-item>
-          <el-form-item label="用户编码" prop="userCode">
+<!--          <el-form-item label="用户编码" prop="userCode">
             <el-input v-model="form.userCode" :disabled="true" placeholder="请输入" />
-          </el-form-item>
+          </el-form-item>-->
           <el-form-item label="资产类型" prop="coinType">
             <el-select v-model="form.coinType" placeholder="请选择资产">
               <el-option

@@ -2,6 +2,7 @@ package com.xms.app.controller.chat;
 
 import cn.hutool.ai.core.Message;
 import cn.hutool.ai.model.openai.OpenaiService;
+import cn.hutool.core.util.StrUtil;
 import com.xms.app.entity.req.OpenAiActionReq;
 import com.xms.common.annotation.Anonymous;
 import com.xms.common.annotation.RepeatSubmit;
@@ -11,6 +12,7 @@ import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.exception.ServiceException;
 import com.xms.common.result.ResponseCode;
 import com.xms.common.utils.SecurityUtils;
+import com.xms.common.utils.StringUtils;
 import com.xms.dao.service.UserInfoService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -139,9 +141,8 @@ public class OpenAiChatController {
 	 * @return SSE 长连接，按 message 事件推送模型返回片段
 	 */
 	@PostMapping(value = "/chat/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-	@Anonymous
 	public SseEmitter chatSSe(@RequestBody Message message) {
-		//requireAiAgent();
+		requireAiAgent();
 		Long logUserId = getCurrentUserIdForLog("OpenAI SSE");
 		log.info("OpenAI SSE开始请求，userId={}, message={}", logUserId, message);
 		return SseEmitterHelper.createEmitter(5 * 60 * 1000L, (emitter, stopped) ->
@@ -158,7 +159,11 @@ public class OpenAiChatController {
 	@PostMapping("/chat/image")
 	public ResultPista chatImage(@RequestBody ChatImageReq req) {
 		requireAiAgent();
-		return ResultPista.data(openaiService.chatVision(req.getPrompt(), req.getImages()));
+		if(StringUtils.isBlank(req.getImages())){
+			throw new ServiceException(ResponseCode.CODE_1002);
+		}
+		List<String> images = StrUtil.split(req.getImages(), ',', -1, true, true);
+		return ResultPista.data(openaiService.chatVision(req.getPrompt(), images));
 	}
 
 	/**
@@ -173,10 +178,15 @@ public class OpenAiChatController {
 	public SseEmitter chatImageSse(@RequestBody ChatImageReq req) {
 		requireAiAgent();
 		Long logUserId = getCurrentUserIdForLog("OpenAI图像SSE");
+		if(StringUtils.isBlank(req.getImages())){
+			throw new ServiceException(ResponseCode.CODE_1002);
+		}
+		List<String> images = StrUtil.split(req.getImages(), ',', -1, true, true);
+		//转成list
 		log.info("OpenAI图像SSE开始请求，userId={}, prompt={}, imageCount={}",
-			logUserId, req.getPrompt(), req.getImages() == null ? 0 : req.getImages().size());
+			logUserId, req.getPrompt(), req.getImages() == null ? 0 : images.size());
 		return SseEmitterHelper.createEmitter(5 * 60 * 1000L, (emitter, stopped) ->
-			openaiService.chatVision(req.getPrompt(), req.getImages(), data ->
+			openaiService.chatVision(req.getPrompt(), images, data ->
 				sendOpenAiSseChunk(emitter, stopped, logUserId, data, "OpenAI图像SSE")));
 	}
 

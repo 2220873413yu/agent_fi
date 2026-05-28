@@ -1,11 +1,15 @@
 package com.xms.app.entity.dto;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.xms.common.annotation.Excel;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * 充值记录dto对象
@@ -21,6 +25,9 @@ public class RechargeRecordDto {
 
 	/** 充值订单号 */
 	private String orderNo;
+
+	/** 创建时间 */
+	private Date createTime;
 
 	/**
 	 * 充值金额

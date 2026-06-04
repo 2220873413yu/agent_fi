@@ -18,4 +18,9 @@ public class UserMoneyBo{
 	 * AFI
 	 */
 	private BigDecimal validNum2;
+
+	/**
+	 * 锁定usdt
+	 */
+	private BigDecimal validNum3;
 }

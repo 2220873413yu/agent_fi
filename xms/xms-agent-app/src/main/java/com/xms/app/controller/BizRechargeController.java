@@ -31,7 +31,7 @@ public class BizRechargeController {
 	/**
 	 * 充值记录
 	 *
-	 * @param coinType   币种 2:AFI
+	 * @param coinType   币种 2:AFI,1:USDT
 	 * @param lastId   当前记录最后一个ID
 	 * @return
 	 */
@@ -39,9 +39,6 @@ public class BizRechargeController {
 	@GetMapping("/listRechargeRecord")
 	public ResultPista<List<RechargeRecordDto>> listRechargeRecord(Integer coinType, Long lastId) {
 		if(coinType == null){
-			return ResultPista.data(new ArrayList<>());
-		}
-		if(coinType != 2){
 			return ResultPista.data(new ArrayList<>());
 		}
 		return bizRechargeService.listRechargeRecord(coinType,lastId);

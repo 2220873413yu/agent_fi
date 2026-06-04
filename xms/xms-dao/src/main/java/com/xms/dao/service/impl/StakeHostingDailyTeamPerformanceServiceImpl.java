@@ -139,9 +139,6 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public void prepareDailySnapshots(Integer rewardDay, List<Long> rewardUserIds) {
-		if (rewardDay == null) {
-			throw new ServiceException("G7收益率快照日期不能为空");
-		}
 		// 1. 合并“当天已有团队新增记录的用户”和“本轮101订单用户”，确保没推广的订单用户也有纯静态快照。
 		Set<Long> userIds = new LinkedHashSet<>();
 		List<Long> statUserIds = baseMapper.selectUserIdsByStatDay(rewardDay);
@@ -155,6 +152,7 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		BigDecimal pureStaticRateBeforeReturnPercent = new BigDecimal(iSysParaService.getValue(ConstantSys.PURE_STATIC_RATE_BEFORE_RETURN_PERCENT));
 		// 3. 批量预加载昨日团队新增和最近G_day历史，避免 prepareOneSnapshot 按用户循环时产生N+1查询。
 		Map<Long, BigDecimal> yesterdayTeamNewMap = loadYesterdayTeamNewAmountMap(userIds, rewardDay);
+		// 3.1 批量查这些用户 rewardDay 之前最多 6 天的已计算快照，用于提取历史 g_day，计算 g_smooth。
 		Map<Long, List<StakeHostingDailyTeamPerformance>> recentSnapshotMap = loadRecentSnapshotMap(userIds, rewardDay);
 		// 4. 逐个用户生成当天快照；已计算完成的快照会在 prepareOneSnapshot 中跳过，支持任务重跑。
 		for (Long userId : userIds) {
@@ -249,28 +247,34 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		UserInfo user = userInfoService.lambdaQuery()
 			.eq(UserInfo::getUserId, userId)
 			.one();
-		if (user == null) {
-			return;
-		}
 		baseMapper.upsertEmptyDay(user.getUserId(), user.getAccount(), rewardDay);
 		StakeHostingDailyTeamPerformance snapshot = lambdaQuery()
 			.eq(StakeHostingDailyTeamPerformance::getUserId, userId)
 			.eq(StakeHostingDailyTeamPerformance::getStatDay, rewardDay)
-			.eq(StakeHostingDailyTeamPerformance::getDeleted, 0)
 			.one();
 		if (snapshot == null || (snapshot.getCalcStatus() != null && snapshot.getCalcStatus() == CALC_STATUS_DONE)) {
 			return;
 		}
 		// G7按“今日团队新增 vs 昨日团队新增”计算，不读取当前有效托管余额，也不扣订单到期金额。
 		BigDecimal previousTvl = nvl(yesterdayTeamNewAmount).setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		// 当前团队新增来自 rewardDay 当天快照里的 team_new_amount；字段名叫 current_team_tvl，
+		// 但当前业务口径不是有效托管存量，而是“收益归属日当天伞下新增托管USDT”。
 		BigDecimal currentTvl = nvl(snapshot.getTeamNewAmount())
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		// 单日G值只比较今日新增和昨日新增：昨日为0时返回0%，否则按增长率公式计算并限制正向最大200%。
 		BigDecimal gDay = calculateGDay(previousTvl, currentTvl);
+		// 历史G值取 rewardDay 前最近最多6个已计算快照，用于和当天G值一起做最多7天平滑。
 		List<BigDecimal> previousGDays = extractGDays(previousSnapshots);
+		// G_smooth = 当天g_day + 最近最多6天历史g_day 的平均值；历史不足6天时按实际条数平均。
 		BigDecimal gSmooth = calculateGSmooth(previousGDays, gDay);
+		// 是否进入G7区间不仅看今日/昨日新增，也看最近6天是否仍存在真实团队新增窗口。
 		boolean hasG7Window = hasG7Window(previousTvl, currentTvl, previousSnapshots);
+		// 命中G7窗口时用Gsmooth匹配G7收益率配置；未命中时先写回本前纯静态比例作为快照展示值。
+		// 真实发放时 rate_source=3 会在 calculateStaticRate 内按订单是否回本重新选择纯静态参数。
 		BigDecimal staticRate = hasG7Window ? staticRateConfigService.matchStaticRate(gSmooth) : pureStaticRateBeforeReturnPercent;
+		// rate_source=1 表示G7区间收益率；rate_source=3 表示未推广/纯静态规则，不是“第3档收益率”。
 		Integer rateSource = hasG7Window ? RATE_SOURCE_G7 : RATE_SOURCE_PURE_STATIC;
+		// 将本次快照计算结果一次性写回，calc_status=1 表示该用户 rewardDay 的收益率快照已可被101读取。
 		lambdaUpdate()
 			.eq(StakeHostingDailyTeamPerformance::getId, snapshot.getId())
 			.set(StakeHostingDailyTeamPerformance::getPreviousTeamTvl, previousTvl)

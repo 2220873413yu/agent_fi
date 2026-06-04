@@ -108,12 +108,12 @@ public class StakeHostingOrder extends BaseEntity {
 	@ApiModelProperty(value = "支付金额，站内USDT支付为托管金额")
 	private BigDecimal payAmount;
 
-	/** 支付时间 */
+	/** 支付时间；站内USDT支付创建即支付成功，当前101收益发放不依赖该字段 */
 	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
 	@Excel(name = "支付时间", sort = 14, width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
 	private Date payTime;
 
-	/** 生效时间 */
+	/** 生效时间；站内USDT支付创建即生效，当前101收益发放以create_day作为收益资格边界 */
 	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
 	@Excel(name = "生效时间", sort = 15, width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
 	private Date effectiveTime;

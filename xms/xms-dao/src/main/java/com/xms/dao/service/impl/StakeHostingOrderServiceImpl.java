@@ -115,7 +115,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.eq(StakeHostingOrder::getCreateDay, createDay)
 			.count();
 		if (todayWaitCount >= DAILY_WAIT_PAY_LIMIT) {
-			throw new ServiceException("Daily pending order limit exceeded");
+			throw new ServiceException(ResponseCode.CODE_1263);
 		}
 
 		// 用户订单保存为待支付/待生效，实际支付金额、hash 和生效时间由回调填充。
@@ -124,7 +124,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setPayStatus(PAY_WAIT);
 		order.setStatus(STATUS_WAIT);
 		if (!save(order)) {
-			throw new ServiceException("Create stake hosting order failed");
+			throw new ServiceException(ResponseCode.CODE_1298);
 		}
 		return order;
 	}
@@ -200,10 +200,10 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	public int confirmChainPaid(String orderNo, String payHash, BigDecimal payAmount) {
 		// 步骤1：校验链上支付确认需要的基础参数，金额必须为正数，单位为USDT。
 		if (StrUtil.isBlank(orderNo) || StrUtil.isBlank(payHash)) {
-			throw new ServiceException("Order no and pay hash are required");
+			throw new ServiceException(ResponseCode.CODE_300);
 		}
 		if (payAmount == null || payAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("Business processing failed");
+			throw new ServiceException(ResponseCode.CODE_1003);
 		}
 
 		// 步骤2：按订单号读取订单。查不到时返回成功，避免外部重复推送阻塞回调流程。
@@ -221,7 +221,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 
 		// 步骤4：实付金额不能小于订单托管USDT金额，防止少付订单被错误激活。
 		if (payAmount.compareTo(order.getStakeUsdtAmount()) < 0) {
-			throw new ServiceException("Pay amount is less than stake amount");
+			throw new ServiceException(ResponseCode.CODE_1309);
 		}
 		Date now = new Date();
 
@@ -241,7 +241,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.set(StakeHostingOrder::getUpdateTime, now)
 			.update();
 		if (!update) {
-			throw new ServiceException("Stake hosting order status changed");
+			throw new ServiceException(ResponseCode.CODE_1302);
 		}
 
 		// 步骤6：订单生效后同步维护本人业绩、团队业绩和全球分红权重；该部分在当前事务内落库。
@@ -266,7 +266,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	@RedisLock(value = RedisConstant.LockConstant.XMS_STAKE_APPLY, param = "#req.userId")
 	public int createAdminGrantOrder(StakeHostingOrder req) {
 		if (req == null) {
-			throw new ServiceException("Grant request is required");
+			throw new ServiceException(ResponseCode.CODE_300);
 		}
 		// 后台赠送同样使用启用套餐和金额规则，并固化套餐快照，避免后续配置变化影响历史订单。
 		UserInfo userInfo = getGrantUser(req);
@@ -287,7 +287,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setG7ExpirePerformanceStatus(G7_STATUS_WAIT);
 		order.setRemark(req.getRemark());
 		if (!save(order)) {
-			throw new ServiceException("Create admin grant order failed");
+			throw new ServiceException(ResponseCode.CODE_1298);
 		}
 		addHostingPerformance(order);
 		// 事务提交后再发送托管生效消息，避免消费者读取到未提交订单。
@@ -320,7 +320,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.eq(StakeHostingOrder::getDeleted, 0)
 			.one();
 		if (order == null) {
-			throw new ServiceException("托管订单不存在或不属于当前用户");
+			throw new ServiceException(ResponseCode.CODE_1299);
 		}
 		// 已经完成停止且本金已退还的重复请求视为成功，避免用户重复点击或网络重试造成误报。
 		if (order.getSourceType() == SOURCE_USER
@@ -335,13 +335,13 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			|| order.getPackageDays() != 1
 			|| order.getPayStatus() != PAY_SUCCESS
 			|| order.getStatus() != STATUS_RUNNING) {
-			throw new ServiceException("当前托管订单不支持停止");
+			throw new ServiceException(ResponseCode.CODE_1300);
 		}
 		if (order.getPrincipalReturnStatus() != PRINCIPAL_RETURN_WAIT) {
-			throw new ServiceException("托管本金已处理，请勿重复操作");
+			throw new ServiceException(ResponseCode.CODE_1301);
 		}
 		if (order.getStakeUsdtAmount().compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("托管本金金额异常");
+			throw new ServiceException(ResponseCode.CODE_1283);
 		}
 
 		Date now = new Date();
@@ -363,7 +363,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.set(StakeHostingOrder::getUpdateTime, now)
 			.update();
 		if (!claimed) {
-			throw new ServiceException("托管订单状态已变化，请刷新后重试");
+			throw new ServiceException(ResponseCode.CODE_1302);
 		}
 
 		// 停止成功后立即退还 USDT 本金到可用余额；sourceId 使用托管订单ID，便于流水追踪和排查。
@@ -408,7 +408,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.set(UserInfo::getUpdateTime, new Date())
 			.update();
 		if (!update) {
-			throw new ServiceException("Update user hosting performance failed");
+			throw new ServiceException(ResponseCode.CODE_1003);
 		}
 		if (userInfo.getInviteUserId() != null) {
 			userInfoService.lambdaUpdate()
@@ -426,7 +426,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 					"global_dividend_umbrella_weight = IFNULL(global_dividend_umbrella_weight,0) + " + globalDividendWeight.toPlainString())
 				.update();
 			if (!update) {
-				throw new ServiceException("Update team hosting performance failed");
+				throw new ServiceException(ResponseCode.CODE_1003);
 			}
 			recalculateGlobalDividendCommunityWeight(parentIds);
 		}
@@ -454,7 +454,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.set(UserInfo::getUpdateTime, new Date())
 			.update();
 		if (!update) {
-			throw new ServiceException("Update user hosting performance failed");
+			throw new ServiceException(ResponseCode.CODE_1003);
 		}
 		if (userInfo.getInviteUserId() != null) {
 			userInfoService.lambdaUpdate()
@@ -470,7 +470,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 				.setSql("performance_mining = IFNULL(performance_mining,0) + " + amount.toPlainString())
 				.update();
 			if (!update) {
-				throw new ServiceException("Update team hosting performance failed");
+				throw new ServiceException(ResponseCode.CODE_1003);
 			}
 			// 旧兼容入口不重算全球分红小区权重，因为没有订单绩效积分快照。
 		}
@@ -518,7 +518,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.set(UserInfo::getUpdateTime, new Date())
 			.update();
 		if (!update) {
-			throw new ServiceException("Subtract user hosting performance failed");
+			throw new ServiceException(ResponseCode.CODE_1003);
 		}
 		if (userInfo.getInviteUserId() != null) {
 			userInfoService.lambdaUpdate()
@@ -814,7 +814,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		// Snapshot the package service fee ratio at order creation. Future settlement must not be affected by package config changes.
 		order.setServiceFeeRatio(hostingPackage.getServiceFeeRatio() == null ? BigDecimal.ZERO : hostingPackage.getServiceFeeRatio());
 		if (hostingPackage.getPerformanceCoefficient() == null) {
-			throw new ServiceException("Package performance coefficient is required");
+			throw new ServiceException(ResponseCode.CODE_1303);
 		}
 		// 绩效积分按订单金额 * 套餐绩效系数计算，是全球分红权重和后续业绩口径的重要快照。
 		BigDecimal performanceCoefficient = hostingPackage.getPerformanceCoefficient();
@@ -854,7 +854,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 				return userInfo;
 			}
 		}
-		throw new ServiceException("User not found");
+		throw new ServiceException(ResponseCode.CODE_1007);
 	}
 
 	/**
@@ -865,13 +865,13 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	 */
 	private UserInfo getUserInfo(Long userId) {
 		if (userId == null) {
-			throw new ServiceException("User id is required");
+			throw new ServiceException(ResponseCode.CODE_300);
 		}
 		UserInfo userInfo = userInfoService.lambdaQuery()
 			.eq(UserInfo::getUserId, userId)
 			.one();
 		if (userInfo == null) {
-			throw new ServiceException("User not found");
+			throw new ServiceException(ResponseCode.CODE_1007);
 		}
 		return userInfo;
 	}
@@ -886,14 +886,14 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	 */
 	private StakeHostingPackage getEnabledPackage(Long packageId) {
 		if (packageId == null) {
-			throw new ServiceException("Package id is required");
+			throw new ServiceException(ResponseCode.CODE_1304);
 		}
 		StakeHostingPackage hostingPackage = stakeHostingPackageService.lambdaQuery()
 			.eq(StakeHostingPackage::getId, packageId)
 			.eq(StakeHostingPackage::getStatus, 1)
 			.one();
 		if (hostingPackage == null) {
-			throw new ServiceException("Package not found or disabled");
+			throw new ServiceException(ResponseCode.CODE_1305);
 		}
 		return hostingPackage;
 	}
@@ -908,13 +908,13 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	 */
 	private void validateAmount(BigDecimal amount, StakeHostingPackage hostingPackage) {
 		if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new ServiceException("Stake amount must be greater than zero");
+			throw new ServiceException(ResponseCode.CODE_1306);
 		}
 		if (amount.stripTrailingZeros().scale() > 0) {
-			throw new ServiceException("Stake amount must be an integer");
+			throw new ServiceException(ResponseCode.CODE_1307);
 		}
 		if (amount.compareTo(hostingPackage.getMinAmount()) < 0) {
-			throw new ServiceException("Stake amount is below package minimum");
+			throw new ServiceException(ResponseCode.CODE_1308);
 		}
 	}
 }

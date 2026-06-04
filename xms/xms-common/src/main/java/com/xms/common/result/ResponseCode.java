@@ -172,6 +172,18 @@ public enum ResponseCode {
 	CODE_1295(1295, "Polymarket订单不存在", "Polymarket order does not exist"),
 	CODE_1296(1296, "Polymarket市场结算消息投递失败", "Polymarket market settlement message enqueue failed"),
 	CODE_1297(1297, "该Polymarket市场已下单，不能重复购买", "Polymarket market already ordered"),
+	CODE_1298(1298, "托管订单创建失败", "Stake hosting order create failed"),
+	CODE_1299(1299, "托管订单不存在", "Stake hosting order does not exist"),
+	CODE_1300(1300, "当前托管订单不支持该操作", "Current stake hosting order does not support this operation"),
+	CODE_1301(1301, "托管本金已处理，请勿重复操作", "Stake hosting principal has been processed, please do not repeat"),
+	CODE_1302(1302, "托管订单状态已变化，请刷新后重试", "Stake hosting order status changed, please refresh and try again"),
+	CODE_1303(1303, "托管套餐业绩系数配置错误", "Stake hosting package performance coefficient config error"),
+	CODE_1304(1304, "托管套餐不能为空", "Stake hosting package is required"),
+	CODE_1305(1305, "托管套餐不存在或未启用", "Stake hosting package does not exist or is disabled"),
+	CODE_1306(1306, "托管金额必须大于0", "Stake hosting amount must be greater than zero"),
+	CODE_1307(1307, "托管金额必须为整数", "Stake hosting amount must be an integer"),
+	CODE_1308(1308, "托管金额低于套餐最低起投金额", "Stake hosting amount is below package minimum"),
+	CODE_1309(1309, "支付金额小于托管金额", "Pay amount is less than stake hosting amount"),
 
 
 	CODE_107(107, "IP黑名单拦截", ""),

@@ -142,6 +142,19 @@ public class StakeHostingOrderDto {
 	private Integer isReturnPrincipal;
 
 	/**
+	 * 本金退还状态 0:未退还 1:已退还 2:无需退还
+	 */
+	@ApiModelProperty(value = "本金退还状态 0:未退还 1:已退还 2:无需退还")
+	private Integer principalReturnStatus;
+
+	/**
+	 * 本金退还时间
+	 */
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@ApiModelProperty(value = "本金退还时间")
+	private Date principalReturnTime;
+
+	/**
 	 * 是否已绑定AFI加速 0:否 1:是
 	 */
 	@ApiModelProperty(value = "是否已绑定AFI加速 0:否 1:是")

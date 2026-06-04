@@ -28,6 +28,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="todayReward" column="today_reward" />
         <result property="totalStaticReward" column="total_static_reward" />
         <result property="isReturnPrincipal" column="is_return_principal" />
+        <result property="principalReturnStatus" column="principal_return_status" />
+        <result property="principalReturnTime" column="principal_return_time" />
         <result property="afiAccelerated" column="afi_accelerated" />
         <result property="lastRewardDay" column="last_reward_day" />
         <result property="createDay" column="create_day" />
@@ -65,6 +67,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="todayReward" column="today_reward" />
         <result property="totalStaticReward" column="total_static_reward" />
         <result property="isReturnPrincipal" column="is_return_principal" />
+        <result property="principalReturnStatus" column="principal_return_status" />
+        <result property="principalReturnTime" column="principal_return_time" />
         <result property="afiAccelerated" column="afi_accelerated" />
         <result property="lastRewardDay" column="last_reward_day" />
         <result property="createDay" column="create_day" />
@@ -77,7 +81,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select id, order_no, user_id, account, package_id, package_name, package_days, stake_usdt_amount, service_fee_ratio,
                performance_coefficient, performance_points,
                source_type, pay_status, status, pay_hash, pay_amount, pay_time, effective_time, finish_time,
-               run_days, today_reward, total_static_reward, is_return_principal, afi_accelerated, last_reward_day, create_day
+               run_days, today_reward, total_static_reward, is_return_principal, principal_return_status, principal_return_time,
+               afi_accelerated, last_reward_day, create_day
         from t_stake_hosting_order
     </sql>
 
@@ -87,7 +92,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                afi.pledge_ratio as afi_pledge_ratio,
                afi.accelerate_rate as afi_accelerate_rate,
                o.source_type, o.pay_status, o.status, o.pay_hash, o.pay_amount, o.pay_time, o.effective_time, o.finish_time,
-               o.run_days, o.today_reward, o.total_static_reward, o.is_return_principal, o.afi_accelerated, o.last_reward_day, o.create_day
+               o.run_days, o.today_reward, o.total_static_reward, o.is_return_principal, o.principal_return_status,
+               o.principal_return_time, o.afi_accelerated, o.last_reward_day, o.create_day
         from t_stake_hosting_order o
         left join t_stake_hosting_afi_pledge afi
                on afi.deleted = 0
@@ -107,6 +113,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="status != null"> and status = #{status}</if>
             <if test="payHash != null and payHash != ''"> and pay_hash = #{payHash}</if>
             <if test="isReturnPrincipal != null"> and is_return_principal = #{isReturnPrincipal}</if>
+            <if test="principalReturnStatus != null"> and principal_return_status = #{principalReturnStatus}</if>
             <if test="afiAccelerated != null"> and afi_accelerated = #{afiAccelerated}</if>
             <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
             and deleted = 0
@@ -127,6 +134,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="status != null"> and o.status = #{status}</if>
             <if test="payHash != null and payHash != ''"> and o.pay_hash = #{payHash}</if>
             <if test="isReturnPrincipal != null"> and o.is_return_principal = #{isReturnPrincipal}</if>
+            <if test="principalReturnStatus != null"> and o.principal_return_status = #{principalReturnStatus}</if>
             <if test="afiAccelerated != null"> and o.afi_accelerated = #{afiAccelerated}</if>
             <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and o.create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
             and o.deleted = 0

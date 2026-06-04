@@ -108,54 +108,73 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 
 
 
+	/**
+	 * Redis Stream 动态业务消息统一分发入口。
+	 *
+	 * <p>当前已接入的业务类型包括：bizType=1 节点订单后置处理，bizType=2 提现成功后置入口，
+	 * bizType=4 托管订单等级重算，bizType=6 托管订单生效后置处理。Redis 消息只作为触发器，
+	 * 各分支必须按消息ID重新查询数据库订单，不能信任消息体作为业务快照。</p>
+	 *
+	 * @param req Redis Stream 原始消息体列表，元素会转换为 {@link OrderMsgDO}
+	 * @return 1 表示当前消息分发完成或无可处理内容
+	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public Integer handlerDynamicOrderSettlement(List req) {
 		List<OrderMsgDO> ids = BeanUtil.copyToList(req, OrderMsgDO.class);
-		log.debug("Business processing log");
-		if(CollectionUtil.isNotEmpty(ids)) {
+		log.debug("Dynamic order settlement message size={}", ids.size());
+		if (CollectionUtil.isNotEmpty(ids)) {
+			// 当前 Redis Stream 接收器按单条业务消息投递；保留 List 入参是为了兼容 Stream 原始消息体。
 			OrderMsgDO orderMsgDO = ids.get(0);
-			if(orderMsgDO.getBizType().equals(1)){
-				// Business processing note.
+			Integer bizType = orderMsgDO.getBizType();
+			if (Objects.equals(bizType, 1)) {
+				// 节点订单支付成功后的后置处理：节点业绩统计、直推/间推奖励入账、奖励记录、订单业务状态完成。
 				Integer x = handleBizType1(orderMsgDO);
 				if (x != null) return x;
-			}else if(orderMsgDO.getBizType().equals(2)){
-				// Business processing note.
+			} else if (Objects.equals(bizType, 2)) {
+				// 提现成功后的后置处理入口；当前具体分润逻辑已整体注释，方法内不会产生资产变动。
 				handleBizType2(orderMsgDO);
-			}else if(orderMsgDO.getBizType().equals(3)){
-				// Business processing note.
+			} else if (Objects.equals(bizType, 3)) {
+				// 预留业务类型，当前没有实际处理逻辑。
 				handleBizType3(orderMsgDO);
-			}else if(orderMsgDO.getBizType().equals(4)){
-				// Business processing note.
+			} else if (Objects.equals(bizType, 4)) {
+				// 托管订单业绩变化后的等级重算；走代理调用，确保 NOT_SUPPORTED 事务传播配置生效。
 				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
-			}else if(orderMsgDO.getBizType().equals(5)){
-				// Business processing note.
-			}else if(orderMsgDO.getBizType().equals(6)){
+			} else if (Objects.equals(bizType, 5)) {
+				// 预留业务类型，当前没有实际处理逻辑。
+			} else if (Objects.equals(bizType, 6)) {
 				// 托管订单生效后的异步处理：G7团队新增、小区业绩、真实等级重算。
 				SpringUtils.getBean(RedisStreamBizJobServiceImpl.class).handleStakeHostingMessageNoTransaction(orderMsgDO);
-			}else if(orderMsgDO.getBizType().equals(7)){
-				// Business processing note.
+			} else if (Objects.equals(bizType, 7)) {
+				// 预留业务类型，当前没有实际处理逻辑。
+			} else {
+				log.info("Dynamic order settlement skipped, unsupported bizType={}, id={}", bizType, orderMsgDO.getId());
 			}
 		}
 		return 1;
 	}
 
 	/**
+	 * 在当前事务外处理托管订单相关异步消息。
 	 *
+	 * <p>托管等级重算和托管生效后置处理都可能执行较重的查询、统计和批量更新。外层 Stream 消费入口已经带事务，
+	 * 这里通过 Spring 代理调用并设置 {@link Propagation#NOT_SUPPORTED}，让这些托管后置逻辑不挂在外层事务里。</p>
 	 *
-	 *
-	 *
-	 *
+	 * @param orderMsgDO 托管异步消息，id 为托管订单ID；bizType=4 表示等级重算，bizType=6 表示订单生效后置处理
 	 *
 	 */
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public void handleStakeHostingMessageNoTransaction(OrderMsgDO orderMsgDO) {
-		if (orderMsgDO.getBizType().equals(4)) {
+		if (Objects.equals(orderMsgDO.getBizType(), 4)) {
+			// 托管订单完成、停止或业绩变化后，只重算相关链路用户的小区业绩和真实等级。
 			handleBizType4(orderMsgDO);
-		} else if (orderMsgDO.getBizType().equals(5)) {
-		} else if (orderMsgDO.getBizType().equals(6)) {
+		} else if (Objects.equals(orderMsgDO.getBizType(), 5)) {
+			// 预留托管业务类型，当前无处理逻辑。
+		} else if (Objects.equals(orderMsgDO.getBizType(), 6)) {
+			// 托管订单首次生效后，补做 G7 团队新增统计，并刷新相关链路等级。
 			handleStakeHostingEffectiveAfter(orderMsgDO);
-		} else if (orderMsgDO.getBizType().equals(7)) {
+		} else if (Objects.equals(orderMsgDO.getBizType(), 7)) {
+			// 预留托管业务类型，当前无处理逻辑。
 		}
 	}
 
@@ -212,7 +231,12 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	}
 
 	/**
+	 * 处理托管订单等级重算消息。
 	 *
+	 * <p>bizType=4 通常由托管订单停止、完成或业绩回退后触发。该方法按托管订单ID重新查库，
+	 * 找到订单用户及其所有上级，重算小区业绩后刷新真实等级；找不到订单或用户时幂等跳过。</p>
+	 *
+	 * @param orderMsgDO 托管等级重算消息，id 为托管订单ID
 	 */
 	private void handleBizType4(OrderMsgDO orderMsgDO) {
 		StakeHostingOrder order = stakeHostingOrderService.lambdaQuery()
@@ -227,7 +251,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			.eq(UserInfo::getUserId, order.getUserId())
 			.one();
 		if (userInfo == null) {
-			log.info("Business processing log");
+			log.info("托管等级重算跳过，订单用户不存在 orderId={}, userId={}", order.getId(), order.getUserId());
 			return;
 		}
 		LinkedHashSet<Long> recalculateUserIds = new LinkedHashSet<>();
@@ -236,6 +260,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 		if (CollectionUtil.isNotEmpty(parentIds)) {
 			recalculateUserIds.addAll(parentIds);
 		}
+		// 先重算订单用户及其上级的小区业绩，再按最新等级规则刷新真实等级。
 		stakeOrderService.calculateCommunityPerformance(new ArrayList<>(recalculateUserIds));
 		List<UserLevelConfig> userLevelConfigList = userLevelConfigService.lambdaQuery()
 			.gt(UserLevelConfig::getLevel, 0)
@@ -250,15 +275,22 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	}
 
 	/**
+	 * 预留业务类型 bizType=3 的处理入口。
 	 *
-	 * @param orderMsgDO
+	 * <p>当前没有实际业务逻辑，保留方法是为了避免历史消息或未来业务接入时改动分发结构。</p>
+	 *
+	 * @param orderMsgDO 动态业务消息
 	 */
 	private void handleBizType3(OrderMsgDO orderMsgDO) {
 	}
 
 	/**
+	 * 提现成功后的后置业务入口。
 	 *
-	 * @param orderMsgDO
+	 * <p>历史设计里这里负责提现手续费入池、代理分红、奖励记录和钱包批量入账；当前主体逻辑已整体注释，
+	 * 分发到该方法不会产生实际资产变动。</p>
+	 *
+	 * @param orderMsgDO 提现后置消息，id 为提现订单ID
 	 */
 	private void handleBizType2(OrderMsgDO orderMsgDO) {
 		/*Withdrawal withdrawal = withdrawalService.lambdaQuery()
@@ -438,9 +470,14 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 	}
 
 	/**
+	 * 处理节点订单支付成功后的异步后置业务。
 	 *
-	 * @param orderMsgDO
-	 * @return
+	 * <p>bizType=1 在当前消费者中按节点订单处理：重新读取 `t_node_package_order` 中
+	 * `status=1`、`biz_status=0` 的订单，更新节点团队业绩，发放直推/间推 USDT 奖励，
+	 * 写入奖励记录，最后把订单业务状态改为已处理。消息查不到可处理节点订单时幂等跳过。</p>
+	 *
+	 * @param orderMsgDO 节点订单消息，id 为节点订单ID
+	 * @return 当前保留返回值；返回 null 表示分支处理结束，外层继续返回成功
 	 */
 	@Nullable
 	private Integer handleBizType1(OrderMsgDO orderMsgDO) {
@@ -455,8 +492,9 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 		UserInfo userInfo = userInfoService.lambdaQuery()
 			.eq(UserInfo::getUserId, packageOrder.getUserId())
 			.one();
-		// Business processing note.
+		// 只有存在邀请人的节点订单才会产生上级节点业绩和推荐奖励。
 		if(userInfo.getInviteUserId()!=null){
+			// 增加直推节点业绩和整条上级链路的节点团队业绩，供节点等级和分红统计使用。
 			userInfoService.lambdaUpdate()
 				.eq(UserInfo::getUserId, userInfo.getInviteUserId())
 				.setSql("sub_node_performance = sub_node_performance + 1")
@@ -467,7 +505,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 				.setSql("node_team_performance = node_team_performance + 1")
 				.setSql("umbrella_node_performance = umbrella_node_performance + " + packageOrder.getOrderValueUsdt())
 				.update();
-			// Business processing note.
+			// 直推奖励使用邀请人当前节点等级配置里的直推比例，奖励币种为 USDT。
 			UserInfo inviteUserInfo = userInfoService.lambdaQuery()
 				.eq(UserInfo::getUserId, userInfo.getInviteUserId())
 				.one();
@@ -481,14 +519,14 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 						.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew)
 						.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 					if(directReward.compareTo(BigDecimal.ZERO)>0){
-						// Business processing note.
+						// 直推奖励入账到邀请人的 USDT 可用余额，sourceId 记录购买节点的用户ID。
 						int count = userWalletServiceImpl.handerUserMoney(directReward, packageOrder.getOrderNo(),
 							inviteUserInfo.getUserId(), packageOrder.getUserId(), ConstantType.user_money_log_source_type.type_1,
 							ConstantType.user_money_coin_type.type_1);
 						if (count != 1) {
 							throw new ServiceException(ResponseCode.CODE_1015);
 						}
-						// Business processing note.
+						// 奖励记录和钱包流水使用同一来源订单号，方便后台核对直推奖励明细。
 						RewardRecord rewardRecordEntity = new RewardRecord();
 						rewardRecordEntity.setOrderCode(IDUtils.getSnowflakeStr());
 						rewardRecordEntity.setUserId(inviteUserInfo.getUserId());
@@ -505,6 +543,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			}
 
 			//闂傚倸鐡ㄧ敮瑙勭附閺嵮冃?
+			// 间推奖励发给邀请人的上级，比例取该间推用户当前节点等级配置。
 			if(inviteUserInfo.getInviteUserId()!=null){
 				UserInfo indirectUserInfo = userInfoService.lambdaQuery()
 					.eq(UserInfo::getUserId, inviteUserInfo.getInviteUserId())
@@ -528,7 +567,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 								throw new ServiceException(ResponseCode.CODE_1015);
 							}
 
-							// Business processing note.
+							// 写入间推奖励记录，sourceUserId 保留购买节点的用户ID。
 							RewardRecord rewardRecordEntity = new RewardRecord();
 							rewardRecordEntity.setOrderCode(IDUtils.getSnowflakeStr());
 							rewardRecordEntity.setUserId(indirectUserInfo.getUserId());
@@ -546,7 +585,7 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 			}
 		}
 
-		// Business processing note.
+		// 节点奖励和业绩处理完成后抢占 biz_status，防止同一订单重复处理。
 		boolean update1 = nodePackageOrderService.lambdaUpdate()
 			.eq(NodePackageOrder::getId, packageOrder.getId())
 			.eq(NodePackageOrder::getBizStatus, 0)

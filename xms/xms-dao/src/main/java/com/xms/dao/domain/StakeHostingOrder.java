@@ -144,13 +144,24 @@ public class StakeHostingOrder extends BaseEntity {
 	@ApiModelProperty(value = "是否回本 0:否 1:是")
 	private Integer isReturnPrincipal;
 
+	/** 本金退还状态 0:未退还 1:已退还 2:无需退还 */
+	@Excel(name = "本金退还状态", sort = 21, dictType = "t_stake_hosting_order_principal_return_status")
+	@ApiModelProperty(value = "本金退还状态 0:未退还 1:已退还 2:无需退还")
+	private Integer principalReturnStatus;
+
+	/** 本金退还时间 */
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@Excel(name = "本金退还时间", sort = 22, width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+	@ApiModelProperty(value = "本金退还时间")
+	private Date principalReturnTime;
+
 	/** 是否已绑定AFI加速 0:否 1:是 */
-	@Excel(name = "AFI加速", sort = 21, dictType = "t_stake_hosting_order_afi_accelerated")
+	@Excel(name = "AFI加速", sort = 23, dictType = "t_stake_hosting_order_afi_accelerated")
 	@ApiModelProperty(value = "是否已绑定AFI加速 0:否 1:是")
 	private Integer afiAccelerated;
 
 	/** 最近一次发放日期，格式yyyyMMdd */
-	@Excel(name = "最近发放日期", sort = 22)
+	@Excel(name = "最近发放日期", sort = 24)
 	@ApiModelProperty(value = "最近一次发放日期，格式yyyyMMdd")
 	private Integer lastRewardDay;
 

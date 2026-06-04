@@ -28,7 +28,12 @@ public class UserRelationServiceImpl extends ServiceImpl<UserRelationMapper, Use
 	private final XmsRedis xmsRedis;
 
 	/**
-	 * 获取上级用户，包含自己的
+	 * 查询指定用户的闭包上级关系，包含 distance=0 的自己。
+	 *
+	 * <p>登录注册合一流程会用邀请人的这组关系，批量生成新用户到自己和全部祖先的关系记录。</p>
+	 *
+	 * @param userId 用户ID
+	 * @return 按 distance 升序排列的闭包关系
 	 */
 	@Override
 	public List<UserRelation> getParentList(Long userId) {

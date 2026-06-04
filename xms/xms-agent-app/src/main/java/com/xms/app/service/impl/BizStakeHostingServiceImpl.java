@@ -11,6 +11,7 @@ import com.xms.app.entity.dto.StakeHostingPackageDto;
 import com.xms.app.entity.resp.CreateStakeHostingOrderResp;
 import com.xms.app.entity.vo.CreateStakeHostingOrderVo;
 import com.xms.app.entity.vo.PledgeStakeHostingAfiVo;
+import com.xms.app.entity.vo.StopStakeHostingOrderVo;
 import com.xms.app.service.BizCommonService;
 import com.xms.app.service.BizStakeHostingService;
 import com.xms.common.config.redis.XmsRedis;
@@ -47,6 +48,7 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 	private final IStakeHostingAfiPledgeService stakeHostingAfiPledgeService;
 	private final IStakeHostingAfiAccelerateConfigService stakeHostingAfiAccelerateConfigService;
 	private final UserInfoService userInfoService;
+	private final XmsCommonService xmsCommonServiceImpl;
 	private final XmsRedis xmsRedis;
 	private final BizCommonService bizCommonService;
 
@@ -61,6 +63,7 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 									  IStakeHostingAfiPledgeService stakeHostingAfiPledgeService,
 									  IStakeHostingAfiAccelerateConfigService stakeHostingAfiAccelerateConfigService,
 									  UserInfoService userInfoService,
+									  XmsCommonService xmsCommonServiceImpl,
 									  XmsRedis xmsRedis,
 									  BizCommonService bizCommonService) {
 		this.stakeHostingPackageService = stakeHostingPackageService;
@@ -68,6 +71,7 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		this.stakeHostingAfiPledgeService = stakeHostingAfiPledgeService;
 		this.stakeHostingAfiAccelerateConfigService = stakeHostingAfiAccelerateConfigService;
 		this.userInfoService = userInfoService;
+		this.xmsCommonServiceImpl = xmsCommonServiceImpl;
 		this.xmsRedis = xmsRedis;
 		this.bizCommonService = bizCommonService;
 	}
@@ -125,16 +129,31 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		return dto;
 	}
 
+	/**
+	 * 创建用户侧托管待支付订单。
+	 *
+	 * <p>请求先按当前登录用户的钱包地址做签名校验，再创建待支付订单。该入口不扣减站内 USDT 钱包，
+	 * 订单只有在链上支付回调确认后才会进入生效状态并触发业绩、权重和后置异步处理。</p>
+	 *
+	 * @param req 创建托管订单请求，金额单位为 USDT，包含套餐ID、金额、随机数和签名
+	 * @param userId 当前登录用户ID
+	 * @return 待支付订单号和订单金额快照
+	 */
 	@Override
 	public ResultPista<CreateStakeHostingOrderResp> createOrder(CreateStakeHostingOrderVo req, Long userId) {
+		// 下单绑定当前登录用户的钱包地址，防止前端传入其他地址代签。
 		UserInfo userInfo = userInfoService.lambdaQuery()
 			.eq(UserInfo::getUserId, userId)
 			.one();
 		if (userInfo == null) {
 			throw userNotFoundException();
 		}
+
+		// 钱包签名只证明用户发起下单意愿，实际付款仍以后续链上回调为准。
 		checkWallet(req.getRandomNum(), req.getSignature(), userInfo.getAccount(), xmsRedis);
 		StakeHostingOrder order = stakeHostingOrderService.createUserOrder(userId, req.getPackageId(), req.getAmount());
+
+		// 返回链上支付需要绑定的订单号和应付金额快照。
 		CreateStakeHostingOrderResp resp = new CreateStakeHostingOrderResp();
 		resp.setOrderNo(order.getOrderNo());
 		resp.setStakeUsdtAmount(order.getStakeUsdtAmount());
@@ -164,6 +183,25 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 			return java.util.Collections.emptyList();
 		}
 		return list.stream().map(this::toOrderDto).collect(Collectors.toList());
+	}
+
+	/**
+	 * 停止当前登录用户的1天自动复投托管订单。
+	 *
+	 * <p>App层先校验当前是否处于结算限制窗口，避免和101静态收益任务重叠；订单状态抢占、USDT退本、
+	 * 业绩回退和等级重算消息由订单服务在事务内完成。</p>
+	 *
+	 * @param req 停止托管请求，包含托管订单ID
+	 * @return success表示停止成功
+	 */
+	@Override
+	public ResultPista<String> stop(StopStakeHostingOrderVo req) {
+		ResultPista resultPista = xmsCommonServiceImpl.checkMineSettleTime();
+		if (!ResultPista.isSuccess(resultPista)) {
+			throw new ServiceException(resultPista.getMsg());
+		}
+		stakeHostingOrderService.stopUserOneDayAutoReinvestOrder(SecurityUtils.getFrontUserId(), req.getOrderId());
+		return ResultPista.data("success");
 	}
 
 	/**
@@ -261,6 +299,8 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		dto.setTodayReward(item.getTodayReward());
 		dto.setTotalStaticReward(item.getTotalStaticReward());
 		dto.setIsReturnPrincipal(item.getIsReturnPrincipal());
+		dto.setPrincipalReturnStatus(item.getPrincipalReturnStatus());
+		dto.setPrincipalReturnTime(item.getPrincipalReturnTime());
 		dto.setAfiAccelerated(item.getAfiAccelerated());
 		dto.setLastRewardDay(item.getLastRewardDay());
 		return dto;
@@ -340,18 +380,30 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		return new ServiceException(ResponseCode.CODE_1007);
 	}
 
+	/**
+	 * 处理托管订单链上支付回调。
+	 *
+	 * <p>生产环境会按共享 md5Key 验签；Windows 环境保留本地调试绕过。验签通过后不在 App 层直接改状态，
+	 * 而是交给 DAO 订单服务按待支付状态做幂等推进，避免重复回调重复增加业绩或重复发送异步消息。</p>
+	 *
+	 * @param req 外部回调参数，金额单位为 USDT
+	 * @return success 表示处理完成；验签失败返回签名错误
+	 */
 	@Override
 	public ResultPista<String> orderCallback(StakeOrderBo req) {
 		log.info("托管订单回调 req:{}", req);
 		Map<String, Object> map = BeanUtil.beanToMap(req);
 		String sign = SignUtil.getSign(map, false, false, md5Key);
 		String osName = SystemUtil.getOsInfo().getName();
+		// 非 Windows 环境必须验签，回调可信性依赖外部服务签名和共享密钥。
 		if (!osName.toUpperCase().contains(SysConstant.OS_NAME_WINDOWS)) {
 			if (!sign.equals(req.getSign())) {
 				log.error("托管订单回调验签失败");
 				return ResultPista.fail(ResponseCode.SIGN_VALIDATE_ERROR);
 			}
 		}
+
+		// 支付状态推进、金额校验、幂等和后置异步消息均由订单服务统一处理。
 		stakeHostingOrderService.confirmChainPaid(req.getOrderNo(), req.getHash(), req.getAmount());
 		return ResultPista.data("success");
 	}

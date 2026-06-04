@@ -7,6 +7,7 @@ import com.xms.app.entity.resp.CreateStakeHostingOrderResp;
 import com.xms.app.entity.dto.StakeHostingPackageDto;
 import com.xms.app.entity.vo.CreateStakeHostingOrderVo;
 import com.xms.app.entity.vo.PledgeStakeHostingAfiVo;
+import com.xms.app.entity.vo.StopStakeHostingOrderVo;
 import com.xms.app.service.BizStakeHostingService;
 import com.xms.common.annotation.RepeatSubmit;
 import com.xms.common.core.domain.api.ResultPista;
@@ -74,6 +75,21 @@ public class BizStakeHostingController {
 	@GetMapping("/orderList")
 	public ResultPista<List<StakeHostingOrderDto>> orderList(Long lastId, Integer status) {
 		return ResultPista.data(bizStakeHostingService.orderList(lastId, status));
+	}
+
+	/**
+	 * 停止1天自动复投托管订单。
+	 *
+	 * 当前登录用户只能停止自己购买的1天产出中订单；停止成功后退还该订单USDT本金，并让订单退出后续101静态收益。
+	 *
+	 * @param req 停止托管请求，包含托管订单ID
+	 * @return success表示停止成功
+	 */
+	@ApiOperation(value = "停止托管")
+	@PostMapping("/stop")
+	@RepeatSubmit
+	public ResultPista<String> stop(@Valid @RequestBody StopStakeHostingOrderVo req) {
+		return bizStakeHostingService.stop(req);
 	}
 //
 //	@ApiOperation(value = "可加速托管订单")

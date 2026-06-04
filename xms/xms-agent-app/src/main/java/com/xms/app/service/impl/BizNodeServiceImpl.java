@@ -283,6 +283,15 @@ public class BizNodeServiceImpl implements BizNodeService {
 		return result;
 	}
 
+	/**
+	 * 处理用户购买节点的支付回调。
+	 *
+	 * <p>回调成功后会把节点订单改为支付成功、写入用户节点权益、增加套餐销量，并在事务提交后投递节点业绩异步处理。
+	 * 如果用户此前取消节点时暂停了AFI线性释放订单，则在新节点权益生效后恢复原释放订单，不重置已释放进度。</p>
+	 *
+	 * @param req 节点订单支付回调参数
+	 * @return success表示回调处理完成或幂等忽略
+	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public ResultPista<String> nodeOrderCallback(StakeOrderBo req) {
@@ -343,6 +352,8 @@ public class BizNodeServiceImpl implements BizNodeService {
 		if (!update) {
 			throw new ServiceException("更新用户节点信息失败");
 		}
+
+		nodePackageOrderService.restorePausedReleaseOrderIfNeeded(packageOrder);
 
 		nodePackageService.lambdaUpdate()
 			.eq(NodePackage::getId, packageOrder.getPackageLevel())

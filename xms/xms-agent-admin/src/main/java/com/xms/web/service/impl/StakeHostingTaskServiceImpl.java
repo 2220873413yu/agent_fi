@@ -113,38 +113,34 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	private static final int DELETED_NO = 0;
 
 	/**
+	 * 发放托管订单每日静态收益。
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * <p>任务按收益日写入 `xms_task` 做日级幂等；`last_reward_day` 只记录最近发放日期，
+	 * 不作为强制拦截条件，方便本地重复执行任务验证收益链路。</p>
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public void distributeDailyStaticReward() {
 		String strDate = DateUtil.format(DateUtil.date(), "yyyyMMdd");
 		int rewardDay = Integer.parseInt(strDate);
-		// Business processing note.
+		// 任务日期已存在时直接跳过，避免整批静态收益重复发放。
 		Map<String, Object> task = asyncTaskServiceImpl.getTask(SysConstant.TSK_TYPE_101, strDate);
 		if (!CollectionUtil.isEmpty(task)) {
 			log.debug("Task already exists");
 			return;
 		}
 
-		// Business processing note.
+		// 只扫描已支付、产出中的有效托管订单；任务级幂等由 xms_task 控制。
 		List<StakeHostingOrder> orderList = stakeHostingOrderService.lambdaQuery()
+			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
 			.eq(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_RUNNING)
-			// Business processing note.
-//			.and(wrapper -> wrapper.ne(StakeHostingOrder::getLastRewardDay, rewardDay).or().isNull(StakeHostingOrder::getLastRewardDay))
+			.eq(StakeHostingOrder::getDeleted, DELETED_NO)
+			//.and(wrapper -> wrapper.ne(StakeHostingOrder::getLastRewardDay, rewardDay).or().isNull(StakeHostingOrder::getLastRewardDay))
 			.list();
 		if (CollectionUtil.isEmpty(orderList)) {
 			log.info("Business processing skipped");
-			addDailyTask(strDate);
+			//todo 本地注释为了方便
+			//addDailyTask(strDate);
 			return;
 		}
 		List<Long> rewardUserIds = orderList.stream()
@@ -157,33 +153,36 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		BigDecimal dailyServiceFee = BigDecimal.ZERO;
 		List<StaticRewardResult> staticRewardResults = new ArrayList<>(orderList.size());
 		for (StakeHostingOrder order : orderList) {
-			// Business processing note.
 			StaticRewardResult result = distributeOne(order, rewardDay, now, staticContext);
+			if (result == null) {
+				continue;
+			}
 			staticRewardResults.add(result);
 			dailyServiceFee = dailyServiceFee.add(result.serviceFee);
 		}
-		// Business processing note.
+		if (CollectionUtil.isEmpty(staticRewardResults)) {
+			//todo 本地注释为了方便
+			//addDailyTask(strDate);
+			return;
+		}
+		// 静态收益明细先落库，再批量入账用户 USDT 钱包。
 		saveStaticRewardSettlements(staticRewardResults);
-		// Business processing note.
 		grantStaticRewards(staticRewardResults, now);
 		TeamRewardCollectContext teamRewardContext = new TeamRewardCollectContext();
 		for (StaticRewardResult result : staticRewardResults) {
 			if (result.shouldDistributeTeamReward()) {
-				// Business processing note.
+				// 用户购买单按净静态收益继续发放托管动态奖励，后台拨付单在结果对象内静默跳过。
 				distributeTeamReward(result.order, result.grossReward, result.baseStaticRate, result.afiAccelerateRate,
 					result.actualStaticRate, result.serviceFeeRatio, result.serviceFee, result.netReward, rewardDay, now,
 					teamRewardContext);
 			}
 		}
-		// Business processing note.
 		flushTeamRewardContext(teamRewardContext);
-		// Business processing note.
+		// 非自动复投订单到期后，再统一处理退本、回退业绩、退还 AFI 质押和等级重算。
 		handleFinishedOrdersAfterRewards(staticRewardResults, now);
-		// Business processing note.
 		stakeHostingGlobalDividendPoolService.incomeDailyServiceFee(rewardDay,
 			dailyServiceFee.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew), "task101");
-		// Business processing note.
-		// Business processing note.
+		//todo 本地注释为了方便
 		//addDailyTask(strDate);
 	}
 
@@ -585,82 +584,93 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 计算并抢占发放单笔托管订单的当日静态收益。
 	 *
+	 * <p>用户购买的 1 天托管订单命中自动复投规则时，只更新收益累计和最近发放日，不把订单置为完成。
+	 * 其他订单仍按套餐天数到期完成。返回 {@code null} 表示订单已被其他并发任务处理，本轮静默跳过。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param order 待发放的产出中托管订单
+	 * @param rewardDay 收益日期，格式 yyyyMMdd
+	 * @param now 本轮任务时间
+	 * @param context 静态收益计算上下文
+	 * @return 本轮发放结果；为空表示订单级幂等抢占失败
 	 */
 	private StaticRewardResult distributeOne(StakeHostingOrder order, int rewardDay, Date now, StaticRewardCalculateContext context) {
-		// Business processing note.
+		// 读取用户指定收益率、纯静态规则或 G7 快照，计算订单当天基础静态收益率。
 		BigDecimal todayRate = calculateStaticRate(order, rewardDay, context);
-		// Business processing note.
 		BigDecimal baseGrossReward = order.getStakeUsdtAmount().multiply(todayRate)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
-		// Business processing note.
+		// 已生效的 AFI 质押会放大基础静态收益；1 天套餐正常不会命中 AFI 加速。
 		StakeHostingAfiPledge effectiveAfiPledge = getEffectiveAfiPledge(order.getId(), context);
 		BigDecimal afiAccelerateRate = getAfiAccelerateRate(effectiveAfiPledge);
-		// Business processing note.
 		BigDecimal grossReward = applyAfiAccelerate(baseGrossReward, afiAccelerateRate);
-		// Business processing note.
 		BigDecimal baseStaticRate = rateToPercent(todayRate);
 		BigDecimal actualStaticRate = calculateActualStaticRate(todayRate, afiAccelerateRate);
-		// Business processing note.
+		// 静态收益先扣服务费，净收益发给用户，服务费进入每日全球分红奖池。
 		BigDecimal serviceFeeRatio = getServiceFeeRatio(order);
 		BigDecimal serviceFee = grossReward.multiply(serviceFeeRatio)
 			.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 		BigDecimal reward = grossReward.subtract(serviceFee)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
-		int nextRunDays = order.getRunDays() + 1;
-		BigDecimal totalReward = order.getTotalStaticReward()
+		int currentRunDays = order.getRunDays() == null ? 0 : order.getRunDays();
+		int nextRunDays = currentRunDays + 1;
+		BigDecimal totalReward = nvl(order.getTotalStaticReward())
 			.add(reward)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 
-		// Business processing note.
+		// 结算明细记录静态收益、服务费、收益率和 AFI 加速倍率快照，用于后台追溯。
 		StakeHostingRewardSettlement staticSettlement = buildSettlement(order, null, REWARD_TYPE_STATIC_FEE, null, grossReward, serviceFeeRatio,
 			serviceFee, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 			serviceFeeRatio, serviceFee, reward, ARRIVAL_YES, null, rewardDay, now);
 
-		// Business processing note.
-		StakeHostingOrder update = new StakeHostingOrder();
-		update.setId(order.getId());
-		update.setTodayReward(reward);
-		update.setTotalStaticReward(totalReward);
-		update.setRunDays(nextRunDays);
-		update.setLastRewardDay(rewardDay);
-		update.setIsReturnPrincipal(totalReward.compareTo(order.getStakeUsdtAmount()) >= 0 ? 1 : 0);
-		update.setUpdateTime(now);
-		// Business processing note.
-		boolean finished = nextRunDays >= order.getPackageDays();
+		// 用户购买的 1 天套餐自动复投，到期后仍保持产出中，等待后续 App 停止接口退本。
+		boolean autoReinvest = isUserPurchasedOneDayOrder(order);
+		boolean finished = !autoReinvest && nextRunDays >= order.getPackageDays();
+		var updateChain = stakeHostingOrderService.lambdaUpdate()
+			.eq(StakeHostingOrder::getId, order.getId())
+			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
+			.eq(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_RUNNING)
+			.eq(StakeHostingOrder::getDeleted, DELETED_NO)
+			.set(StakeHostingOrder::getTodayReward, reward)
+			.set(StakeHostingOrder::getTotalStaticReward, totalReward)
+			.set(StakeHostingOrder::getRunDays, nextRunDays)
+			.set(StakeHostingOrder::getLastRewardDay, rewardDay)
+			.set(StakeHostingOrder::getIsReturnPrincipal, totalReward.compareTo(order.getStakeUsdtAmount()) >= 0 ? 1 : 0)
+			.set(StakeHostingOrder::getUpdateTime, now);
 		if (finished) {
-			update.setStatus(StakeHostingOrderServiceImpl.STATUS_FINISHED);
-			update.setFinishTime(now);
+			updateChain
+				.set(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_FINISHED)
+				.set(StakeHostingOrder::getFinishTime, now);
 		}
-		if (!stakeHostingOrderService.updateById(update)) {
-			throw new ServiceException("Business processing failed");
+		if (!updateChain.update()) {
+			log.info("托管静态收益跳过，订单当天已发放或状态已变化 orderId={}, rewardDay={}", order.getId(), rewardDay);
+			return null;
 		}
-		// Business processing note.
 		return new StaticRewardResult(order, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 			serviceFeeRatio, serviceFee, reward, staticSettlement, finished);
 	}
 
 	/**
+	 * 判断订单是否命中 1 天用户购买单自动复投规则。
 	 *
+	 * @param order 托管订单
+	 * @return true 表示该订单到期后继续产出中，不自动完成和退本
+	 */
+	private boolean isUserPurchasedOneDayOrder(StakeHostingOrder order) {
+		return order.getSourceType() != null
+			&& order.getSourceType() == StakeHostingOrderServiceImpl.SOURCE_USER
+			&& order.getPackageDays() != null
+			&& order.getPackageDays() == 1;
+	}
+
+	/**
+	 * 处理本轮静态收益后到期完成的托管订单。
 	 *
+	 * <p>只有非自动复投订单会进入这里。用户购买单先退还 USDT 本金并标记退本状态；
+	 * 后台拨付单没有用户实付本金，标记为无需退还。随后统一回退业绩、退还 AFI 质押并触发等级重算。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param results 本轮静态收益发放结果
+	 * @param now 本轮任务时间
 	 */
 	private void handleFinishedOrdersAfterRewards(List<StaticRewardResult> results, Date now) {
 		if (CollectionUtil.isEmpty(results)) {
@@ -673,17 +683,17 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			return;
 		}
 
-		// Business processing note.
+		// 到期完成订单先维护本金退还状态，避免后续补偿或停止逻辑重复退本。
 		refundFinishedUserPrincipal(finishedResults, now);
+		markFinishedGrantPrincipalNotRequired(finishedResults, now);
 
 		Map<Long, Long> finishedUserOrderMap = new HashMap<>();
 		for (StaticRewardResult result : finishedResults) {
 			StakeHostingOrder order = result.order;
-			// Business processing note.
+			// 订单完成后回退本人、直推、伞下和全球分红权重等托管业绩影响。
 			stakeHostingOrderService.subtractHostingPerformance(order.getUserId(), order.getStakeUsdtAmount(), order.getId());
-			// Business processing note.
+			// 非 1 天套餐可能绑定 AFI 加速，到期时退回仍在质押中的 AFI。
 			stakeHostingAfiPledgeService.returnPledgeByOrderId(order.getId());
-			// Business processing note.
 			finishedUserOrderMap.putIfAbsent(order.getUserId(), order.getId());
 		}
 		for (Map.Entry<Long, Long> entry : finishedUserOrderMap.entrySet()) {
@@ -693,13 +703,13 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 批量退还到期用户购买单的 USDT 本金。
 	 *
+	 * <p>只处理 `source_type=0` 且 `principal_return_status=0` 的订单。钱包入账使用
+	 * `valid_num1` 和 `source_type=39`，并在同一事务内把订单本金退还状态改为已退还。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param finishedResults 本轮已完成的托管订单结果
+	 * @param now 本轮任务时间
 	 */
 	private void refundFinishedUserPrincipal(List<StaticRewardResult> finishedResults, Date now) {
 		if (CollectionUtil.isEmpty(finishedResults)) {
@@ -707,32 +717,93 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		}
 		int batchSize = 1000;
 		List<UserMoney> userMoneyList = new ArrayList<>(Math.min(finishedResults.size(), batchSize));
+		List<Long> returnedOrderIds = new ArrayList<>(Math.min(finishedResults.size(), batchSize));
 		for (StaticRewardResult result : finishedResults) {
 			StakeHostingOrder order = result.order;
-			// Business processing note.
 			if (order.getSourceType() == null || order.getSourceType() != StakeHostingOrderServiceImpl.SOURCE_USER) {
 				continue;
 			}
-			// Business processing note.
+			if (order.getPrincipalReturnStatus() != null
+				&& order.getPrincipalReturnStatus() != StakeHostingOrderServiceImpl.PRINCIPAL_RETURN_WAIT) {
+				continue;
+			}
 			if (order.getStakeUsdtAmount() == null || order.getStakeUsdtAmount().compareTo(BigDecimal.ZERO) <= 0) {
 				continue;
 			}
+			// 到期本金退还入账到用户 USDT 可用余额，流水按托管订单号和订单ID追踪。
 			UserMoney userMoney = new UserMoney();
 			userMoney.setId(order.getUserId());
 			userMoney.setValidNum1(order.getStakeUsdtAmount().setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
 			userMoney.setGtId(IDUtils.getSnowflakeStr());
 			userMoney.setSourceCode(order.getOrderNo());
-			userMoney.setSourceId(order.getUserId());
+			userMoney.setSourceId(order.getId());
 			userMoney.setSourceType(ConstantType.user_money_log_source_type.type_39);
 			userMoney.setUpdateTime(now);
 			userMoneyList.add(userMoney);
+			returnedOrderIds.add(order.getId());
 			if (userMoneyList.size() >= batchSize) {
 				batchUpdateMoneyValid1(userMoneyList);
+				markPrincipalReturned(returnedOrderIds, now);
 				userMoneyList.clear();
+				returnedOrderIds.clear();
 			}
 		}
 		batchUpdateMoneyValid1(userMoneyList);
+		markPrincipalReturned(returnedOrderIds, now);
 		userMoneyList.clear();
+		returnedOrderIds.clear();
+	}
+
+	/**
+	 * 将已完成的后台拨付单标记为无需退还本金。
+	 *
+	 * <p>后台拨付单没有用户链上支付本金，订单完成后不写钱包流水，只维护退本状态为 2，避免后台和后续停止逻辑误判为待退本。</p>
+	 *
+	 * @param finishedResults 本轮已完成的托管订单结果
+	 * @param now 本轮任务时间
+	 */
+	private void markFinishedGrantPrincipalNotRequired(List<StaticRewardResult> finishedResults, Date now) {
+		List<Long> grantOrderIds = finishedResults.stream()
+			.map(result -> result.order)
+			.filter(order -> order.getSourceType() != null && order.getSourceType() == StakeHostingOrderServiceImpl.SOURCE_ADMIN)
+			.filter(order -> order.getPrincipalReturnStatus() == null
+				|| order.getPrincipalReturnStatus() == StakeHostingOrderServiceImpl.PRINCIPAL_RETURN_WAIT)
+			.map(StakeHostingOrder::getId)
+			.collect(Collectors.toList());
+		if (CollectionUtil.isEmpty(grantOrderIds)) {
+			return;
+		}
+		boolean updated = stakeHostingOrderService.lambdaUpdate()
+			.in(StakeHostingOrder::getId, grantOrderIds)
+			.eq(StakeHostingOrder::getPrincipalReturnStatus, StakeHostingOrderServiceImpl.PRINCIPAL_RETURN_WAIT)
+			.set(StakeHostingOrder::getPrincipalReturnStatus, StakeHostingOrderServiceImpl.PRINCIPAL_RETURN_NOT_REQUIRED)
+			.set(StakeHostingOrder::getUpdateTime, now)
+			.update();
+		if (!updated) {
+			throw new ServiceException("Mark grant principal return status failed");
+		}
+	}
+
+	/**
+	 * 标记已完成退本的钱包入账订单。
+	 *
+	 * @param orderIds 已完成 USDT 本金退还的钱包订单ID集合
+	 * @param now 本轮任务时间
+	 */
+	private void markPrincipalReturned(List<Long> orderIds, Date now) {
+		if (CollectionUtil.isEmpty(orderIds)) {
+			return;
+		}
+		boolean updated = stakeHostingOrderService.lambdaUpdate()
+			.in(StakeHostingOrder::getId, orderIds)
+			.eq(StakeHostingOrder::getPrincipalReturnStatus, StakeHostingOrderServiceImpl.PRINCIPAL_RETURN_WAIT)
+			.set(StakeHostingOrder::getPrincipalReturnStatus, StakeHostingOrderServiceImpl.PRINCIPAL_RETURN_DONE)
+			.set(StakeHostingOrder::getPrincipalReturnTime, now)
+			.set(StakeHostingOrder::getUpdateTime, now)
+			.update();
+		if (!updated) {
+			throw new ServiceException("Mark principal returned failed");
+		}
 	}
 
 	/**

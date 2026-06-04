@@ -28,28 +28,6 @@ public class BizRechargeController {
 	@Autowired
 	private BizRechargeService bizRechargeService;
 
-	@Autowired
-	private XmsCommonService xmsCommonServiceImpl;
-
-
-
-	/**
-	 * 充值MAI(USDT->MAI)
-	 * @param req 充值请求参数
-	 * @return 订单号
-	 * @throws Exception
-	 */
-//	@ApiOperation(value = "充值MAI(USDT->MAI)")
-//	@PostMapping(value = "/createOrder")
-//	@RepeatSubmit
-//	public ResultPista<CreateOrderResp> createOrder(@Valid @RequestBody CreateRechargeOrder req)  throws Exception{
-//	/*	ResultPista resultPista = xmsCommonServiceImpl.checkMineSettleTime();
-//		if (!resultPista.isSuccess()) {
-//			throw new ServiceException(resultPista.getMsg());
-//		}*/
-//		return bizRechargeService.createOrder(req);
-//	}
-
 	/**
 	 * 充值记录
 	 *

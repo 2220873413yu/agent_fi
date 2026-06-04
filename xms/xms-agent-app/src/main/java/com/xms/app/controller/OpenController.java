@@ -28,10 +28,6 @@ public class OpenController {
 	@Autowired
 	private BizWithdrawalService bizWithdrawalService;
 
-
-	@Autowired
-	private BizStakeService bizStakeService;
-
 	@Autowired
 	private BizNodeService bizNodeService;
 
@@ -41,20 +37,11 @@ public class OpenController {
 	@Autowired
 	private BizRechargeService  bizRechargeService;
 
-//	/**
-//	 * df资产划转
-//	 * 从旧系统的df资产划转到本系统锁定usdt资产
-//	 * @param req df划转请求参数
-//	 * @return
-//	 */
-//	@PostMapping("/notify/dfTransfer")
-//	@Anonymous
-//	public ResultPista<String> dfTransfer(@Validated @RequestBody DfTransferBo req) {
-//		return bizRechargeService.dfTransfer(req);
-//	}
 
 	/**
 	 * 充值回调
+	 * @param req 请求参数
+	 * @return
 	 */
 	@PostMapping("/afiOrder/callback")
 	@Anonymous
@@ -62,35 +49,6 @@ public class OpenController {
 		return bizRechargeService.rechargeCallback(req);
 	}
 
-
-
-//
-//	/**
-//	 * swap订单回调(链上进行swap的时候进行回调)
-//	 */
-//	@PostMapping("/notify/swapOrder")
-//	@Anonymous
-//	public ResultPista<String> swapOrderCallback(@Validated @RequestBody SwapOrderCallbackReq req) {
-//		return bizMiningService.swapOrderCallback(req);
-//	}
-//
-//	/**
-//	 * 用户支付成功 创建激活码订单，回调接口(支付激活币)
-//	 */
-//	@PostMapping("/activeOrder/callback")
-//	@Anonymous
-//	public ResultPista<String> activeOrderCallback(@Validated @RequestBody DestroyCallbackBo req) {
-//		return bizCardService.activeOrderCallback(req);
-//	}
-//
-//	/**
-//	 * 领取空投回调
-//	 */
-//	@PostMapping("/claimAirdrop/callback")
-//	@Anonymous
-//	public ResultPista<String> claimAirdropCallback(@Validated @RequestBody DestroyCallbackBo req) {
-//		return bizCardService.claimAirdropCallback(req);
-//	}
 
 	/**
 	 * 节点订单回调
@@ -109,15 +67,6 @@ public class OpenController {
 	public ResultPista<String> stakeHostingOrderCallback(@Validated @RequestBody StakeOrderBo req) {
 		return bizStakeHostingService.orderCallback(req);
 	}
-//
-//	/**
-//	 * 质押订单回调
-//	 */
-//	@PostMapping("/stakeOrder/callback")
-//	@Anonymous
-//	public ResultPista<String> stakeOrderCallback(@Validated @RequestBody StakeOrderBo req) {
-//		return bizStakeService.stakeOrderCallback(req);
-//	}
 
 	/**
 	 * 提现回调

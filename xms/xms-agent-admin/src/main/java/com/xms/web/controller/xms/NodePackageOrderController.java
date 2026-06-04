@@ -94,6 +94,20 @@ public class NodePackageOrderController extends BaseController
 		return toAjax(nodePackageOrderService.updateOrderById(nodePackageOrder));
 	}
 
+	/**
+	 * 取消已生效节点订单。
+	 *
+	 * <p>该接口沿用节点订单编辑权限，不新增RuoYi按钮权限。后台取消会归档原订单、
+	 * 暂停后续AFI释放，并回滚节点权益和节点业绩。</p>
+	 */
+	@PreAuthorize("@ss.hasPermi('xms:nodePackageOrder:edit')")
+	@Log(title = "取消节点订单", businessType = BusinessType.UPDATE)
+	@PutMapping("/cancel/{id}")
+	@RepeatSubmit
+	public AjaxResult cancelNode(@PathVariable("id") Long id) {
+		return toAjax(nodePackageOrderService.cancelNodePackageOrder(id, getUsername()));
+	}
+
     /**
      * 删除节点购买记录
      */

@@ -49,15 +49,9 @@ public class BizWithdrawalController {
 	@Autowired
 	private BizWithdrawalService bizWithdrawalService;
 
-	@Autowired
-	private XmsCommonService xmsCommonServiceImpl;
+//	@Autowired
+//	private XmsCommonService xmsCommonServiceImpl;
 
-	/**
-	 * 发起提现
-	 *
-	 * @param withdrawalVo
-	 * @return
-	 */
 
 	/**
 	 * 提现配置
@@ -88,15 +82,6 @@ public class BizWithdrawalController {
 		return ResultPista.success();
 	}
 
-//	/**
-//	 * 提现汇总（总提现/今日提现/待处理）
-//	 */
-//	@ApiOperation("提现汇总")
-//	@GetMapping("/summary")
-//	public ResultPista<WithdrawalSummaryResp> withdrawalSummary() {
-//		return ResultPista.data(
-//			bizWithdrawalService.withdrawalSummary(SecurityUtils.getLoginAppUser().getUserId()));
-//	}
 
 
 	/**

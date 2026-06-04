@@ -85,48 +85,13 @@ public class UserInfoController {
 		return ResultPista.data(resp);
 	}
 
-//	/**
-//	 * 获取算力页面展示数据
-//	 *
-//	 * @return 返回随机数
-//	 */
-//	@ApiOperation(value = "获取算力页面展示数据")
-//	@GetMapping(value = "/computingPowerData")
-//	public ResultPista<ComputingPowerBo> computingPowerData() {
-//		return ResultPista.data(bizUserService.computingPowerData());
-//	}
-//
-//	/**
-//	 * 获取算力奖励产出列表
-//	 * @param lastId
-//	 * @return
-//	 */
-//	@ApiOperation(value = "获取算力奖励产出列表")
-//	@GetMapping(value = "/powerDataList")
-//	public ResultPista<List<UserMoneyLog>> powerDataList(Long lastId) {
-//		return ResultPista.data(bizUserService.powerDataList(lastId));
-//	}
-
-//	/**
-//	 * 获取用户资产信息
-//	 *
-//	 * @return 用户资产信息 DTO
-//	 */
-//	@ApiOperation(value = "获取用户资产信息")
-//	@GetMapping(value = "/getUserAssetInfo")
-//	public ResultPista<UserAssetInfoBo> getUserAssetInfo() {
-//		Long userId = SecurityUtils.getLoginAppUser().getUserId();
-//		// 空实现占位，后续可在 BizUserServiceImpl 中补充具体资产统计逻辑
-//		return ResultPista.data(bizUserService.getUserAssetInfo(userId));
-//	}
-
-
-
 	/**
-	 * 获取随机消息
+	 * 生成钱包签名登录用的随机消息。
 	 *
-	 * @param address 钱包地址
-	 * @return 返回随机数
+	 * <p>前端拿到随机数后发起钱包签名，登录接口再用随机数、签名和钱包地址校验是否为本人操作。</p>
+	 *
+	 * @param address 钱包地址，统一转为小写后参与 Redis 随机数 key
+	 * @return 5 分钟内有效的钱包签名随机数
 	 */
 	@ApiOperation(value = "获取随机消息")
 	@GetMapping(value = "/getMessage")
@@ -138,9 +103,10 @@ public class UserInfoController {
 
 
 	/**
-	 * 检查钱包地址是否注册过,返回false是没注册过,true注册过
+	 * 检查钱包地址是否已经注册。
+	 *
 	 * @param address 钱包地址
-	 * @return
+	 * @return {@code true} 表示已存在用户，{@code false} 表示可以走首次登录注册流程
 	 */
 	@ApiOperation(value = "检查账号是否注册过")
 	@Anonymous
@@ -157,26 +123,14 @@ public class UserInfoController {
 	}
 
 
-
 	/**
-	 * 登录接口
+	 * 钱包签名登录接口。
 	 *
-	 * @param address
-	 * @return
-	 */
-	@ApiOperation(value = "登录")
-	@GetMapping(value = "/getToken")
-	@Anonymous
-	public ResultPista<LoginAppUser> getToken(String address) {
-		return bizUserService.getToken(address);
-	}
-
-
-	/**
-	 * 登录接口
+	 * <p>如果钱包地址已存在，仅校验签名并签发 Token；如果钱包地址不存在，则要求邀请码有效，
+	 * 并在同一事务内创建用户、初始化钱包、写入邀请关系闭包表后再签发 Token。</p>
 	 *
-	 * @param loginVo
-	 * @return
+	 * @param loginVo 钱包地址、签名随机数、签名和首次登录邀请码
+	 * @return App 登录用户和 Token 信息
 	 */
 	@ApiOperation(value = "登录")
 	@PostMapping(value = "/login")
@@ -184,47 +138,6 @@ public class UserInfoController {
 		loginVo.setAddress(loginVo.getAddress().toLowerCase());
 		return bizUserService.login(loginVo);
 	}
-
-//	/**
-//	 * 登录接口
-//	 *
-//	 * @return
-//	 */
-//	@ApiOperation(value = "登录")
-//	@Anonymous
-//	@PostMapping(value = "/batchRegister")
-//	@Transactional(rollbackFor = Exception.class)
-//	public ResultPista batchRegister() {
-//		List<BatchUserBo> batchUserList = userInfoService.getBatchUser();
-//		for (BatchUserBo batchUserBo : batchUserList) {
-//			log.info("开始注册用户:{}", batchUserBo.getWalletAddress());
-//			bizUserService.login(batchUserBo);
-//		}
-//		return ResultPista.success();
-//	}
-
-
-//	/**
-//	 * 查询全网节点信息
-//	 *
-//	 * @return
-//	 */
-//	@ApiOperation(value = "查询全网节点信息")
-//	@GetMapping(value = "/getTotalNode")
-//	public ResultPista<Integer> getTotalNode() {
-//		List<IdoOrder> idoOrderList = idoOrderService.lambdaQuery()
-//			.eq(IdoOrder::getBizStatus, 2)
-//			.select(IdoOrder::getShares)
-//			.list();
-//		Integer totalNode = 0;
-//		if(CollectionUtil.isNotEmpty(idoOrderList)){
-//			for (IdoOrder idoOrder : idoOrderList) {
-//				totalNode =totalNode + idoOrder.getShares();
-//			}
-//		}
-//		return ResultPista.data(totalNode);
-//	}
-
 
 	/**
 	 * 查询用户详情
@@ -264,7 +177,6 @@ public class UserInfoController {
 		return ResultPista.data(bizUserService.listSubMembers(pageIndex, pageSize,gameLevel));
 	}
 
-
 	/**
 	 * 我的团队数据
 	 *
@@ -288,91 +200,6 @@ public class UserInfoController {
 	public ResultPista<CurrentStakeHostingStaticRateDto> currentStakeHostingStaticRate() {
 		return ResultPista.data(bizUserService.currentStakeHostingStaticRate(SecurityUtils.getLoginAppUser().getUserId()));
 	}
-
-	/**
-	 * 我的团队用户信息
-	 * @return
-	 */
-//	@ApiOperation(value = "我的团队用户信息")
-//	@GetMapping("/listMyDirectMembers")
-//	public ResultPista<List<MyDirectMemberDto>> listMyDirectMembers() {
-//		return ResultPista.data(bizUserService.listMyDirectMembers());
-//	}
-
-
-
-
-
-
-//	/**
-//	 * 我的团队数据 总成员、直推人数、团队销毁usdt、等级
-//	 * @param lastId lastId
-//	 * @param distance 层级
-//	 * @param level 等级
-//	 * @return
-//	 */
-//	@ApiOperation(value = "我的团队数据")
-//	@GetMapping("/teamMembers")
-//	public ResultPista<MyTeamMemberPageDto> listMyTeamMembers(Long lastId,Integer distance,Integer level) {
-//		return ResultPista.data(bizUserService.listMyTeamMembers(lastId,distance,level));
-//	}
-//
-
-
-
-//	/**
-//	 * 我的团队页面
-//	 *
-//	 * @return
-//	 */
-//	@ApiOperation(value = "我的团队页面")
-//	@GetMapping(value = "/getTeamInfo")
-//	public ResultPista<List<TeamOverviewDto>> getMyTeamOverview() {
-//		return ResultPista.data(bizUserService.getMyTeamOverview(SecurityUtils.getLoginAppUser().getUserId()));
-//	}
-
-//	/**
-//	 * 查询用户收益信息
-//	 *
-//	 * @return
-//	 */
-//	@ApiOperation(value = "查询用户收益信息")
-//	@GetMapping(value = "/getIncomeSummary")
-//	public ResultPista<UserIncomeSummaryVo> getIncomeSummary() {
-//		return ResultPista.data(bizUserService.getIncomeSummary(SecurityUtils.getLoginAppUser().getUserId()));
-//	}
-
-
-
-
-
-
-
-//	/**
-//	 * 修改用户基础信息
-//	 * @param req
-//	 * @return
-//	 */
-//	@ApiOperation(value = "修改用户基础信息")
-//	@PostMapping(value = "/updateBaseInfo")
-//	public ResultPista updateBaseInfo(@Valid @RequestBody UserBaseInfoVo req) {
-//		bizUserService.updateBaseInfo(req);
-//		return ResultPista.success();
-//	}
-
-
-	//	/**
-//	 * 查询用户业绩信息
-//	 *
-//	 * @return
-//	 */
-//	@ApiOperation(value = "查询用户业绩信息")
-//	@GetMapping(value = "/getTeamView")
-//	public ResultPista<TeamViewBO> getTeamView() {
-//		TeamViewBO result = bizUserService.getTeamView(SecurityUtils.getLoginAppUser().getUserId());
-//		return ResultPista.data(result);
-//	}
-
 
 }
 

@@ -8,6 +8,7 @@ import com.xms.app.entity.dto.StakeHostingPackageDto;
 import com.xms.app.entity.resp.CreateStakeHostingOrderResp;
 import com.xms.app.entity.vo.CreateStakeHostingOrderVo;
 import com.xms.app.entity.vo.PledgeStakeHostingAfiVo;
+import com.xms.app.entity.vo.StopStakeHostingOrderVo;
 import com.xms.common.core.domain.api.ResultPista;
 
 import java.util.List;
@@ -26,7 +27,13 @@ public interface BizStakeHostingService {
 	List<StakeHostingPackageDto> packageList();
 
 	/**
-	 * 创建托管订单
+	 * 创建用户侧托管待支付订单。
+	 *
+	 * <p>该方法只创建待链上支付的托管订单，不扣减站内钱包余额；支付成功由外部回调推进订单生效。</p>
+	 *
+	 * @param req 创建托管订单请求，金额单位为 USDT，包含钱包签名随机数
+	 * @param userId 当前登录用户ID
+	 * @return 待支付订单号和订单快照金额
 	 */
 	ResultPista<CreateStakeHostingOrderResp> createOrder(CreateStakeHostingOrderVo req, Long userId);
 
@@ -38,6 +45,16 @@ public interface BizStakeHostingService {
 	 * @return 当前登录用户托管订单展示列表
 	 */
 	List<StakeHostingOrderDto> orderList(Long lastId, Integer status);
+
+	/**
+	 * 停止当前用户的1天自动复投托管订单。
+	 *
+	 * <p>该入口只做App层结算时间窗口校验和当前用户透传，实际退本、回退业绩和等级重算由DAO订单服务在事务内完成。</p>
+	 *
+	 * @param req 停止托管请求，包含订单ID
+	 * @return success表示停止成功
+	 */
+	ResultPista<String> stop(StopStakeHostingOrderVo req);
 
 	/**
 	 * 查询可提交 AFI 质押加速的托管订单列表。
@@ -63,12 +80,22 @@ public interface BizStakeHostingService {
 	StakeHostingOrderDto orderDetail(Long id);
 
 	/**
-	 * 提交AFI质押加速
+	 * 提交 AFI 质押加速。
+	 *
+	 * <p>按当前登录用户、托管订单和加速配置创建 AFI 质押记录，具体资产处理由 DAO 质押服务完成。</p>
+	 *
+	 * @param req AFI 质押加速请求，包含托管订单ID、配置ID和钱包签名信息
+	 * @return AFI 质押加速记录展示对象
 	 */
 	ResultPista<StakeHostingAfiPledgeDto> pledgeAfi(PledgeStakeHostingAfiVo req);
 
 	/**
-	 * 托管订单链上支付回调
+	 * 托管订单链上支付回调。
+	 *
+	 * <p>验签通过后按订单号、交易 hash 和实付 USDT 金额确认支付，订单幂等和状态推进由 DAO 订单服务保证。</p>
+	 *
+	 * @param req 外部支付回调参数，包含订单号、链上 hash、实付金额和签名
+	 * @return success 表示回调处理完成或幂等成功
 	 */
 	ResultPista<String> orderCallback(StakeOrderBo req);
 }

@@ -57,6 +57,17 @@ public interface IStakeHostingOrderService extends XmsDataService<StakeHostingOr
 	int createAdminGrantOrder(StakeHostingOrder req);
 
 	/**
+	 * 停止用户购买的1天自动复投托管订单。
+	 *
+	 * <p>停止成功后退还USDT本金、订单退出产出中、回退托管业绩，并触发等级重算消息。</p>
+	 *
+	 * @param userId 当前登录用户ID
+	 * @param orderId 托管订单ID
+	 * @return 1表示停止成功
+	 */
+	int stopUserOneDayAutoReinvestOrder(Long userId, Long orderId);
+
+	/**
 	 * 扣减托管业绩，订单完成时调用
 	 *
 	 * @param userId 用户ID

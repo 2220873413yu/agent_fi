@@ -35,6 +35,14 @@ export function updateNodePackageOrder(data) {
   })
 }
 
+// 取消节点订单
+export function cancelNodePackageOrder(id) {
+  return request({
+    url: '/xms/nodePackageOrder/cancel/' + id,
+    method: 'put'
+  })
+}
+
 // 删除节点购买记录
 export function delNodePackageOrder(id) {
   return request({

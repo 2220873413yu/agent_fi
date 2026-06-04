@@ -250,11 +250,15 @@ public class BizUserServiceImpl implements BizUserService {
 	}
 
 	/**
-	 * 验证钱包签名
+	 * 校验钱包签名是否匹配本次登录随机数。
 	 *
-	 * @param randomNum
-	 * @param signature
-	 * @param address
+	 * <p>Redis 中的随机数由 {@link #getMessage(String)} 生成，key 使用钱包地址小写值和随机数拼接。
+	 * Windows 开发环境会跳过验签，非 Windows 环境校验通过后删除随机数，防止同一签名重复使用。</p>
+	 *
+	 * @param randomNum 前端请求登录时提交的随机数
+	 * @param signature 钱包对随机数的签名
+	 * @param address 钱包地址
+	 * @param xmsRedis Redis 访问组件，用于校验和删除随机数
 	 */
 	public static void checkWallet(String randomNum, String signature, String address, XmsRedis xmsRedis) {
 		address = address.toLowerCase();
@@ -272,80 +276,6 @@ public class BizUserServiceImpl implements BizUserService {
 			throw new ServiceException(ResponseCode.SIGN_VALIDATE_ERROR);
 		}
 		xmsRedis.del(ConstantStatic.USER_RANDOM + address + randomNum);
-	}
-
-	@Override
-	public List<UserMoneyLog> powerDataList(Long lastId) {
-		List<UserMoneyLog> userMoneyLogList = userMoneyLogService.lambdaQuery()
-			.eq(UserMoneyLog::getUserId, SecurityUtils.getLoginAppUser().getUserId())
-			.eq(UserMoneyLog::getCoinType, 2)
-			.in(UserMoneyLog::getSourceType, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-			.lt(Func.isNotEmpty(lastId), UserMoneyLog::getId, lastId)
-			.orderByDesc(UserMoneyLog::getId)
-			.last(SysConstant.PAGE_LIMIT)
-			.list();
-		return userMoneyLogList;
-	}
-
-	@Override
-	public ComputingPowerBo computingPowerData() {
-		ComputingPowerBo result = new ComputingPowerBo();
-		Long userId = SecurityUtils.getLoginAppUser().getUserId();
-		UserInfo userInfo = userInfoServiceImpl.lambdaQuery()
-			.eq(UserInfo::getUserId, userId)
-			.one();
-
-		result.setGlobalTotalPower(BigDecimal.ZERO);
-		result.setTodayReward(userMoneyService.getTodayReward(userId));
-		result.setTotalReward(userMoneyService.getTotalReward(userId));
-		return result;
-	}
-
-	@Override
-	public TeamViewBO getTeamView(Long userId) {
-		UserInfo userInfo = userInfoServiceImpl.lambdaQuery()
-			.eq(UserInfo::getUserId, userId)
-			.one();
-		TeamViewBO teamViewBO = new TeamViewBO();
-		//直推业绩
-
-		teamViewBO.setSubPerformance(userInfo.getSubPerformance());
-		//小区业绩
-		teamViewBO.setCommunityPerformance(userInfo.getCommunityPerformance());
-		//团队业绩
-		teamViewBO.setUmbrellaPerformance(userInfo.getUmbrellaPerformance());
-		//邀请人数
-		userInfo.getUmbrellaNum();
-		teamViewBO.setUmbrellaNum(userInfo.getUmbrellaNum());
-		teamViewBO.setSubNum(userInfo.getSubNum());
-		//直推奖励
-		teamViewBO.setSubReward(userMoneyService.querySubReward(userId));
-		teamViewBO.setIndirectReward(userMoneyService.queryIndirectReward(userId));
-		//间推奖励
-		return teamViewBO;
-	}
-
-	/**
-	 * 绑定邀请人
-	 * @param req 邀请信息
-	 * @return
-	 */
-	@Override
-	@RedisLock(value = RedisConstant.LockConstant.USER_LOGIN, param = "#req.userId")
-	@Transactional(rollbackFor = Exception.class)
-	public ResultPista bindInviteUser(BindInviteUserReq req) {
-		return ResultPista.success();
-	}
-
-	@Override
-	public ResultPista<LoginAppUser> getToken(String address) {
-		UserInfo userInfo = userInfoServiceImpl.lambdaQuery()
-			.eq(UserInfo::getAccount, address)
-			.one();
-		if(userInfo ==null){
-			throw new ServiceException("用户不存在");
-		}
-		return getLoginAppUserResult(userInfo, appTokenService, Constants.TOKEN_APP_PREFIX);
 	}
 
 	/**
@@ -411,156 +341,6 @@ public class BizUserServiceImpl implements BizUserService {
 	}
 
 
-	/**
-	 * 我的团队数据
-	 * @return
-	 */
-	@Override
-	public List<MyDirectMemberDto> listMyDirectMembers() {
-//		Long userId = SecurityUtils.getLoginAppUser().getUserId();
-//		List<UserInfo> childUsers = userInfoMapper.getTeamMembersLimited(userId,null);
-//		if (CollectionUtil.isEmpty(childUsers)) {
-//			return Collections.emptyList();
-//		}
-//		return childUsers.stream().map(childInfo -> {
-//			MyDirectMemberDto entity = new MyDirectMemberDto();
-//			//用户id
-//			entity.setUserId(childInfo.getUserId());
-//			//直推人数
-//			entity.setSubNum(childInfo.getSubNum());
-//			//团队人数
-//			entity.setUmbrellaNum(childInfo.getUmbrellaNum());
-//			//团队有效人数
-//			entity.setValidUmbrellaNum(childInfo.getValidUmbrellaNum());
-//			//个人节点
-//			entity.setPerformance(childInfo.getPerformance());
-//			//团队节点
-//			entity.setUmbrellaPerformance(childInfo.getUmbrellaPerformance());
-//			entity.setAccount(childInfo.getAccount());
-//			entity.setGameLevel(childInfo.getGameLevel());
-//			entity.setCreateTime(childInfo.getCreateTime());
-//			return entity;
-//		}).collect(Collectors.toList());
-		return null;
-	}
-
-	/**
-	 * 我的团队数据 总成员、直推人数、团队销毁usdt、等级
-	 * @param lastId lastId
-	 * @param distance 层级
-	 * @param level level
-	 * @return
-	 */
-	@Override
-	public MyTeamMemberPageDto listMyTeamMembers(Long lastId, Integer distance,Integer level) {
-		Long userId = SecurityUtils.getLoginAppUser().getUserId();
-		List<Long> levelUserIds = null;
-		if (level != null) {
-			levelUserIds = userInfoServiceImpl.lambdaQuery()
-				.eq(UserInfo::getGameLevel, level)
-				.select(UserInfo::getUserId)
-				.list().stream()
-				.map(UserInfo::getUserId)
-				.filter(Objects::nonNull)
-				.collect(Collectors.toList());
-			if (CollectionUtil.isEmpty(levelUserIds)) {
-				MyTeamMemberPageDto empty = new MyTeamMemberPageDto();
-				empty.setTotal(0L);
-				empty.setRecords(Collections.emptyList());
-				return empty;
-			}
-		}
-
-		LambdaQueryWrapper<UserRelation> countWrapper = new LambdaQueryWrapper<>();
-		countWrapper.eq(UserRelation::getParUserId, userId)
-			.eq(UserRelation::getActiveFlag, 1)
-			.gt(UserRelation::getDistance, 0);
-		if (distance != null) {
-			countWrapper.eq(UserRelation::getDistance, distance);
-		}
-		if (levelUserIds != null) {
-			countWrapper.in(UserRelation::getPosUserId, levelUserIds);
-		}
-		long total = userRelationService.count(countWrapper);
-
-		LambdaQueryWrapper<UserRelation> pageWrapper = new LambdaQueryWrapper<>();
-		pageWrapper.eq(UserRelation::getParUserId, userId)
-			.eq(UserRelation::getActiveFlag, 1)
-			.gt(UserRelation::getDistance, 0);
-		if (distance != null) {
-			pageWrapper.eq(UserRelation::getDistance, distance);
-		} else {
-			pageWrapper.orderByAsc(UserRelation::getDistance);
-		}
-		if (levelUserIds != null) {
-			pageWrapper.in(UserRelation::getPosUserId, levelUserIds);
-		}
-		if (lastId != null) {
-			UserRelation lastRelation = userRelationService.lambdaQuery()
-				.eq(UserRelation::getParUserId, userId)
-				.eq(UserRelation::getPosUserId, lastId)
-				.eq(UserRelation::getActiveFlag, 1)
-				.select(UserRelation::getId)
-				.orderByDesc(UserRelation::getId)
-				.last("limit 1")
-				.one();
-			if (lastRelation != null) {
-				pageWrapper.lt(UserRelation::getId, lastRelation.getId());
-			}
-		}
-		pageWrapper.orderByDesc(UserRelation::getId).last(SysConstant.PAGE_LIMIT);
-
-		List<UserRelation> relationList = userRelationService.list(pageWrapper);
-		if (CollectionUtil.isEmpty(relationList)) {
-			MyTeamMemberPageDto empty = new MyTeamMemberPageDto();
-			empty.setTotal(total);
-			empty.setRecords(Collections.emptyList());
-			return empty;
-		}
-
-		List<Long> childUserIds = relationList.stream()
-			.map(UserRelation::getPosUserId)
-			.filter(Objects::nonNull)
-			.distinct()
-			.collect(Collectors.toList());
-		if (CollectionUtil.isEmpty(childUserIds)) {
-			MyTeamMemberPageDto empty = new MyTeamMemberPageDto();
-			empty.setTotal(total);
-			empty.setRecords(Collections.emptyList());
-			return empty;
-		}
-
-		LambdaQueryChainWrapper<UserInfo> childQuery = userInfoServiceImpl.lambdaQuery()
-			.in(UserInfo::getUserId, childUserIds)
-			.select(UserInfo::getUserId, UserInfo::getAccount, UserInfo::getGameLevel,
-				UserInfo::getUmbrellaPerformance,UserInfo::getCreateTime);
-		if (level != null) {
-			childQuery.eq(UserInfo::getGameLevel, level);
-		}
-		List<UserInfo> childUsers = childQuery.list();
-		Map<Long, UserInfo> childUserMap = childUsers.stream()
-			.collect(Collectors.toMap(UserInfo::getUserId, Function.identity(), (a, b) -> a));
-
-		List<MyTeamMemberDto> result = new ArrayList<>(relationList.size());
-		for (UserRelation relation : relationList) {
-			UserInfo child = childUserMap.get(relation.getPosUserId());
-			if (child == null) {
-				continue;
-			}
-			MyTeamMemberDto dto = new MyTeamMemberDto();
-			dto.setUserId(child.getUserId());
-			dto.setAccount(child.getAccount());
-			dto.setGameLevel(child.getGameLevel());
-			dto.setUmbrellaPerformance(child.getUmbrellaPerformance());
-			dto.setCreateTime(child.getCreateTime());
-			dto.setDistance(relation.getDistance());
-			result.add(dto);
-		}
-		MyTeamMemberPageDto dto = new MyTeamMemberPageDto();
-		dto.setTotal(total);
-		dto.setRecords(result);
-		return dto;
-	}
 
 	/**
 	 * 我的团队数据
@@ -898,14 +678,23 @@ public class BizUserServiceImpl implements BizUserService {
 			.multiply(new BigDecimal("100"));
 	}
 
+	/**
+	 * 钱包签名登录，首次登录时自动完成邀请注册。
+	 *
+	 * <p>该方法是当前 App 注册和登录合并后的主入口：先校验钱包签名；已注册用户直接检查状态并签发 Token；
+	 * 未注册用户必须携带有效邀请码，并在同一事务中创建用户、初始化托管奖励汇总、初始化钱包、写入邀请闭包关系。</p>
+	 *
+	 * @param loginVo 钱包地址、签名随机数、签名和首次登录邀请码
+	 * @return App 登录用户和 Token 信息
+	 */
 	@Override
 	@RedisLock(value = RedisConstant.LockConstant.USER_LOGIN, param = "#loginVo.address")
 	@Transactional(rollbackFor = Exception.class)
 	public ResultPista<LoginAppUser> login(LoginVo loginVo) {
-		//验签，随机数
+		// 校验钱包签名和随机数，避免非本人钱包直接注册或登录。
 		checkWallet(loginVo.getRandomNum(), loginVo.getSignature(), loginVo.getAddress(), xmsRedis);
 		UserInfo userInfo;
-		//根据注册钱包地址查询
+		// 按钱包地址查询用户；不存在时进入首次登录注册流程。
 		userInfo = userInfoServiceImpl.lambdaQuery().eq(UserInfo::getAccount, loginVo.getAddress()).one();
 		if (userInfo == null) {
 			UserInfo inviteUser;
@@ -917,17 +706,17 @@ public class BizUserServiceImpl implements BizUserService {
 			if (inviteUser == null) {
 				throw new ServiceException(ResponseCode.CODE_1010);
 			}
-			//查询上级团队用户
+			// 查询邀请人的闭包上级，后续用于构造新用户的全部祖先关系。
 			List<UserRelation> urList = userRelationService.getParentList(inviteUser.getUserId());
 			List<Long> parentUserIds = urList.stream().map(UserRelation::getParUserId).collect(Collectors.toList());
-			//父级链
+			// parentChain 是冗余的祖先链字符串，便于部分业务快速读取所有上级用户ID。
 			String parentChain;
 			if (StringUtils.isBlank(inviteUser.getParentChain())) {
 				parentChain = String.valueOf(inviteUser.getUserId());
 			} else {
 				parentChain = inviteUser.getParentChain() + "," + inviteUser.getUserId();
 			}
-			//新增用户
+			// 创建用户基础信息，注册时默认无有效托管订单、无等级、提现开关开启。
 			userInfo = UserInfo.builder()
 				//账号
 				.account(loginVo.getAddress())
@@ -955,9 +744,10 @@ public class BizUserServiceImpl implements BizUserService {
 				TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
 				throw new ServiceException(ResponseCode.CODE_1002);
 			}
+			//初始化用户托管奖励累计汇总
 			initStakeHostingRewardSummary(userInfo.getUserId());
 
-			//更新上级直推人数
+			// 更新邀请人的直推人数，以及所有祖先的团队人数。
 			userInfoServiceImpl.lambdaUpdate().setSql(" sub_num = sub_num + 1 ")
 				.eq(UserInfo::getUserId, inviteUser.getUserId()).update();
 			if (parentUserIds.size() > 0) {
@@ -965,11 +755,11 @@ public class BizUserServiceImpl implements BizUserService {
 				userInfoServiceImpl.lambdaUpdate().setSql(" umbrella_num = umbrella_num + 1")
 					.in(UserInfo::getUserId, parentUserIds).update();
 			}
-			//创建新系统钱包
+			// 新用户钱包主键与用户ID保持一致，后续钱包余额增减依赖该记录存在。
 			UserMoney userMoney = UserMoney.builder().id(userInfo.getUserId()).build();
 			userMoneyService.save(userMoney);
 
-			//新增关系表
+			// 写入闭包关系表：distance=0 表示自己，distance>0 表示对应层级的祖先。
 			List<UserRelation> dataList = Lists.newArrayList();
 			UserRelation ur = UserRelation.builder().parUserId(userInfo.getUserId())
 				.posUserId(userInfo.getUserId()).distance(0).build();
@@ -984,7 +774,7 @@ public class BizUserServiceImpl implements BizUserService {
 				dataList.add(urPar);
 			}
 
-			// 批量插入
+			// 批量插入整条祖先链，失败时回滚用户、钱包和人数统计。
 			boolean b = userRelationService.saveBatch(dataList);
 			if (!b) {
 				TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
@@ -997,111 +787,13 @@ public class BizUserServiceImpl implements BizUserService {
 			}
 		}
 
-		//记录用户登录IP地址
+		// 记录用户最近登录IP并签发 App Token。
 		recordUserLoginIp(userInfo);
-		//删除随机数验证
+		// 兼容 Windows 开发环境跳过验签的场景，登录完成后再尝试清理随机数。
 		xmsRedis.del(ConstantStatic.USER_RANDOM + loginVo.getAddress());
 		return getLoginAppUserResult(userInfo, appTokenService, Constants.TOKEN_APP_PREFIX);
 	}
 
-	@Override
-	public ResultPista<LoginAppUser> login(BatchUserBo req) {
-
-		UserInfo userInfo;
-		//根据注册钱包地址查询
-		userInfo = userInfoServiceImpl.lambdaQuery().eq(UserInfo::getAccount, req.getWalletAddress()).one();
-		if (userInfo == null) {
-			UserInfo inviteUser;
-			if (StringUtils.isBlank(req.getParentWalletAddress())) {
-				throw new ServiceException("邀请用户不存在");
-			} else {
-				inviteUser = userInfoServiceImpl.lambdaQuery().eq(UserInfo::getAccount, req.getParentWalletAddress()).one();
-			}
-			if (inviteUser == null) {
-				throw new ServiceException("邀请用户不存在"+req);
-			}
-			//查询上级团队用户
-			List<UserRelation> urList = userRelationService.getParentList(inviteUser.getUserId());
-			List<Long> parentUserIds = urList.stream().map(UserRelation::getParUserId).collect(Collectors.toList());
-			//父级链
-			String parentChain;
-			if (StringUtils.isBlank(inviteUser.getParentChain())) {
-				parentChain = String.valueOf(inviteUser.getUserId());
-			} else {
-				parentChain = inviteUser.getParentChain() + "," + inviteUser.getUserId();
-			}
-			//新增用户
-			userInfo = UserInfo.builder()
-				//账号
-				.account(req.getWalletAddress())
-				//用户编码
-				.userCode(RandomUtil.randomNumbers(10))
-				.gameLevel(SysConstant.ZERO)
-				//保底等级
-				.minGameLevel(SysConstant.ZERO)
-				//用户名密码 存的是md5然后盐加密之后的密码
-				.inviteUserId(inviteUser.getUserId())
-				.inviteUserCode(inviteUser.getUserCode())
-				.isValid(SysConstant.ZERO)
-				.subNum(SysConstant.ZERO)
-				.validSubNum(SysConstant.ZERO)
-				.umbrellaNum(SysConstant.ZERO)
-				.validUmbrellaNum(SysConstant.ZERO)
-				.performance(BigDecimal.ZERO)
-				.umbrellaPerformance(BigDecimal.ZERO)
-				.parentChain(parentChain)
-				.withdrawalOpenOrClose(SysConstant.TWO)
-				.status(SysConstant.ONE)
-				.build();
-			boolean res = userInfoServiceImpl.save(userInfo);
-			if (!res) {
-				TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-				throw new ServiceException(ResponseCode.CODE_1002);
-			}
-			initStakeHostingRewardSummary(userInfo.getUserId());
-
-			//更新上级直推人数
-			userInfoServiceImpl.lambdaUpdate().setSql(" sub_num = sub_num + 1 ")
-				.eq(UserInfo::getUserId, inviteUser.getUserId()).update();
-			if (parentUserIds.size() > 0) {
-				//更新上级团队人数
-				userInfoServiceImpl.lambdaUpdate().setSql(" umbrella_num = umbrella_num + 1")
-					.in(UserInfo::getUserId, parentUserIds).update();
-			}
-			//创建新系统钱包
-			UserMoney userMoney = UserMoney.builder().id(userInfo.getUserId()).build();
-			userMoneyService.save(userMoney);
-
-			//新增关系表
-			List<UserRelation> dataList = Lists.newArrayList();
-			UserRelation ur = UserRelation.builder().parUserId(userInfo.getUserId())
-				.posUserId(userInfo.getUserId()).distance(0).build();
-			dataList.add(ur);//新增自己
-			for (UserRelation temp : urList) {
-				//限制最多200层
-				if (temp.getDistance() + 1 > 200) {
-					throw new ServiceException(ResponseCode.CODE_1064);
-				}
-				UserRelation urPar = UserRelation.builder().parUserId(temp.getParUserId())
-					.posUserId(userInfo.getUserId()).distance(temp.getDistance() + 1).build();
-				dataList.add(urPar);
-			}
-
-			// 批量插入
-			boolean b = userRelationService.saveBatch(dataList);
-			if (!b) {
-				TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-				throw new ServiceException(ResponseCode.CODE_1003);
-			}
-
-		} else {
-			if (!userInfo.getStatus().equals(SysConstant.ONE)) {
-				throw new ServiceException(ResponseCode.CODE_401);
-			}
-		}
-
-		return ResultPista.success();
-	}
 
 	/**
 	 * 记录用户登录IP地址
@@ -1139,6 +831,14 @@ public class BizUserServiceImpl implements BizUserService {
 		}
 	}
 
+	/**
+	 * 生成钱包签名登录用的随机数并写入 Redis。
+	 *
+	 * <p>Redis key 由钱包地址和随机数拼接，过期时间为 5 分钟；登录验签时必须提交同一个随机数。</p>
+	 *
+	 * @param address 钱包地址，调用方应传入小写地址
+	 * @return 随机数
+	 */
 	@Override
 	public String getMessage(String address) {
 		String radom = IdUtil.randomUUID();
@@ -1186,39 +886,6 @@ public class BizUserServiceImpl implements BizUserService {
 		verifyCode(req.getEmail(), req.getCode(), SysConstant.ONE, req.getUuid(), xmsRedis, sysParaServiceImpl);
 		//注册
 		return ResultPista.data(SpringUtils.getBean(BizUserServiceImpl.class).realRegister(req,inviteUserInfo));
-	}
-
-	@Override
-	public void bindEmail(BindEmailVo req) {
-	/*	//校验邮箱格式是否正确
-		if (!Validator.isEmail(req.getEmail())) {
-			throw new ServiceException(ResponseCode.CODE_1215);
-		}
-
-		long count = userInfoServiceImpl.lambdaQuery()
-			.eq(UserInfo::getEmail, req.getEmail())
-			.count();
-		if(count>0){
-			throw new ServiceException(ResponseCode.CODE_1214);
-		}
-
-		//校验验证码是否正确
-		verifyCode(req.getEmail(), req.getCode(), SysConstant.TWO, req.getUuid(), xmsRedis, sysParaServiceImpl);
-		UserInfo queryUserInfo = userInfoServiceImpl.lambdaQuery()
-			.eq(UserInfo::getUserId, SecurityUtils.getLoginAppUser().getUserId())
-			.select(UserInfo::getEmail,UserInfo::getUserId)
-			.one();
-		if(StrUtil.isNotBlank(queryUserInfo.getEmail())){
-			throw new ServiceException(ResponseCode.CODE_1216);
-		}
-		//绑定
-		boolean update = userInfoServiceImpl.lambdaUpdate()
-			.eq(UserInfo::getUserId, SecurityUtils.getLoginAppUser().getUserId())
-			.set(UserInfo::getEmail, req.getEmail())
-			.update();
-		if(!update){
-			throw new ServiceException(ResponseCode.CODE_1002);
-		}*/
 	}
 
 	/**
@@ -1350,26 +1017,6 @@ public class BizUserServiceImpl implements BizUserService {
 		return ResultPista.success();
 	}
 
-	/**
-	 * 修改用户基础信息
-	 * @param req
-	 */
-	@Override
-	public void updateBaseInfo(UserBaseInfoVo req) {
-		if(StringUtils.isNotBlank(req.getNickName()) || StringUtils.isNotBlank(req.getAvatar())){
-			userInfoServiceImpl.lambdaUpdate()
-				.eq(UserInfo::getUserId, SecurityUtils.getLoginAppUser().getUserId())
-				.set(StringUtils.isNotBlank(req.getNickName()),UserInfo::getAccount, req.getNickName())
-				.set(StringUtils.isNotBlank(req.getAvatar()),UserInfo::getAvatar, req.getAvatar())
-				.update();
-			UserInfo userInfo = userInfoServiceImpl.lambdaQuery()
-				.eq(UserInfo::getUserId, SecurityUtils.getLoginAppUser().getUserId())
-				.one();
-			//获取域名
-			userInfo.setAvatar(sysParaServiceImpl.getValue(ConstantSys.biz_image_domain)+userInfo.getAvatar());
-			registerIM(userInfo);
-		}
-	}
 
 
 

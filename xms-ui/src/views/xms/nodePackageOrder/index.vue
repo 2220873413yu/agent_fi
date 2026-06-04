@@ -130,16 +130,26 @@
     <el-table v-loading="loading" :data="nodePackageOrderList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="主键id" align="center" prop="id" v-if="false"/>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width"   width="120">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="180">
         <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            v-if="scope.row.status == 1"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['xms:nodePackageOrder:edit']"
-          >修改节点订单</el-button>
+          <div class="node-order-actions">
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-edit"
+              v-if="scope.row.status == 1"
+              @click="handleUpdate(scope.row)"
+              v-hasPermi="['xms:nodePackageOrder:edit']"
+            >修改节点订单</el-button>
+            <el-button
+              size="mini"
+              type="text"
+              v-if="scope.row.status == 1"
+              v-hasPermi="['xms:nodePackageOrder:edit']"
+              icon="el-icon-close"
+              @click="handleCancelNode(scope.row)"
+            >取消节点</el-button>
+          </div>
           <!--          <el-button
                       size="mini"
                       type="text"
@@ -271,7 +281,7 @@
 </template>
 
 <script>
-import { listNodePackageOrder, getNodePackageOrder, delNodePackageOrder, addNodePackageOrder, updateNodePackageOrder } from "@/api/xms/nodePackageOrder";
+import { listNodePackageOrder, delNodePackageOrder, addNodePackageOrder, updateNodePackageOrder, cancelNodePackageOrder } from '@/api/xms/nodePackageOrder'
 
 export default {
   name: "NodePackageOrder",
@@ -446,6 +456,16 @@ export default {
         }
       });
     },
+    /** 取消节点按钮操作 */
+    handleCancelNode(row) {
+      const orderNo = row.orderNo || row.id
+      this.$modal.confirm('是否确认取消节点订单"' + orderNo + '"？取消后将归档订单、回滚节点权益和业绩，并暂停后续AFI释放。').then(function() {
+        return cancelNodePackageOrder(row.id)
+      }).then(() => {
+        this.getList()
+        this.$modal.msgSuccess('取消成功')
+      }).catch(() => {})
+    },
     /** 提交按钮 */
     submitForm() {
       this.$refs["form"].validate(valid => {
@@ -485,3 +505,16 @@ export default {
   }
 };
 </script>
+
+<style scoped>
+.node-order-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.4;
+}
+
+.node-order-actions .el-button + .el-button {
+  margin-left: 0;
+}
+</style>

@@ -121,9 +121,9 @@ public class NodePackageReleaseOrder extends BaseEntity {
 	@ApiModelProperty(value = "最后释放日期，格式yyyyMMdd")
 	private Integer lastReleaseDay;
 
-	/** 状态：0待释放 1释放中 2释放完成 3异常。 */
+	/** 状态：0待释放 1释放中 2释放完成 3异常 4已暂停。 */
 	@Excel(name = "释放状态", sort = 19, dictType = "t_node_package_release_order_status")
-	@ApiModelProperty(value = "状态：0待释放 1释放中 2释放完成 3异常")
+	@ApiModelProperty(value = "状态：0待释放 1释放中 2释放完成 3异常 4已暂停")
 	private Integer status;
 
 	/** 初始化批次号。 */

@@ -32,13 +32,6 @@ public class DestroyCallbackBo {
     @NotBlank(message = "sign not null")
     private String sign;
 
-//	/**
-//     * 币种类型 2:afi
-//     */
-//	@ValidDiyStatus(values = {2})
-//	@NotNull(message = "coinType not null")
-//	private Integer coinType;
-
     /**
      * 充值代币数量
      */

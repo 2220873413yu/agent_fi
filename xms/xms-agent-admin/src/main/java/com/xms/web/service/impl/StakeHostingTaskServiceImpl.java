@@ -63,14 +63,20 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
+ * 托管收益定时任务服务。
  *
+ * <p>当前类承载 101 每日托管静态收益、102 周全球分红等后台定时任务。
+ * 101 会同时影响订单收益累计、团队动态奖励、钱包余额、奖励记录、结算明细和全球分红奖池，
+ * 修改时必须同步关注钱包流水、批量写入和任务幂等。</p>
  */
 @Slf4j
 @Service
 @AllArgsConstructor
 public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	/**
+	 * 缺省静态收益率乘数。
 	 *
+	 * <p>当 G7 快照存在但基础收益率为空时使用，0.005 表示 0.5%。</p>
 	 */
 	private static final BigDecimal PLACEHOLDER_STATIC_RATE = new BigDecimal("0.005");
 	private static final boolean FORCE_TEST_STATIC_RATE = Boolean.parseBoolean("true");
@@ -116,22 +122,32 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	/**
 	 * 发放托管订单每日静态收益。
 	 *
-	 * <p>任务按收益日写入 `xms_task` 做日级幂等；`last_reward_day` 只记录最近发放日期，
-	 * 不作为强制拦截条件，方便本地重复执行任务验证收益链路。</p>
+	 * <p>这是任务101的核心入口。一次执行会按当天 yyyyMMdd 作为收益日，先准备G7收益率快照，
+	 * 再逐笔计算产出中托管订单的静态收益。静态收益成功后，会继续触发上级动态奖励、批量写钱包、
+	 * 保存奖励记录和收益结算明细，最后处理到期订单的本金退还、业绩回退、AFI质押退还和全球分红奖池入账。</p>
+	 *
+	 * <p>幂等口径：理论上任务按 `xms_task(task_type=101, task_value=yyyyMMdd)` 做日级幂等；
+	 * `last_reward_day` 只记录订单最近发放日期，当前不作为强制过滤条件。注意：本地测试期间
+	 * `addDailyTask(strDate)` 被注释时，同一天重复执行会依赖人工控制，不能当成生产幂等。</p>
+	 *
+	 * <p>钱包口径：用户购买单静态/动态收益进入 `valid_num1`；后台拨付单在用户开关开启后，
+	 * 静态收益用 sourceType=47 入 `valid_num3`，动态收益用 sourceType=48 入上级 `valid_num3`。</p>
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public void distributeDailyStaticReward() {
 		String strDate = DateUtil.format(DateUtil.date(), "yyyyMMdd");
+
 		int rewardDay = Integer.parseInt(strDate);
-		// 任务日期已存在时直接跳过，避免整批静态收益重复发放。
+		// 1. 任务级幂等：同一天已有101任务记录时，整批静态收益不再重复发放。
 		Map<String, Object> task = asyncTaskServiceImpl.getTask(SysConstant.TSK_TYPE_101, strDate);
 		if (!CollectionUtil.isEmpty(task)) {
 			log.debug("Task already exists");
 			return;
 		}
 
-		// 只扫描已支付、产出中的有效托管订单；任务级幂等由 xms_task 控制。
+		// 2. 扫描本轮可产出的托管订单：必须已支付、产出中、未删除。这里没有用 last_reward_day 过滤，
+		//    是为了保留你本地重复测试101的便利；生产恢复任务标记时要重点确认幂等边界。
 		List<StakeHostingOrder> orderList = stakeHostingOrderService.lambdaQuery()
 			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
 			.eq(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_RUNNING)
@@ -139,8 +155,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			//.and(wrapper -> wrapper.ne(StakeHostingOrder::getLastRewardDay, rewardDay).or().isNull(StakeHostingOrder::getLastRewardDay))
 			.list();
 		if (CollectionUtil.isEmpty(orderList)) {
-			log.info("Business processing skipped");
-			//todo 本地注释为了方便
+			log.info("101托管静态收益跳过，当天没有可发放的产出中订单 rewardDay={}", rewardDay);
+			// 本地测试期间保留不写任务完成标记；生产环境如果要靠 xms_task 防重，需要恢复 addDailyTask。
 			//addDailyTask(strDate);
 			return;
 		}
@@ -148,28 +164,38 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.map(StakeHostingOrder::getUserId)
 			.distinct()
 			.collect(Collectors.toList());
+		// 3. 准备G7快照：只计算收益率来源，不发钱。后续 calculateStaticRate 会按
+		//    用户指定收益率 -> 纯静态规则 -> G7快照 的优先级选择基础日收益率。
 		stakeHostingDailyTeamPerformanceService.prepareDailySnapshots(rewardDay, rewardUserIds);
 		StaticRewardCalculateContext staticContext = buildStaticRewardCalculateContext(orderList, rewardDay);
 		Date now = new Date();
 		BigDecimal dailyServiceFee = BigDecimal.ZERO;
 		List<StaticRewardResult> staticRewardResults = new ArrayList<>(orderList.size());
+		// 4. 逐笔计算静态收益：distributeOne 会更新订单 todayReward、totalStaticReward、runDays、
+		//    lastRewardDay，并在非自动复投订单到期时把订单置为已完成；返回null表示订单被跳过。
 		for (StakeHostingOrder order : orderList) {
 			StaticRewardResult result = distributeOne(order, rewardDay, now, staticContext);
 			if (result == null) {
 				continue;
 			}
+			// 收集成功发放的订单结果，后续钱包入账、动态奖励、退本和奖池入账都只基于这些成功结果。
 			staticRewardResults.add(result);
+			// 每笔静态收益扣出的服务费先在内存累加，任务末尾统一进入全球分红奖池。
 			dailyServiceFee = dailyServiceFee.add(result.serviceFee);
 		}
 		if (CollectionUtil.isEmpty(staticRewardResults)) {
-			//todo 本地注释为了方便
+			// 所有订单都被开关、状态抢占或并发变化跳过时，不产生钱包、结算明细和奖池入账。
+			// 本地测试期间保留不写任务完成标记；生产环境如果要靠 xms_task 防重，需要恢复 addDailyTask。
 			//addDailyTask(strDate);
 			return;
 		}
-		// 静态收益明细先落库，再批量入账用户 USDT 钱包。
+		// 5. 先保存静态收益结算明细，记录毛收益、服务费、净收益、基础收益率、AFI加速倍率等审计字段。
 		saveStaticRewardSettlements(staticRewardResults);
+		// 6. 再批量发放静态净收益并写奖励记录：用户购买入 valid_num1，后台拨付入 valid_num3。
 		grantStaticRewards(staticRewardResults, now);
 		TeamRewardCollectContext teamRewardContext = new TeamRewardCollectContext();
+		// 7. 静态净收益大于0后触发团队动态奖励。动态奖励使用静态净收益作为基数，
+		//    直推、极差、平级只先收集到上下文，真正钱包入账在 flushTeamRewardContext。
 		for (StaticRewardResult result : staticRewardResults) {
 			if (result.shouldDistributeTeamReward()) {
 				// 用户购买单动态收益进入可用USDT；后台拨付单仅在用户开关开启后触发动态，且进入拨付收益USDT。
@@ -178,17 +204,20 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 					teamRewardContext);
 			}
 		}
+		// 8. 统一落地团队动态奖励：批量更新钱包、保存 RewardRecord、保存动态结算明细、更新普通奖励汇总。
 		flushTeamRewardContext(teamRewardContext);
-		// 非自动复投订单到期后，再统一处理退本、回退业绩、退还 AFI 质押和等级重算。
+		// 9. 处理到期完成订单：用户购买单退还USDT本金；后台拨付单标记无需退本；
+		//    同时回退托管业绩、退还AFI质押，并在事务提交后触发等级重算消息。
 		handleFinishedOrdersAfterRewards(staticRewardResults, now);
+		// 10. 每笔静态收益扣出的服务费进入每日全球分红奖池，后续由102周分红任务按权重分配。
 		stakeHostingGlobalDividendPoolService.incomeDailyServiceFee(rewardDay,
 			dailyServiceFee.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew), "task101");
-		//todo 本地注释为了方便
+		// 本地测试期间保留不写任务完成标记；生产环境如果要靠 xms_task 防重，需要恢复 addDailyTask。
 		//addDailyTask(strDate);
 	}
 
 	/**
-	 *
+	 * 写入101任务当天完成标记。
 	 */
 	private void addDailyTask(String strDate) {
 		int rows = asyncTaskServiceImpl.addTask(SysConstant.TSK_TYPE_101, strDate);
@@ -289,14 +318,13 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 测算托管订单在指定日期会使用的静态收益率。
 	 *
+	 * <p>该方法只用于后台/测试查看，不发放收益、不改订单、不写钱包。它会复用101的G7快照准备
+	 * 和收益率选择逻辑，帮助产品、测试核对某天某订单最终命中的收益率来源。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param rewardDay 收益日期，格式yyyyMMdd；为空时使用当天
+	 * @return 每笔产出中订单的静态收益率测算结果
 	 */
 	@Override
 	public List<StakeHostingStaticRateTestDto> testCalculateStaticRate(Integer rewardDay) {
@@ -305,14 +333,14 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.eq(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_RUNNING)
 			.list();
 		if (CollectionUtil.isEmpty(orderList)) {
-			log.info("Business processing log");
+			log.info("托管静态收益率测算跳过，当前没有产出中订单 rewardDay={}", statDay);
 			return new ArrayList<>();
 		}
 		List<Long> rewardUserIds = orderList.stream()
 			.map(StakeHostingOrder::getUserId)
 			.distinct()
 			.collect(Collectors.toList());
-		// Business processing note.
+		// 测算时也先准备当天G7快照，确保收益率来源与正式101发放一致。
 		stakeHostingDailyTeamPerformanceService.prepareDailySnapshots(statDay, rewardUserIds);
 		StaticRewardCalculateContext context = buildStaticRewardCalculateContext(orderList, statDay);
 		List<StakeHostingStaticRateTestDto> results = new ArrayList<>(orderList.size());
@@ -590,6 +618,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * <p>用户购买的 1 天托管订单命中自动复投规则时，只更新收益累计和最近发放日，不把订单置为完成。
 	 * 其他订单仍按套餐天数到期完成。返回 {@code null} 表示订单已被其他并发任务处理，本轮静默跳过。</p>
 	 *
+	 * <p>核心公式：
+	 * 基础毛收益 = 托管USDT金额 * 基础静态日收益率乘数；
+	 * 加速毛收益 = 基础毛收益 * AFI加速倍率；
+	 * 服务费 = 加速毛收益 * 服务费比例 / 100；
+	 * 静态净收益 = 加速毛收益 - 服务费。</p>
+	 *
 	 * @param order 待发放的产出中托管订单
 	 * @param rewardDay 收益日期，格式 yyyyMMdd
 	 * @param now 本轮任务时间
@@ -602,24 +636,33 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 				order.getId(), order.getUserId(), rewardDay);
 			return null;
 		}
-		// 读取用户指定收益率、纯静态规则或 G7 快照，计算订单当天基础静态收益率。
+		// 1. 读取订单当天基础静态收益率乘数。优先级在 calculateStaticRate 内部处理：
+		//    用户后台指定收益率 > 未推广纯静态规则 > G7快照收益率。
 		BigDecimal todayRate = calculateStaticRate(order, rewardDay, context);
+		// 2. 基础毛收益 = 托管USDT金额 * 基础静态日收益率乘数。
+		//    例：1000U * 0.005 = 5U；这里还没有扣服务费，也还没有应用AFI加速。
 		BigDecimal baseGrossReward = order.getStakeUsdtAmount().multiply(todayRate)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
-		// 已生效的 AFI 质押会放大基础静态收益；1 天套餐正常不会命中 AFI 加速。
+		// 3. 读取订单当天已生效的AFI质押加速倍率；没有质押时倍率按1处理。
 		StakeHostingAfiPledge effectiveAfiPledge = getEffectiveAfiPledge(order.getId(), context);
 		BigDecimal afiAccelerateRate = getAfiAccelerateRate(effectiveAfiPledge);
+		// 4. 加速毛收益 = 基础毛收益 * AFI加速倍率。
+		//    例：基础毛收益5U，倍率1.2，则加速毛收益为6U。
 		BigDecimal grossReward = applyAfiAccelerate(baseGrossReward, afiAccelerateRate);
+		// 5. 结算明细需要保存展示口径的百分比：基础收益率和AFI加速后的实际收益率。
 		BigDecimal baseStaticRate = rateToPercent(todayRate);
 		BigDecimal actualStaticRate = calculateActualStaticRate(todayRate, afiAccelerateRate);
-		// 静态收益先扣服务费，净收益发给用户，服务费进入每日全球分红奖池。
+		// 6. 服务费 = 加速毛收益 * 订单服务费比例 / 100。服务费不发给用户，任务末尾统一进入全球分红奖池。
 		BigDecimal serviceFeeRatio = getServiceFeeRatio(order);
 		BigDecimal serviceFee = grossReward.multiply(serviceFeeRatio)
 			.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		// 7. 静态净收益 = 加速毛收益 - 服务费。后续静态钱包入账、动态奖励基数都使用这个净收益。
 		BigDecimal reward = grossReward.subtract(serviceFee)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		// 8. runDays 表示已发放静态收益次数；本轮发放成功后加1。
 		int currentRunDays = order.getRunDays() == null ? 0 : order.getRunDays();
 		int nextRunDays = currentRunDays + 1;
+		// 9. totalStaticReward 累计的是已发静态净收益，不包含被扣出的服务费。
 		BigDecimal totalReward = nvl(order.getTotalStaticReward())
 			.add(reward)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
@@ -631,9 +674,11 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			serviceFee, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 			serviceFeeRatio, serviceFee, reward, ARRIVAL_YES, null, rewardDay, now);
 
-		// 用户购买的 1 天套餐自动复投，到期后仍保持产出中，等待后续 App 停止接口退本。
+		// 10. 1天用户购买单命中自动复投：即使 nextRunDays >= packageDays，也不改成已完成，
+		//     继续保持产出中，直到用户后续在App点击停止托管才退本金。
 		boolean autoReinvest = isUserPurchasedOneDayOrder(order);
 		boolean finished = !autoReinvest && nextRunDays >= order.getPackageDays();
+		// 11. 带状态条件更新订单，避免已被其他流程改成非产出中的订单继续写收益。
 		var updateChain = stakeHostingOrderService.lambdaUpdate()
 			.eq(StakeHostingOrder::getId, order.getId())
 			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
@@ -650,10 +695,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 				.set(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_FINISHED)
 				.set(StakeHostingOrder::getFinishTime, now);
 		}
+		// 12. 更新失败表示订单状态已变化或不再符合发放条件，本轮不写钱包、不写动态奖励、不写退本。
 		if (!updateChain.update()) {
 			log.info("托管静态收益跳过，订单当天已发放或状态已变化 orderId={}, rewardDay={}", order.getId(), rewardDay);
 			return null;
 		}
+		// 13. 返回结果对象给外层：外层会基于该对象保存静态结算明细、发钱包、发动态奖励和处理到期副作用。
 		return new StaticRewardResult(order, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 			serviceFeeRatio, serviceFee, reward, staticSettlement, finished);
 	}
@@ -843,9 +890,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 批量保存本轮静态收益结算明细。
 	 *
+	 * <p>这里只落库 `t_stake_hosting_reward_settlement`，不修改钱包。钱包发放由后续
+	 * `grantStaticRewards` 分批处理，避免结算明细和资产入账逻辑混在一起。</p>
 	 *
-	 *
+	 * @param results 本轮成功计算并更新订单的静态收益结果
 	 */
 	private void saveStaticRewardSettlements(List<StaticRewardResult> results) {
 		if (CollectionUtil.isEmpty(results)) {
@@ -941,14 +991,14 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 构建101静态收益计算上下文。
 	 *
+	 * <p>上下文会一次性预加载订单用户、当日G7快照、有效AFI质押和纯静态系统参数。
+	 * 这些数据在订单循环中反复使用，提前加载可以减少N+1查询，也保证同一轮任务使用同一批快照。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param orderList 本轮待发放托管订单
+	 * @param rewardDay 收益日，格式yyyyMMdd
+	 * @return 静态收益计算上下文
 	 */
 	private StaticRewardCalculateContext buildStaticRewardCalculateContext(List<StakeHostingOrder> orderList, int rewardDay) {
 		StaticRewardCalculateContext context = new StaticRewardCalculateContext();
@@ -964,11 +1014,11 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.distinct()
 			.collect(Collectors.toList());
 
-		// Business processing note.
+		// 1. 纯静态收益率来自系统参数，分别对应回本前和回本后的日收益率，单位是%。
 		context.pureStaticRateBeforeReturnPercent = new BigDecimal(sysParaServiceImpl.getValue(ConstantSys.PURE_STATIC_RATE_BEFORE_RETURN_PERCENT));
 		context.pureStaticRateAfterReturnPercent = new BigDecimal(sysParaServiceImpl.getValue(ConstantSys.PURE_STATIC_RATE_AFTER_RETURN_PERCENT));
 
-		// Business processing note.
+		// 2. 预加载订单用户信息，收益率优先级和后台拨付收益开关都依赖用户字段。
 		List<UserInfo> users = userInfoService.lambdaQuery()
 			.in(UserInfo::getUserId, userIds)
 			.list();
@@ -977,7 +1027,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 				.collect(Collectors.toMap(UserInfo::getUserId, Function.identity(), (a, b) -> a));
 		}
 
-		// Business processing note.
+		// 3. 预加载当天已计算完成的G7快照，用于读取订单用户当天基础静态收益率。
 		List<StakeHostingDailyTeamPerformance> snapshots = stakeHostingDailyTeamPerformanceService.lambdaQuery()
 			.in(StakeHostingDailyTeamPerformance::getUserId, userIds)
 			.eq(StakeHostingDailyTeamPerformance::getStatDay, rewardDay)
@@ -989,7 +1039,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 				.collect(Collectors.toMap(StakeHostingDailyTeamPerformance::getUserId, Function.identity(), (a, b) -> a));
 		}
 
-		// Business processing note.
+		// 4. 预加载已生效的AFI质押加速记录，静态收益毛收益会按加速倍率放大。
 		List<StakeHostingAfiPledge> pledges = stakeHostingAfiPledgeService.lambdaQuery()
 			.in(StakeHostingAfiPledge::getStakeHostingOrderId, orderIds)
 			.le(StakeHostingAfiPledge::getEffectiveDay, rewardDay)
@@ -1003,9 +1053,9 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 101静态收益计算上下文。
 	 *
-	 *
-	 *
+	 * <p>该对象只在单轮任务内使用，用Map缓存用户、快照和AFI质押，避免循环内重复查库。</p>
 	 */
 	private static class StaticRewardCalculateContext {
 		private Map<Long, UserInfo> userMap = new HashMap<>();
@@ -1016,10 +1066,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 单笔托管订单本轮静态收益计算结果。
 	 *
-	 *
-	 *
-	 *
+	 * <p>结果对象会继续用于三类后续动作：保存静态结算明细、批量钱包入账和触发团队动态收益。
+	 * finished表示本轮静态收益后订单是否已到套餐天数并被置为完成。</p>
 	 */
 	private static class StaticRewardResult {
 		private final StakeHostingOrder order;
@@ -1065,30 +1115,31 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 获取订单当天已生效的 AFI 加速质押记录。
 	 *
+	 * <p>101 任务在进入订单循环前已经按订单ID预加载有效质押记录，这里只从上下文Map读取，
+	 * 避免每笔订单单独查库。返回 null 表示该订单当天没有可用加速。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param orderId 托管订单ID
+	 * @param context 101静态收益计算上下文
+	 * @return 有效 AFI 质押记录；没有则返回 null
 	 */
 	private StakeHostingAfiPledge getEffectiveAfiPledge(Long orderId, StaticRewardCalculateContext context) {
 		if (orderId == null) {
 			return null;
 		}
-		// Business processing note.
+		// AFI质押有效性已在预加载SQL中通过 effective_day/status 过滤，这里不重复判断。
 		return context.afiPledgeMap.get(orderId);
 	}
 
 	/**
+	 * 读取 AFI 加速倍率。
 	 *
+	 * <p>accelerateRate 是倍率，不是百分比。没有有效质押或倍率小于等于0时按1倍处理，
+	 * 即不放大静态毛收益。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param pledge 已生效的 AFI 质押记录
+	 * @return 加速倍率，例如1.2表示静态毛收益放大到1.2倍
 	 */
 	private BigDecimal getAfiAccelerateRate(StakeHostingAfiPledge pledge) {
 		if (pledge == null || pledge.getAccelerateRate() == null || pledge.getAccelerateRate().compareTo(BigDecimal.ZERO) <= 0) {
@@ -1098,11 +1149,14 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 应用 AFI 加速倍率得到静态毛收益。
 	 *
+	 * <p>计算公式：基础毛收益 = 托管USDT金额 * 基础静态收益率乘数；
+	 * 加速后毛收益 = 基础毛收益 * AFI加速倍率。这里统一按项目金额精度做四舍五入。</p>
 	 *
-	 *
-	 *
-	 *
+	 * @param baseGrossReward 未加速的静态毛收益
+	 * @param afiAccelerateRate AFI加速倍率
+	 * @return 加速后的静态毛收益
 	 */
 	private BigDecimal applyAfiAccelerate(BigDecimal baseGrossReward, BigDecimal afiAccelerateRate) {
 		return baseGrossReward.multiply(afiAccelerateRate)
@@ -1183,7 +1237,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		} else {
 			finalStaticRate = snapshot.getBaseStaticRate();
 			rateSource = "g7_snapshot";
-			remark = "Business processing remark";
+			remark = "G7 snapshot rate is used";
 		}
 		return StakeHostingStaticRateTestDto.builder()
 			.orderId(order.getId())
@@ -1205,10 +1259,14 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
-	 * Reads the pure static rate percent used when no G7 snapshot exists.
+	 * 读取纯静态收益率参数。
 	 *
-	 * @param returnedPrincipal true when the stake hosting order has returned principal
-	 * @return percent value from t_sys_para, e.g. 0.5 means 0.5%
+	 * <p>没有G7快照或快照来源为未推广规则时，101 会根据订单是否已回本选择回本前/回本后纯静态参数。
+	 * 参数单位是%，例如0.5表示0.5%。</p>
+	 *
+	 * @param context 101静态收益计算上下文
+	 * @param returnedPrincipal true表示订单已回本，使用回本后收益率
+	 * @return 纯静态日收益率，单位%
 	 */
 	private BigDecimal loadPureStaticRatePercent(StaticRewardCalculateContext context, boolean returnedPrincipal) {
 		return returnedPrincipal
@@ -1217,20 +1275,23 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
-	 * Converts a percent rate to a multiplier used for reward calculation.
+	 * 将百分比收益率转换为收益计算乘数。
 	 *
-	 * @param percentRate percent value, e.g. 0.5 means 0.5%
-	 * @return multiplier value, e.g. 0.005
+	 * <p>配置和快照中的收益率单位是%，订单收益计算使用乘数，所以需要除以100。
+	 * 例如0.5%会转成0.005。</p>
+	 *
+	 * @param percentRate 百分比收益率，单位%
+	 * @return 收益计算乘数
 	 */
 	private BigDecimal percentToRate(BigDecimal percentRate) {
 		return percentRate.divide(PERCENT_DIVISOR, 8, ConstantStatic.roundingModeNew);
 	}
 
 	/**
+	 * 将收益计算乘数转换为百分比展示值。
 	 *
-	 *
-	 *
-	 *
+	 * @param rate 收益计算乘数，例如0.005
+	 * @return 百分比收益率，例如0.5000
 	 */
 	private BigDecimal rateToPercent(BigDecimal rate) {
 		return rate.multiply(PERCENT_DIVISOR)
@@ -1238,11 +1299,14 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 计算最终实际静态收益率展示值。
 	 *
+	 * <p>计算公式：实际静态收益率(%) = 基础收益率乘数 * AFI加速倍率 * 100。
+	 * 该值写入结算明细，方便后台解释“基础收益率 + AFI加速”后的真实发放比例。</p>
 	 *
-	 *
-	 *
-	 *
+	 * @param baseRate 基础收益率乘数
+	 * @param afiAccelerateRate AFI加速倍率
+	 * @return 实际静态收益率，单位%
 	 */
 	private BigDecimal calculateActualStaticRate(BigDecimal baseRate, BigDecimal afiAccelerateRate) {
 		return baseRate.multiply(afiAccelerateRate)
@@ -1251,13 +1315,13 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 获取订单服务费比例快照。
 	 *
+	 * <p>服务费比例来自下单时套餐快照，单位是%。101 会用该比例从静态毛收益中扣出服务费，
+	 * 服务费当天汇总后进入全球分红奖池。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param order 托管订单
+	 * @return 服务费比例，单位%；为空时按0处理
 	 */
 	private BigDecimal getServiceFeeRatio(StakeHostingOrder order) {
 		if (order == null || order.getServiceFeeRatio() == null) {
@@ -1267,35 +1331,41 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 基于单笔订单静态净收益触发团队动态奖励。
 	 *
+	 * <p>动态奖励分两段：先给直属上级发直推奖，再按有效上级链计算极差/平级奖。
+	 * 用户购买单动态奖励进入可用USDT；后台拨付单只有开关开启并产生静态收益后才会进入这里，
+	 * 且动态奖励进入拨付收益USDT。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param order 产生静态收益的托管订单
+	 * @param grossReward 静态毛收益
+	 * @param baseStaticRate 基础静态收益率乘数
+	 * @param afiAccelerateRate AFI加速倍率
+	 * @param actualStaticRate 实际静态收益率，单位%
+	 * @param serviceFeeRatio 服务费比例，单位%
+	 * @param serviceFee 服务费金额
+	 * @param netReward 扣服务费后的静态净收益，作为动态奖励基数
+	 * @param rewardDay 收益日，格式yyyyMMdd
+	 * @param now 本轮任务时间
+	 * @param context 团队奖励收集上下文
 	 */
 	private void distributeTeamReward(StakeHostingOrder order, BigDecimal grossReward, BigDecimal baseStaticRate,
 									  BigDecimal afiAccelerateRate, BigDecimal actualStaticRate,
 									  BigDecimal serviceFeeRatio, BigDecimal serviceFee,
 									  BigDecimal netReward, int rewardDay, Date now,
 									  TeamRewardCollectContext context) {
+		// 1. 直属上级用于直推奖；没有上级时本订单不产生动态奖励。
 		List<ParentUserTaskVo> parentUsers = getCachedParentUsers(order.getUserId(), context);
 		if (CollectionUtil.isEmpty(parentUsers)) {
-			log.info("Business processing log");
+			log.info("托管动态奖励跳过，用户无上级 userId={}, orderId={}", order.getUserId(), order.getId());
 			return;
 		}
 		distributeDirectReward(order, parentUsers.get(0), grossReward, baseStaticRate, afiAccelerateRate,
 			actualStaticRate, serviceFeeRatio, serviceFee, netReward, rewardDay, now, context);
+		// 2. 极差/平级奖只在有效上级链中计算，无有效上级时直推之后结束。
 		List<ParentUserTaskVo> rewardParentUsers = getCachedRewardParentUsers(order.getUserId(), context);
 		if (CollectionUtil.isEmpty(rewardParentUsers)) {
-			log.info("Business processing log");
+			log.info("托管极差/平级奖励跳过，用户无有效上级 userId={}, orderId={}", order.getUserId(), order.getId());
 			return;
 		}
 		distributeDiffAndSameLevelReward(order, rewardParentUsers, grossReward, baseStaticRate, afiAccelerateRate,
@@ -1303,66 +1373,68 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 计算并收集直属上级直推奖励。
 	 *
+	 * <p>直推奖励基数为订单静态净收益，比例读取系统参数。直属上级无有效托管资格时，
+	 * 当前实现直接跳过，不发放也不写未到账结算明细。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param order 产生静态收益的托管订单
+	 * @param directUser 直属上级
+	 * @param grossReward 静态毛收益
+	 * @param baseStaticRate 基础静态收益率乘数
+	 * @param afiAccelerateRate AFI加速倍率
+	 * @param actualStaticRate 实际静态收益率，单位%
+	 * @param serviceFeeRatio 服务费比例，单位%
+	 * @param serviceFee 服务费金额
+	 * @param netReward 静态净收益，作为直推奖基数
+	 * @param rewardDay 收益日，格式yyyyMMdd
+	 * @param now 本轮任务时间
+	 * @param context 团队奖励收集上下文
 	 */
 	private void distributeDirectReward(StakeHostingOrder order, ParentUserTaskVo directUser, BigDecimal grossReward,
 										BigDecimal baseStaticRate, BigDecimal afiAccelerateRate, BigDecimal actualStaticRate,
 										BigDecimal serviceFeeRatio, BigDecimal serviceFee, BigDecimal netReward,
 										int rewardDay, Date now, TeamRewardCollectContext context) {
-		// Business processing note.
+		// 1. 直推比例是系统参数，单位是%；直推金额 = 静态净收益 * 直推比例 / 100。
 		BigDecimal directRatioPercent = getCachedDirectRewardRatioPercent(context);
 		BigDecimal directReward = calculateReward(netReward, directRatioPercent);
 		if (directUser == null) {
-			// Business processing note.
-			log.info("Business processing log");
+			log.info("托管直推奖励跳过，直属上级为空 orderId={}", order.getId());
 			return;
 		}
 		Integer skipReason = getRewardSkipReason(directUser);
 		if (skipReason != null) {
-			// Business processing note.
+			// 2. 直属上级没有有效托管资格时不发放；历史未到账明细逻辑保留注释，当前不落库。
 //			collectSkippedSettlement(context, order, directUser.getUserId(), REWARD_TYPE_PLATFORM, effectiveLevel(directUser), netReward, directRatioPercent,
 //				directReward, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 //				serviceFeeRatio, serviceFee, netReward, ARRIVAL_NO, skipReason, rewardDay, now);
 			return;
 		}
-		// Business processing note.
+		// 3. 只收集钱包、奖励记录和结算明细，真正批量入账在 flushTeamRewardContext 统一执行。
 		collectTeamReward(context, order, directUser.getUserId(), REWARD_TYPE_DIRECT, effectiveLevel(directUser), netReward, directRatioPercent,
 			directReward, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 			serviceFeeRatio, serviceFee, netReward, rewardDay, now);
 	}
 
 	/**
+	 * 计算并收集有效上级链的极差奖和平级奖。
 	 *
+	 * <p>极差奖使用“覆盖比例”模型：上级等级比例大于已覆盖比例时，只发放差额比例。
+	 * F5及以上同级用户会触发平级规则：同级组内第一人先拿极差池的一半，后续同级用户
+	 * 从剩余平级池按 1/2、1/4、... 分配；低级别用户不参与分配，高级别用户会终止当前同级组。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param order 产生静态收益的托管订单
+	 * @param parentUsers 已过滤为有效托管资格的上级链
+	 * @param grossReward 静态毛收益
+	 * @param baseStaticRate 基础静态收益率乘数
+	 * @param afiAccelerateRate AFI加速倍率
+	 * @param actualStaticRate 实际静态收益率，单位%
+	 * @param serviceFeeRatio 服务费比例，单位%
+	 * @param serviceFee 服务费金额
+	 * @param netReward 静态净收益，作为极差/平级奖基数
+	 * @param rewardDay 收益日，格式yyyyMMdd
+	 * @param now 本轮任务时间
+	 * @param context 团队奖励收集上下文
 	 */
 	private void distributeDiffAndSameLevelReward(StakeHostingOrder order, List<ParentUserTaskVo> parentUsers,
 												  BigDecimal grossReward, BigDecimal baseStaticRate,
@@ -1370,10 +1442,9 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 												  BigDecimal serviceFeeRatio, BigDecimal serviceFee,
 												  BigDecimal netReward, int rewardDay, Date now,
 												  TeamRewardCollectContext context) {
-		// Business processing note.
-		// Same-level rule: later same-level users cause the first user to yield half of this diff pool.
+		// 1. 等级比例来自用户等级配置，单位是%；这里会在上下文中缓存，避免每笔订单重复查配置。
 		Map<Integer, BigDecimal> levelRatioMap = getCachedLevelRatioMap(context);
-		// Business processing note.
+		// 2. coveredRatio 表示上级链已发放到的最高覆盖比例，后续只发放更高等级的差额部分。
 		BigDecimal coveredRatio = BigDecimal.ZERO;
 		for (int i = 0; i < parentUsers.size(); i++) {
 			ParentUserTaskVo parent = parentUsers.get(i);
@@ -1382,10 +1453,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			if (levelRatio.compareTo(BigDecimal.ZERO) <= 0) {
 				continue;
 			}
-			// Business processing note.
+			// 3. 极差比例 = 当前上级等级比例 - 已覆盖比例；没有正差额则不发放。
 			BigDecimal diffRatio = levelRatio.subtract(coveredRatio);
 			if (diffRatio.compareTo(BigDecimal.ZERO) > 0) {
-				// Business processing note.
+				// 4. F5及以上需要向上收集同级组，用于后续平级奖；低等级按单人极差处理。
 				SameLevelGroup sameLevelGroup = level >= 5
 					? collectSameLevelGroupUntilHigher(parentUsers, i, level)
 					: SameLevelGroup.single(i);
@@ -1394,53 +1465,52 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 					ParentUserTaskVo diffUser = parentUsers.get(sameLevelGroup.sameIndexes.get(0));
 					List<Integer> rewardSameIndexes = sameLevelGroup.rewardSameIndexes();
 					boolean hasLaterSameLevel = CollectionUtil.isNotEmpty(rewardSameIndexes);
-					// When later same-level users exist, the first user keeps half of this diff pool and yields the other half.
+					// 5. 有后续同级时，第一位同级用户只拿极差池一半，另一半作为平级池向上分配。
 					BigDecimal firstDiffRewardAmount = hasLaterSameLevel
 						? diffRewardAmount.divide(TWO, ConstantStatic.newScale, ConstantStatic.roundingModeNew)
 						: diffRewardAmount;
-					// Business processing note.
+					// 6. 第一位同级用户的奖励仍记录为极差奖，来源订单和比例保留在结算明细中。
 					collectTeamReward(context, order, diffUser.getUserId(), REWARD_TYPE_DIFF, level, netReward, diffRatio,
 						firstDiffRewardAmount, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 						serviceFeeRatio, serviceFee, netReward, rewardDay, now);
-					// Business processing note.
+					// 7. 当前等级比例已经覆盖，后续上级只有等级比例更高时才继续拿差额。
 					coveredRatio = levelRatio;
 					if (level >= 5 && hasLaterSameLevel) {
 						BigDecimal sameLevelPool = diffRewardAmount.subtract(firstDiffRewardAmount);
-						// Business processing note.
+						// 8. 平级池只分给后续同级用户，第一位同级用户不再参与平级奖。
 						collectSameLevelReward(order, parentUsers, rewardSameIndexes,
 							level, netReward, diffRatio, sameLevelPool, grossReward, baseStaticRate,
 							afiAccelerateRate, actualStaticRate, serviceFeeRatio, serviceFee, rewardDay, now, context);
 					}
 				}
-				// Business processing note.
+				// 9. 同级组中间的低级别和同级用户已处理完，循环直接跳到下一位更高等级上级。
 				i = sameLevelGroup.nextIndex - 1;
 			}
 		}
 	}
 
 	/**
+	 * 收集后续同级用户的平级奖励。
 	 *
+	 * <p>sameIndexes 不包含第一位拿极差奖的同级用户，只包含后续同级用户。
+	 * 平级池由第一位同级用户让出的极差池一半组成，后续同级按位置递减领取。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 * @param level 鐟滅増鎸告晶鐕滅紒娑橆槺妤?
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param order 产生静态收益的托管订单
+	 * @param parentUsers 有效上级链
+	 * @param sameIndexes 后续同级用户在上级链中的下标
+	 * @param level 平级奖励对应的有效等级
+	 * @param netReward 静态净收益，作为奖励基数记录到结算明细
+	 * @param diffRatio 触发本组同级奖励的极差比例，单位%
+	 * @param sameLevelPool 平级奖励池金额
+	 * @param grossReward 静态毛收益
+	 * @param baseStaticRate 基础静态收益率乘数
+	 * @param afiAccelerateRate AFI加速倍率
+	 * @param actualStaticRate 实际静态收益率，单位%
+	 * @param serviceFeeRatio 服务费比例，单位%
+	 * @param serviceFee 服务费金额
+	 * @param rewardDay 收益日，格式yyyyMMdd
+	 * @param now 本轮任务时间
+	 * @param context 团队奖励收集上下文
 	 */
 	private void collectSameLevelReward(StakeHostingOrder order, List<ParentUserTaskVo> parentUsers,
 										List<Integer> sameIndexes, Integer level, BigDecimal netReward,
@@ -1455,7 +1525,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		for (int sameIndex = 0; sameIndex < sameIndexes.size(); sameIndex++) {
 			ParentUserTaskVo rewardUser = parentUsers.get(sameIndexes.get(sameIndex));
 			BigDecimal sameLevelReward = calculateSameLevelReward(sameLevelPool, sameIndex + 1, sameIndexes.size());
-			// Business processing note.
+			// 每位平级用户都单独写钱包增量、奖励记录和结算明细，便于追踪来源订单和分配序号。
 			collectTeamReward(context, order, rewardUser.getUserId(), REWARD_TYPE_SAME_LEVEL, level, netReward, diffRatio,
 				sameLevelReward, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 				serviceFeeRatio, serviceFee, netReward, rewardDay, now);
@@ -1463,15 +1533,15 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 从当前上级开始收集同级组，直到遇到更高等级上级。
 	 *
+	 * <p>同级组用于F5及以上平级奖。扫描过程中低等级上级会被跨过，不参与当前同级组；
+	 * 遇到更高等级上级时停止，让外层循环继续计算新的极差覆盖。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 * @param level 鐟滅増鎸告晶鐕滅紒娑橆槺妤?
-	 *
+	 * @param parentUsers 有效上级链
+	 * @param startIndex 当前触发极差的上级下标
+	 * @param level 当前极差等级
+	 * @return 同级用户下标集合，以及外层循环下一次应继续扫描的位置
 	 */
 	private SameLevelGroup collectSameLevelGroupUntilHigher(List<ParentUserTaskVo> parentUsers, int startIndex, Integer level) {
 		List<Integer> sameIndexes = new ArrayList<>();
@@ -1490,15 +1560,15 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 计算单个平级用户应领取的平级奖励金额。
 	 *
+	 * <p>公式：第n个后续同级用户领取 pool / 2^n；如果是最后一个同级用户，
+	 * 当前实现使用 pool / 2^(总人数-1)。因此多个同级用户时不是平均分，而是按位置递减。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param pool 平级奖励池金额
+	 * @param sameIndex 当前用户在后续同级用户中的序号，从1开始
+	 * @param sameCount 后续同级用户总数
+	 * @return 当前平级用户应得金额
 	 */
 	private BigDecimal calculateSameLevelReward(BigDecimal pool, int sameIndex, int sameCount) {
 		if (sameCount <= 0 || pool.compareTo(BigDecimal.ZERO) <= 0) {
@@ -1513,14 +1583,13 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 判断上级用户是否需要跳过动态奖励。
 	 *
+	 * <p>当前只校验是否具备有效托管奖励资格。返回 null 表示可发放；
+	 * 返回跳过原因时，调用方可选择写未到账明细或直接跳过。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param user 上级用户任务视图
+	 * @return 跳过原因；null表示不跳过
 	 */
 	private Integer getRewardSkipReason(ParentUserTaskVo user) {
 		if (!isValidStakeHostingRewardUser(user)) {
@@ -1530,14 +1599,13 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 获取并缓存用户完整上级链。
 	 *
+	 * <p>同一轮101任务中，一个用户可能有多笔托管订单，缓存上级链可以避免重复查询。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param userId 下级用户ID
+	 * @param context 团队奖励收集上下文
+	 * @return 上级链；无上级时返回空列表
 	 */
 	private List<ParentUserTaskVo> getCachedParentUsers(Long userId, TeamRewardCollectContext context) {
 		if (userId == null) {
@@ -1547,15 +1615,14 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 获取并缓存可参与极差/平级奖励的有效上级链。
 	 *
+	 * <p>直推奖会先看直属上级并单独判断；极差/平级奖这里只保留具备托管奖励资格的上级，
+	 * 无效上级不消耗覆盖比例。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param userId 下级用户ID
+	 * @param context 团队奖励收集上下文
+	 * @return 已过滤有效资格的上级链
 	 */
 	private List<ParentUserTaskVo> getCachedRewardParentUsers(Long userId, TeamRewardCollectContext context) {
 		if (userId == null) {
@@ -1573,27 +1640,25 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 判断上级是否具备托管动态奖励资格。
 	 *
+	 * <p>ParentUserTaskVo.isValid 由上级链查询侧按业务资格计算，101 在这里直接使用该结果。
+	 * false 表示没有有效托管资格，不发动态奖励。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param user 上级用户任务视图
+	 * @return true表示可参与托管动态奖励
 	 */
 	private boolean isValidStakeHostingRewardUser(ParentUserTaskVo user) {
 		return user != null && user.getIsValid() != null && user.getIsValid() == 1;
 	}
 
 	/**
+	 * 获取并缓存等级动态奖励比例。
 	 *
+	 * <p>等级比例本轮任务内稳定，缓存到上下文避免每笔订单重复查询等级配置。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param context 团队奖励收集上下文
+	 * @return key为有效等级，value为团队奖励比例，单位%
 	 */
 	private Map<Integer, BigDecimal> getCachedLevelRatioMap(TeamRewardCollectContext context) {
 		if (context.levelRatioMap == null) {
@@ -1603,12 +1668,11 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 从等级配置表读取团队奖励比例。
 	 *
+	 * <p>比例单位是%，例如10表示可覆盖静态净收益的10%。等级0固定为0，避免无等级用户参与极差覆盖。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
+	 * @return key为等级，value为团队奖励比例，单位%
 	 */
 	private Map<Integer, BigDecimal> getLevelRatioMap() {
 		Map<Integer, BigDecimal> levelRatioMap = new HashMap<>();
@@ -1625,13 +1689,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 获取并缓存直推奖励比例。
 	 *
+	 * <p>直推比例来自系统参数，本轮任务内复用同一份配置。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param context 团队奖励收集上下文
+	 * @return 直推奖励比例，单位%
 	 */
 	private BigDecimal getCachedDirectRewardRatioPercent(TeamRewardCollectContext context) {
 		if (context.directRewardRatioPercent == null) {
@@ -1641,11 +1704,9 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 读取直推奖励比例系统参数。
 	 *
-	 *
-	 *
-	 *
-	 *
+	 * @return 直推奖励比例，单位%
 	 */
 	private BigDecimal getDirectRewardRatioPercent() {
 		String value = sysParaServiceImpl.getValue(ConstantSys.biz_stake_hosting_direct_reward_ratio);
@@ -1655,6 +1716,16 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		return new BigDecimal(value);
 	}
 
+	/**
+	 * 按百分比计算奖励金额。
+	 *
+	 * <p>公式：奖励金额 = 基数 * 比例 / 100。基数通常是静态净收益，
+	 * 比例可能是直推比例、极差比例或平级沿用的极差比例。</p>
+	 *
+	 * @param baseAmount 奖励基数
+	 * @param ratioPercent 奖励比例，单位%
+	 * @return 按项目金额精度处理后的奖励金额
+	 */
 	private BigDecimal calculateReward(BigDecimal baseAmount, BigDecimal ratioPercent) {
 		if (baseAmount == null || ratioPercent == null || baseAmount.compareTo(BigDecimal.ZERO) <= 0 || ratioPercent.compareTo(BigDecimal.ZERO) <= 0) {
 			return BigDecimal.ZERO;
@@ -1663,42 +1734,62 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 	}
 
+	/**
+	 * 计算上级任务视图的有效等级。
+	 *
+	 * <p>动态奖励按 gameLevel、minGameLevel、adminGameLevel 三者最大值作为有效等级，
+	 * 避免某一种等级来源为空时影响奖励覆盖比例。</p>
+	 *
+	 * @param user 上级用户任务视图
+	 * @return 有效等级，空等级按0处理
+	 */
 	private Integer effectiveLevel(ParentUserTaskVo user) {
 		return Math.max(Math.max(defaultLevel(user.getGameLevel()), defaultLevel(user.getMinGameLevel())), defaultLevel(user.getAdminGameLevel()));
 	}
 
+	/**
+	 * 计算用户实体的有效等级。
+	 *
+	 * @param user 用户实体
+	 * @return 有效等级，空等级按0处理
+	 */
 	private int effectiveLevel(UserInfo user) {
 		return Math.max(Math.max(defaultLevel(user.getGameLevel()), defaultLevel(user.getMinGameLevel())), defaultLevel(user.getAdminGameLevel()));
 	}
 
+	/**
+	 * 将空等级兜底为0。
+	 *
+	 * @param level 原始等级
+	 * @return 非空等级
+	 */
 	private int defaultLevel(Integer level) {
 		return level == null ? 0 : level;
 	}
 
 	/**
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
 	 * 收集团队动态奖励的钱包增量、奖励记录和结算明细。
 	 *
 	 * <p>用户购买订单按直推/极差/平级来源类型进入 `valid_num1`；后台拨付订单触发的动态奖励统一使用
 	 * sourceType=48 进入上级用户 `valid_num3` 拨付收益USDT，并且不累计到普通动态奖励汇总表。</p>
+	 *
+	 * @param context 团队奖励收集上下文
+	 * @param order 静态收益来源订单
+	 * @param receiveUserId 动态奖励接收用户ID
+	 * @param rewardType 动态奖励类型：直推、极差或平级
+	 * @param rewardLevel 接收用户有效等级
+	 * @param rewardBase 奖励基数，通常为静态净收益
+	 * @param ratioPercent 奖励比例，单位%
+	 * @param rewardAmount 动态奖励金额
+	 * @param grossReward 静态毛收益
+	 * @param baseStaticRate 基础静态收益率乘数
+	 * @param afiAccelerateRate AFI加速倍率
+	 * @param actualStaticRate 实际静态收益率，单位%
+	 * @param serviceFeeRatio 服务费比例，单位%
+	 * @param serviceFee 服务费金额
+	 * @param netReward 静态净收益
+	 * @param rewardDay 收益日，格式yyyyMMdd
+	 * @param now 本轮任务时间
 	 */
 	private void collectTeamReward(TeamRewardCollectContext context, StakeHostingOrder order, Long receiveUserId, int rewardType, Integer rewardLevel,
 								   BigDecimal rewardBase, BigDecimal ratioPercent, BigDecimal rewardAmount,
@@ -1710,10 +1801,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			return;
 		}
 		boolean grantReward = isAdminGrantOrder(order);
+		// 1. 按订单来源和奖励类型选择钱包流水 sourceType；后台拨付动态收益必须独立为48。
 		int moneySourceType = grantReward ? ConstantType.user_money_log_source_type.type_48
 			: rewardType == REWARD_TYPE_DIRECT ? ConstantType.user_money_log_source_type.type_32
 			: rewardType == REWARD_TYPE_DIFF ? ConstantType.user_money_log_source_type.type_33
 			: ConstantType.user_money_log_source_type.type_34;
+		// 2. 奖励记录 sourceType 与钱包 sourceType 对齐，方便后台按真实收益/拨付收益拆分统计。
 		int rewardSourceType = grantReward ? ConstantType.xms_reward_record_source_type.type_48
 			: rewardType == REWARD_TYPE_DIRECT ? ConstantType.xms_reward_record_source_type.type_28
 			: rewardType == REWARD_TYPE_DIFF ? ConstantType.xms_reward_record_source_type.type_29
@@ -1757,9 +1850,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 收集未到账团队奖励结算明细。
 	 *
-	 *
-	 *
+	 * <p>该方法只写结算上下文，不发钱包。当前直推无效上级逻辑暂未调用，
+	 * 保留用于后续需要展示跳过原因时复用。</p>
 	 */
 	private void collectSkippedSettlement(TeamRewardCollectContext context, StakeHostingOrder order, Long receiveUserId,
 										  int rewardType, Integer rewardLevel, BigDecimal rewardBase,
@@ -1774,9 +1868,15 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 汇总用户购买单的极差和平级奖励统计。
 	 *
+	 * <p>后台拨付订单动态收益进入拨付收益USDT，不计入普通团队奖励汇总；
+	 * 因此调用方只在非后台拨付订单时调用本方法。</p>
 	 *
-	 *
+	 * @param context 团队奖励收集上下文
+	 * @param receiveUserId 收益接收用户ID
+	 * @param rewardType 动态奖励类型
+	 * @param rewardAmount 奖励金额
 	 */
 	private void collectTeamRewardSummary(TeamRewardCollectContext context, Long receiveUserId, int rewardType, BigDecimal rewardAmount) {
 		if (rewardType != REWARD_TYPE_DIFF && rewardType != REWARD_TYPE_SAME_LEVEL) {
@@ -1797,9 +1897,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 批量落地团队动态奖励上下文。
 	 *
+	 * <p>该方法统一 flush 钱包增量、奖励记录、结算明细和用户奖励汇总。
+	 * 任一批量钱包更新失败都会抛异常回滚101任务事务。</p>
 	 *
-	 *
+	 * @param context 团队奖励收集上下文
 	 */
 	private void flushTeamRewardContext(TeamRewardCollectContext context) {
 		if (context == null || context.isEmpty()) {
@@ -1832,12 +1935,14 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		if (CollectionUtil.isEmpty(userMoneyList)) {
 			return;
 		}
+		// 先按目标资产字段拆分，避免同一条批量SQL同时承担真实收益和拨付收益两种资产语义。
 		List<UserMoney> validNum1List = userMoneyList.stream()
 			.filter(item -> item.getValidNum1() != null && item.getValidNum1().compareTo(BigDecimal.ZERO) != 0)
 			.collect(Collectors.toList());
 		List<UserMoney> validNum3List = userMoneyList.stream()
 			.filter(item -> item.getValidNum3() != null && item.getValidNum3().compareTo(BigDecimal.ZERO) != 0)
 			.collect(Collectors.toList());
+		// valid_num1 写可用USDT，valid_num3 写拨付收益USDT，两边都带 gtId/sourceCode/sourceType/sourceId 供流水追踪。
 		batchUpdateMoneyValid1(validNum1List);
 		batchUpdateMoneyValid3(validNum3List);
 	}
@@ -1911,9 +2016,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 团队动态奖励批量收集上下文。
 	 *
-	 *
-	 *
+	 * <p>101 在订单循环中只收集钱包增量、奖励记录、结算明细和汇总增量，最后统一批量落库。
+	 * 同时缓存上级链、等级比例和直推比例，减少同一轮任务内的重复查询。</p>
 	 */
 	private static class TeamRewardCollectContext {
 		private final List<UserMoney> userMoneyList = new ArrayList<>();
@@ -1926,9 +2032,9 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		private BigDecimal directRewardRatioPercent;
 
 		/**
+		 * 判断当前上下文是否没有任何待落地数据。
 		 *
-		 *
-		 *
+		 * @return true 表示无需 flush
 		 */
 		private boolean isEmpty() {
 			return userMoneyList.isEmpty() && rewardRecordList.isEmpty() && settlementList.isEmpty() && summaryMap.isEmpty();
@@ -1936,10 +2042,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 同级奖励扫描结果。
 	 *
-	 *
-	 *
-	 *
+	 * <p>sameIndexes 保存当前同级组的有效上级下标；nextIndex 表示遇到更高等级后，
+	 * 外层极差循环下一次应该继续扫描的位置。</p>
 	 */
 	private static class SameLevelGroup {
 		private final List<Integer> sameIndexes;
@@ -1951,11 +2057,11 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		}
 
 		/**
+		 * 获取真正领取平级奖的后续同级用户下标。
 		 *
+		 * <p>同级组第一位用户已领取极差奖，不再参与平级奖。</p>
 		 *
-		 *
-		 *
-		 *
+		 * @return 后续同级用户下标集合
 		 */
 		private List<Integer> rewardSameIndexes() {
 			if (sameIndexes.size() <= 1) {
@@ -1965,10 +2071,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		}
 
 		/**
+		 * 构造无平级组的单人极差结果。
 		 *
-		 *
-		 *
-		 *
+		 * @param index 当前上级下标
+		 * @return 只包含当前用户的同级组
 		 */
 		private static SameLevelGroup single(int index) {
 			List<Integer> indexes = new ArrayList<>();
@@ -1978,29 +2084,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 立即保存一条托管收益结算明细。
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * <p>101 当前主链路大多使用批量收集保存，本方法保留给需要单条写入的补偿或调试链路。
+	 * 参数会透传到 buildSettlement，包含来源订单、接收用户、奖励类型、比例、金额和跳过原因。</p>
 	 */
 	private void saveSettlement(StakeHostingOrder order, Long receiveUserId, int rewardType, Integer rewardLevel,
 								BigDecimal rewardBase, BigDecimal ratioPercent, BigDecimal rewardAmount,
@@ -2014,11 +2101,30 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 构建托管收益结算明细对象。
 	 *
+	 * <p>结算明细是解释101收益发放的核心审计记录：静态收益写来源订单和服务费信息；
+	 * 直推、极差、平级奖励额外写接收用户、奖励等级、奖励比例、到账状态和跳过原因。</p>
 	 *
-	 *
-	 *
-	 *
+	 * @param order 静态收益来源订单
+	 * @param receiveUserId 奖励接收用户；静态服务费明细可为空
+	 * @param rewardType 奖励类型
+	 * @param rewardLevel 接收用户有效等级
+	 * @param rewardBase 奖励基数
+	 * @param ratioPercent 奖励比例，单位%
+	 * @param rewardAmount 奖励金额或服务费金额
+	 * @param grossReward 静态毛收益
+	 * @param baseStaticRate 基础静态收益率，单位%
+	 * @param afiAccelerateRate AFI加速倍率
+	 * @param actualStaticRate 实际静态收益率，单位%
+	 * @param serviceFeeRatio 服务费比例，单位%
+	 * @param serviceFee 服务费金额
+	 * @param netReward 静态净收益
+	 * @param arrivalStatus 到账状态
+	 * @param skipReason 跳过原因；正常到账时为空
+	 * @param rewardDay 收益日，格式yyyyMMdd
+	 * @param now 创建时间
+	 * @return 待保存的托管收益结算明细
 	 */
 	private StakeHostingRewardSettlement buildSettlement(StakeHostingOrder order, Long receiveUserId, int rewardType, Integer rewardLevel,
 														 BigDecimal rewardBase, BigDecimal ratioPercent, BigDecimal rewardAmount,

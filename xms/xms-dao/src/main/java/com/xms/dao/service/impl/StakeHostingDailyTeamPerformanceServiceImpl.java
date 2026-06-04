@@ -71,6 +71,14 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		return baseMapper.selectStakeHostingDailyTeamPerformanceList(performance);
 	}
 
+	/**
+	 * 记录托管订单生效当天给有效上级带来的G7团队新增业绩。
+	 *
+	 * <p>该方法通常由托管订单生效后的异步流程触发。它先用订单的
+	 * g7_new_performance_status 做幂等抢占，成功后才把订单托管USDT金额累计到买家所有有效上级的当天快照中。</p>
+	 *
+	 * @param orderId 已生效托管订单ID
+	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public void recordOrderTeamNewAmount(Long orderId) {
@@ -91,6 +99,15 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		recordParentAmount(order.getUserId(), statDay(order.getEffectiveTime()), order.getStakeUsdtAmount(), true);
 	}
 
+	/**
+	 * 记录托管订单到期后的G7团队到期业绩。
+	 *
+	 * <p>当前101静态日利率不再使用到期金额扣减，该方法仅为兼容历史字段和旧调用保留。
+	 * 方法仍使用订单 g7_expire_performance_status 做幂等抢占。</p>
+	 *
+	 * @param orderId 到期托管订单ID
+	 * @param rewardDay 到期收益日，格式yyyyMMdd
+	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	@Deprecated
@@ -109,12 +126,23 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		recordParentAmount(order.getUserId(), nextDay(rewardDay), order.getStakeUsdtAmount(), false);
 	}
 
+	/**
+	 * 准备101收益日所需的G7收益率快照。
+	 *
+	 * <p>该方法不发放收益、不改钱包，只负责把当天参与101的用户和当天已有团队新增统计的用户合并，
+	 * 然后按用户生成或补齐 `t_stake_hosting_daily_team_performance` 快照。101 后续会读取
+	 * calc_status=1 的快照作为静态收益率来源之一。</p>
+	 *
+	 * @param rewardDay 收益日，格式yyyyMMdd
+	 * @param rewardUserIds 本轮101待发放订单所属用户ID集合
+	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public void prepareDailySnapshots(Integer rewardDay, List<Long> rewardUserIds) {
 		if (rewardDay == null) {
 			throw new ServiceException("G7收益率快照日期不能为空");
 		}
+		// 1. 合并“当天已有团队新增记录的用户”和“本轮101订单用户”，确保没推广的订单用户也有纯静态快照。
 		Set<Long> userIds = new LinkedHashSet<>();
 		List<Long> statUserIds = baseMapper.selectUserIdsByStatDay(rewardDay);
 		if (CollectionUtil.isNotEmpty(statUserIds)) {
@@ -123,15 +151,24 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		if (CollectionUtil.isNotEmpty(rewardUserIds)) {
 			userIds.addAll(rewardUserIds);
 		}
-		// When the G7 window is not triggered, the daily snapshot stores the before-return pure static percent.
+		// 2. 未命中G7窗口时，快照先保存回本前纯静态比例；真实发放还会按订单是否回本重新选择纯静态参数。
 		BigDecimal pureStaticRateBeforeReturnPercent = new BigDecimal(iSysParaService.getValue(ConstantSys.PURE_STATIC_RATE_BEFORE_RETURN_PERCENT));
+		// 3. 批量预加载昨日团队新增和最近G_day历史，避免 prepareOneSnapshot 按用户循环时产生N+1查询。
 		Map<Long, BigDecimal> yesterdayTeamNewMap = loadYesterdayTeamNewAmountMap(userIds, rewardDay);
 		Map<Long, List<StakeHostingDailyTeamPerformance>> recentSnapshotMap = loadRecentSnapshotMap(userIds, rewardDay);
+		// 4. 逐个用户生成当天快照；已计算完成的快照会在 prepareOneSnapshot 中跳过，支持任务重跑。
 		for (Long userId : userIds) {
 			prepareOneSnapshot(userId, rewardDay, yesterdayTeamNewMap.get(userId), recentSnapshotMap.get(userId), pureStaticRateBeforeReturnPercent);
 		}
 	}
 
+	/**
+	 * 查询用户某天已经计算完成的G7快照。
+	 *
+	 * @param userId 用户ID
+	 * @param rewardDay 收益日，格式yyyyMMdd
+	 * @return 已计算完成且未删除的快照；不存在时返回null
+	 */
 	@Override
 	public StakeHostingDailyTeamPerformance getCalculatedSnapshot(Long userId, Integer rewardDay) {
 		if (userId == null || rewardDay == null) {
@@ -145,6 +182,13 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 			.one();
 	}
 
+	/**
+	 * 判断用户在指定日期是否存在可用于G7判断的团队新增业绩。
+	 *
+	 * @param userId 用户ID
+	 * @param rewardDay 收益日，格式yyyyMMdd
+	 * @return true表示昨日或今日团队新增不全为0
+	 */
 	@Override
 	public boolean hasTeamTvl(Long userId, Integer rewardDay) {
 		StakeHostingDailyTeamPerformance snapshot = getCalculatedSnapshot(userId, rewardDay);
@@ -412,6 +456,12 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		return total.divide(new BigDecimal(count), 4, RoundingMode.HALF_UP);
 	}
 
+	/**
+	 * 查询托管订单并做空值校验。
+	 *
+	 * @param orderId 托管订单ID
+	 * @return 托管订单实体
+	 */
 	private StakeHostingOrder getOrder(Long orderId) {
 		if (orderId == null) {
 			throw new ServiceException("托管订单ID不能为空");
@@ -423,26 +473,63 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		return order;
 	}
 
+	/**
+	 * 将可空金额兜底为0。
+	 *
+	 * @param value 可空金额
+	 * @return 非空金额
+	 */
 	private BigDecimal nvl(BigDecimal value) {
 		return value == null ? BigDecimal.ZERO : value;
 	}
 
+	/**
+	 * 从 yyyyMMddHHmmss 数字时间中截取统计日。
+	 *
+	 * @param time 数字时间
+	 * @return 统计日，格式yyyyMMdd
+	 */
 	private Integer statDay(Long time) {
 		return Integer.valueOf(String.valueOf(time).substring(0, 8));
 	}
 
+	/**
+	 * 将 Date 转成统计日。
+	 *
+	 * @param time 日期时间
+	 * @return 统计日，格式yyyyMMdd
+	 */
 	private Integer statDay(Date time) {
 		return Integer.valueOf(DateUtil.format(time, "yyyyMMdd"));
 	}
 
+	/**
+	 * 计算下一自然日。
+	 *
+	 * @param day 当前日期，格式yyyyMMdd
+	 * @return 下一自然日，格式yyyyMMdd
+	 */
 	private Integer nextDay(Integer day) {
 		return Integer.valueOf(LocalDate.parse(String.valueOf(day), DAY_FORMATTER).plusDays(1).format(DAY_FORMATTER));
 	}
 
+	/**
+	 * 计算上一自然日。
+	 *
+	 * @param day 当前日期，格式yyyyMMdd
+	 * @return 上一自然日，格式yyyyMMdd
+	 */
 	private Integer previousDay(Integer day) {
 		return Integer.valueOf(LocalDate.parse(String.valueOf(day), DAY_FORMATTER).minusDays(1).format(DAY_FORMATTER));
 	}
 
+	/**
+	 * 计算指定日期之前N天。
+	 *
+	 * @param day 当前日期，格式yyyyMMdd
+	 * @param days 回退天数
+	 * @return 回退后的日期，格式yyyyMMdd
+	 */
 	private Integer beforeDays(Integer day, int days) {
 		return Integer.valueOf(LocalDate.parse(String.valueOf(day), DAY_FORMATTER).minusDays(days).format(DAY_FORMATTER));
 	}

@@ -76,8 +76,11 @@ public class XmsTask {
 
 
 	/**
-	 * 任务类型101 每天发放质押奖励
+	 * 任务类型101：每天发放托管静态收益。
 	 *
+	 * <p>该方法是RuoYi Quartz调用入口，本身不做收益计算，只把任务转发到
+	 * StakeHostingTaskServiceImpl.distributeDailyStaticReward。实际发放链路会计算静态收益、
+	 * 触发团队动态奖励、写钱包流水、记录结算明细，并把服务费汇入全球分红奖池。</p>
 	 */
 	public void distributePtbInterest101() {
 		log.info("任务类型101 每天发放托管静态收益");

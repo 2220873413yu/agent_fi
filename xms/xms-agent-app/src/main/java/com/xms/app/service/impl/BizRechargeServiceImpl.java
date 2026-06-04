@@ -237,7 +237,8 @@ public class BizRechargeServiceImpl implements BizRechargeService {
 		if (queryRecord != null) {
 			return ResultPista.data("success");
 		}
-
+		Integer rechargeCoinType = req.getCoinType() == 1? ConstantType.user_money_coin_type.type_1:
+			ConstantType.user_money_coin_type.type_2;
 
 		UserInfo userInfo = userInfoService.lambdaQuery()
 			.eq(UserInfo::getAccount, req.getAddress())
@@ -252,7 +253,7 @@ public class BizRechargeServiceImpl implements BizRechargeService {
 		}
 		rechargeOrder.setOrderNo(IDUtils.getSnowflakeStr());
 		rechargeOrder.setRechargeAmount(req.getAmount());
-		rechargeOrder.setCoinType(ConstantType.user_money_coin_type.type_2);
+		rechargeOrder.setCoinType(rechargeCoinType);
 		rechargeOrder.setTxId(req.getHash());
 		rechargeOrder.setRemark(req.getAddress());
 		rechargeOrder.setCreateTime(new Date());
@@ -263,7 +264,7 @@ public class BizRechargeServiceImpl implements BizRechargeService {
 			int count = userWalletServiceImpl.handerUserMoney(rechargeOrder.getRechargeAmount(),
 				rechargeOrder.getOrderNo(), rechargeOrder.getUserId(),
 				rechargeOrder.getUserId(), ConstantType.user_money_log_source_type.type_3,
-				ConstantType.user_money_coin_type.type_2);
+				rechargeCoinType);
 			if (count != 1) {
 				throw new ServiceException(ResponseCode.CODE_1002);
 			}

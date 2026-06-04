@@ -25,7 +25,18 @@ public class DestroyCallbackBo {
      */
     @NotBlank(message = "hash not null")
     private String hash;
+
+	/**
+	 * 订单号
+	 */
 	private String orderNo;
+
+	/**
+	 * 充值币种 0:afi,1:usdt
+	 */
+	@NotBlank
+	@ValidDiyStatus(values = {0,1}, message = "coinType error")
+	private Integer coinType;
     /**
      * 签名
      */

@@ -130,6 +130,60 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	}
 
 	/**
+	 * 使用用户站内 USDT 可用余额创建已支付托管订单。
+	 *
+	 * <p>该方法用于新的 App 托管购买流程：在同一事务内先生成订单号、扣减用户 `valid_num1`，
+	 * 扣款成功后再保存已支付且产出中的托管订单，并同步增加托管业绩、团队业绩和全球分红权重。
+	 * 事务提交后再发送托管生效异步消息，避免消费者读取到未提交或已回滚的数据。</p>
+	 *
+	 * @param userId 下单用户ID
+	 * @param packageId 托管套餐ID
+	 * @param amount 托管USDT金额，必须为正整数且不低于套餐起投金额
+	 * @return 已支付并产出中的托管订单
+	 */
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public StakeHostingOrder createUserPaidOrder(Long userId, Long packageId, BigDecimal amount) {
+		// 校验用户、启用套餐和下单金额，并固化套餐快照，避免后续配置变化影响历史订单。
+		UserInfo userInfo = getUserInfo(userId);
+		StakeHostingPackage hostingPackage = getEnabledPackage(packageId);
+		validateAmount(amount, hostingPackage);
+
+		Date now = new Date();
+		int createDay = Integer.parseInt(DateUtil.format(DateUtil.date(), "yyyyMMdd"));
+		BigDecimal stakeAmount = amount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+
+		// 先生成订单号，再扣站内USDT；扣款发生在订单落库前，钱包流水主要通过 sourceCode=orderNo 追踪。
+		String orderNo = IDUtils.getSnowflakeStr();
+		int walletRows = userWalletService.handerUserMoney(stakeAmount.negate(), orderNo, userId, userId,
+			ConstantType.user_money_log_source_type.type_46, ConstantType.user_money_coin_type.type_1);
+		if (walletRows != 1) {
+			throw new ServiceException(ResponseCode.CODE_1015);
+		}
+
+		// 扣款成功后创建已支付订单；后续任意业务失败都会让当前事务回滚钱包扣减和订单落库。
+		StakeHostingOrder order = buildBaseOrder(userInfo, hostingPackage, stakeAmount, createDay, orderNo);
+		order.setSourceType(SOURCE_USER);
+		order.setPayStatus(PAY_SUCCESS);
+		order.setStatus(STATUS_RUNNING);
+		order.setPayAmount(stakeAmount);
+		order.setPayTime(now);
+		order.setEffectiveTime(now);
+		order.setG7NewPerformanceStatus(G7_STATUS_WAIT);
+		order.setG7ExpirePerformanceStatus(G7_STATUS_WAIT);
+		if (!save(order)) {
+			throw new ServiceException(ResponseCode.CODE_1015);
+		}
+
+		// 订单生效后同步维护当前有效托管业绩、团队业绩和全球分红权重。
+		addHostingPerformance(order);
+
+		// Redis Stream 只作为后置处理触发器，必须等主事务提交后再投递。
+		sendStakeHostingEffectiveAfterCommit(order.getId());
+		return order;
+	}
+
+	/**
 	 * 确认链上支付成功并让托管订单正式生效。
 	 *
 	 * <p>该方法用于链上支付回调或轮询确认后的订单状态推进。它会校验支付参数和支付金额，
@@ -732,8 +786,25 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	 * @return 未保存的托管订单对象
 	 */
 	private StakeHostingOrder buildBaseOrder(UserInfo userInfo, StakeHostingPackage hostingPackage, BigDecimal amount, int createDay) {
+		return buildBaseOrder(userInfo, hostingPackage, amount, createDay, IDUtils.getSnowflakeStr());
+	}
+
+	/**
+	 * 使用指定订单号构建托管订单基础快照。
+	 *
+	 * <p>站内 USDT 支付流程需要先生成订单号用于钱包流水 `sourceCode`，再把同一个订单号写入托管订单；
+	 * 旧链上待支付和后台拨付流程仍可通过无订单号重载自动生成订单号。</p>
+	 *
+	 * @param userInfo 下单或赠送目标用户
+	 * @param hostingPackage 启用中的托管套餐
+	 * @param amount 托管 USDT 金额
+	 * @param createDay 创建日期，yyyyMMdd 数字格式
+	 * @param orderNo 预生成的托管订单号
+	 * @return 未保存的托管订单对象
+	 */
+	private StakeHostingOrder buildBaseOrder(UserInfo userInfo, StakeHostingPackage hostingPackage, BigDecimal amount, int createDay, String orderNo) {
 		StakeHostingOrder order = new StakeHostingOrder();
-		order.setOrderNo(IDUtils.getSnowflakeStr());
+		order.setOrderNo(orderNo);
 		order.setUserId(userInfo.getUserId());
 		order.setAccount(userInfo.getAccount());
 		order.setPackageId(hostingPackage.getId());

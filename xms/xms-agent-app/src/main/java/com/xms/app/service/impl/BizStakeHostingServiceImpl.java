@@ -15,6 +15,8 @@ import com.xms.app.entity.vo.StopStakeHostingOrderVo;
 import com.xms.app.service.BizCommonService;
 import com.xms.app.service.BizStakeHostingService;
 import com.xms.common.config.redis.XmsRedis;
+import com.xms.common.config.redis.lock.RedisLock;
+import com.xms.common.constant.RedisConstant;
 import com.xms.common.constant.SysConstant;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.exception.ServiceException;
@@ -130,16 +132,18 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 	}
 
 	/**
-	 * 创建用户侧托管待支付订单。
+	 * 创建 App 用户站内 USDT 支付托管订单。
 	 *
-	 * <p>请求先按当前登录用户的钱包地址做签名校验，再创建待支付订单。该入口不扣减站内 USDT 钱包，
-	 * 订单只有在链上支付回调确认后才会进入生效状态并触发业绩、权重和后置异步处理。</p>
+	 * <p>请求先按当前登录用户钱包地址校验签名，签名随机数校验成功后会删除 Redis key，
+	 * 再按用户维度 Redis 锁串行进入托管购买流程。新流程不再创建待支付订单，而是在 DAO 事务内
+	 * 先扣减用户 `valid_num1`，扣款成功后保存已支付、产出中的托管订单，并触发生效后的异步处理。</p>
 	 *
-	 * @param req 创建托管订单请求，金额单位为 USDT，包含套餐ID、金额、随机数和签名
+	 * @param req 创建托管订单请求，金额单位为 USDT，包含套餐ID、金额、随机数和钱包签名
 	 * @param userId 当前登录用户ID
-	 * @return 待支付订单号和订单金额快照
+	 * @return 已支付托管订单号和托管金额快照
 	 */
 	@Override
+	@RedisLock(value = RedisConstant.LockConstant.XMS_STAKE_APPLY, param = "#userId")
 	public ResultPista<CreateStakeHostingOrderResp> createOrder(CreateStakeHostingOrderVo req, Long userId) {
 		// 下单绑定当前登录用户的钱包地址，防止前端传入其他地址代签。
 		UserInfo userInfo = userInfoService.lambdaQuery()
@@ -149,11 +153,12 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 			throw userNotFoundException();
 		}
 
-		// 钱包签名只证明用户发起下单意愿，实际付款仍以后续链上回调为准。
+		// 钱包签名只允许使用一次；校验通过会删除随机数，配合用户锁和 RepeatSubmit 拦截重复下单。
 		checkWallet(req.getRandomNum(), req.getSignature(), userInfo.getAccount(), xmsRedis);
-		StakeHostingOrder order = stakeHostingOrderService.createUserOrder(userId, req.getPackageId(), req.getAmount());
+		// 站内 USDT 支付流程在同一事务内先扣钱包再创建已支付订单，前端不再进入链上支付步骤。
+		StakeHostingOrder order = stakeHostingOrderService.createUserPaidOrder(userId, req.getPackageId(), req.getAmount());
 
-		// 返回链上支付需要绑定的订单号和应付金额快照。
+		// 返回已完成站内 USDT 支付的托管订单号和金额快照。
 		CreateStakeHostingOrderResp resp = new CreateStakeHostingOrderResp();
 		resp.setOrderNo(order.getOrderNo());
 		resp.setStakeUsdtAmount(order.getStakeUsdtAmount());

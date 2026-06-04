@@ -99,14 +99,13 @@ public class StakeHostingOrder extends BaseEntity {
 	@ApiModelProperty(value = "业务状态 0:未开始 1:产出中 2:已完成 3:已暂停")
 	private Integer status;
 
-	/** 支付hash */
-	@Excel(name = "支付hash", sort = 12, width = 40)
-	@ApiModelProperty(value = "支付hash")
+	/** 链上支付hash，站内USDT支付订单为空 */
+	@ApiModelProperty(value = "链上支付hash，站内USDT支付订单为空")
 	private String payHash;
 
-	/** 链上支付金额 */
-	@Excel(name = "链上支付金额", sort = 13)
-	@ApiModelProperty(value = "链上支付金额")
+	/** 支付金额，站内USDT支付为托管金额 */
+	@Excel(name = "支付金额", sort = 13)
+	@ApiModelProperty(value = "支付金额，站内USDT支付为托管金额")
 	private BigDecimal payAmount;
 
 	/** 支付时间 */

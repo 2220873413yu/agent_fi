@@ -39,6 +39,19 @@ public interface IStakeHostingOrderService extends XmsDataService<StakeHostingOr
 	StakeHostingOrder createUserOrder(Long userId, Long packageId, BigDecimal amount);
 
 	/**
+	 * 用户使用站内 USDT 可用余额创建已支付托管订单。
+	 *
+	 * <p>该入口用于新的 App 托管购买流程：先生成订单号并扣减用户 `valid_num1`，
+	 * 扣款成功后保存已支付、产出中的托管订单，并在事务提交后触发托管生效异步处理。</p>
+	 *
+	 * @param userId 用户ID
+	 * @param packageId 套餐ID
+	 * @param amount 托管USDT金额
+	 * @return 已支付并产出中的托管订单
+	 */
+	StakeHostingOrder createUserPaidOrder(Long userId, Long packageId, BigDecimal amount);
+
+	/**
 	 * 链上支付回调确认托管订单
 	 *
 	 * @param orderNo 订单号

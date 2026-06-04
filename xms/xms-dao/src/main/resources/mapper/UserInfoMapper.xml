@@ -31,6 +31,7 @@
         <result column="global_dividend_umbrella_weight" property="globalDividendUmbrellaWeight" />
         <result column="global_dividend_community_weight" property="globalDividendCommunityWeight" />
         <result column="stake_hosting_static_rate" property="stakeHostingStaticRate" />
+        <result column="grant_hosting_reward_enabled" property="grantHostingRewardEnabled" />
 
         <result column="parent_chain" property="parentChain" />
         <result column="create_time" property="createTime" />

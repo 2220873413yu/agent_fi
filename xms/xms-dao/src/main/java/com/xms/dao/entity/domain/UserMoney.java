@@ -50,9 +50,9 @@ public class UserMoney {
 	@Excel(name = "AFI", sort = 3)
     private BigDecimal validNum2;
 	/**
-	 * 可用余额数
+	 * 拨付收益USDT
 	 */
-	//@Excel(name = "可用余额数", sort = 4)
+	@Excel(name = "拨付收益USDT", sort = 4)
     private BigDecimal validNum3;
 
 	/**

@@ -62,11 +62,11 @@ public class OpenController {
 	/**
 	 * 托管订单回调
 	 */
-	@PostMapping("/pledgeOrder/callback")
-	@Anonymous
-	public ResultPista<String> stakeHostingOrderCallback(@Validated @RequestBody StakeOrderBo req) {
-		return bizStakeHostingService.orderCallback(req);
-	}
+//	@PostMapping("/pledgeOrder/callback")
+//	@Anonymous
+//	public ResultPista<String> stakeHostingOrderCallback(@Validated @RequestBody StakeOrderBo req) {
+//		return bizStakeHostingService.orderCallback(req);
+//	}
 
 	/**
 	 * 提现回调

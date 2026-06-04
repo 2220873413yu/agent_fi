@@ -100,7 +100,7 @@ public class BizWithdrawalController {
 		if(coinType == null){
 			return ResultPista.data(PageInfo.emptyPageInfo());
 		}
-		if(!(coinType == 1 || coinType == 2 || coinType == 3 || coinType == 5)){
+		if(!(coinType == 1 || coinType == 2 || coinType == 5)){
 			return ResultPista.data(PageInfo.emptyPageInfo());
 		}
 		pageSize = pageSize >= 20 ? SysConstant.TWENTY : pageSize;

@@ -119,6 +119,11 @@ public interface RedisConstant {
 		String XMS_STAKE_APPLY = REDIS_LOCK + "xmsStakeApply";
 
 		/**
+		 * 后台拨付收益USDT转可用USDT，按用户ID串行化资产迁移。
+		 */
+		String XMS_GRANT_REWARD_TRANSFER = REDIS_LOCK + "xmsGrantRewardTransfer";
+
+		/**
 		 * 购买节点
 		 */
 		String XMS_NODE_APPLY = REDIS_LOCK + "xmsNodeApply";

@@ -171,6 +171,12 @@ public class UserInfo extends BaseXmsEntity {
 	private BigDecimal stakeHostingStaticRate;
 
 	/**
+	 * 后台拨付托管收益开关 0:关闭 1:开启
+	 */
+	@Excel(name = "后台拨付托管收益开关", sort = 11, dictType = "biz_enabled_status")
+	private Integer grantHostingRewardEnabled;
+
+	/**
 	 * OpenAI聊天扣费状态 0:未扣费 1:已扣费
 	 */
 	private Integer openAiPaidStatus;

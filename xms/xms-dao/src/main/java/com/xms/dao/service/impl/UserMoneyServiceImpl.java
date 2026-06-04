@@ -1,15 +1,21 @@
 package com.xms.dao.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.google.common.collect.Lists;
+import com.xms.common.config.redis.lock.RedisLock;
 import com.xms.common.constant.ConstantType;
+import com.xms.common.constant.RedisConstant;
 import com.xms.common.exception.ServiceException;
 import com.xms.common.utils.SecurityUtils;
 import com.xms.common.utils.uuid.IDUtils;
+import com.xms.dao.entity.bo.GrantRewardTransferBo;
 import com.xms.dao.entity.bo.UserMoneyValidNum4Bo;
 import com.xms.dao.entity.domain.UserMoney;
+import com.xms.dao.entity.vo.UpdateUserWalletVo;
 import com.xms.dao.entity.vo.UpdateUserMoneyVo;
 import com.xms.dao.entity.vo.UserMoneyLogVo;
 import com.xms.dao.entity.vo.UserMoneyVo;
+import com.xms.dao.entity.vo.UserWalletLogVo;
 import com.xms.dao.mapper.UserMoneyMapper;
 import com.xms.dao.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +65,66 @@ public class UserMoneyServiceImpl extends ServiceImpl<UserMoneyMapper, UserMoney
 		if (i == 0) {
 			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
 			throw new ServiceException("更新资产异常");
+		}
+		return 1;
+	}
+
+	/**
+	 * 后台将拨付收益USDT转入用户可用USDT。
+	 *
+	 * <p>该操作是同一用户钱包字段迁移，不是充值、提现或平台扣拨。方法按用户ID加Redis锁，
+	 * 在同一事务内通过钱包框架一次性扣减 `valid_num3` 并增加 `valid_num1`，Canal后续按同一个
+	 * transferNo/sourceType=49 生成拨付收益USDT扣减和可用USDT增加两条流水。</p>
+	 *
+	 * @param req 转移用户和转移金额，金额单位USDT
+	 * @return 1表示转移成功
+	 */
+	@Override
+	@RedisLock(value = RedisConstant.LockConstant.XMS_GRANT_REWARD_TRANSFER, param = "#req.userId")
+	@Transactional(rollbackFor = Exception.class)
+	public int transferGrantRewardToUsdt(GrantRewardTransferBo req) {
+		if (req == null || req.getUserId() == null) {
+			throw new ServiceException("用户ID不能为空");
+		}
+		if (req.getTransferAmount() == null || req.getTransferAmount().compareTo(BigDecimal.ZERO) <= 0) {
+			throw new ServiceException("转移数量必须大于0");
+		}
+		BigDecimal transferAmount = req.getTransferAmount();
+
+		// 以后端当前钱包余额为准，前端传入的余额只用于页面即时校验。
+		UserMoney userMoney = getById(req.getUserId());
+		if (userMoney == null) {
+			throw new ServiceException("用户钱包不存在");
+		}
+		BigDecimal grantRewardBalance = userMoney.getValidNum3() == null ? BigDecimal.ZERO : userMoney.getValidNum3();
+		if (grantRewardBalance.compareTo(transferAmount) < 0) {
+			throw new ServiceException("拨付收益USDT余额不足");
+		}
+
+		// 同一个transferNo/sourceType追踪本次字段迁移，Canal会拆成coinType=3扣减和coinType=1入账两条流水。
+		String transferNo = IDUtils.getSnowflakeStr();
+		Long adminUserId = SecurityUtils.getUserId();
+		UpdateUserWalletVo updateUserWalletVo = UpdateUserWalletVo.builder()
+			.userId(req.getUserId())
+			.gtId(IDUtils.getSnowflakeStr())
+			.sourceCode(transferNo)
+			.sourceId(adminUserId)
+			.sourceType(ConstantType.user_money_log_source_type.type_49)
+			.userWalletLogList(Lists.newArrayList(
+				UserWalletLogVo.builder()
+					.coinType(ConstantType.user_money_coin_type.type_3)
+					.changeBalance(transferAmount.negate())
+					.build(),
+				UserWalletLogVo.builder()
+					.coinType(ConstantType.user_money_coin_type.type_1)
+					.changeBalance(transferAmount)
+					.build()
+			))
+			.build();
+		int rows = userWalletServiceImpl.updateWallet(updateUserWalletVo);
+		if (rows != 1) {
+			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+			throw new ServiceException("拨付收益USDT余额不足");
 		}
 		return 1;
 	}

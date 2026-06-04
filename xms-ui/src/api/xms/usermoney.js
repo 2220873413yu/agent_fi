@@ -35,6 +35,15 @@ export function updateUsermoney(data) {
   })
 }
 
+// 拨付收益USDT转入可用USDT
+export function transferGrantReward(data) {
+  return request({
+    url: '/xms/usermoney/transferGrantReward',
+    method: 'put',
+    data: data
+  })
+}
+
 // 删除用户钱包
 export function delUsermoney(id) {
   return request({

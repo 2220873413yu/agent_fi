@@ -14,6 +14,7 @@ import com.xms.common.utils.CollectionUtil;
 import com.xms.common.utils.poi.ExcelUtil;
 import com.xms.dao.domain.*;
 import com.xms.dao.entity.domain.UserRelation;
+import com.xms.dao.entity.bo.GrantHostingRewardSwitchBo;
 import com.xms.dao.entity.bo.UserInfoReqBo;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.entity.dto.UserNetBodyExportDto;
@@ -151,6 +152,17 @@ public class UserInfoController extends BaseController {
 	@RepeatSubmit
 	public AjaxResult edit(@RequestBody UserInfoReqBo userInfo) {
 		return xmsUserInfoService.updateUserInfo(userInfo);
+	}
+
+	/**
+	 * 修改用户维度后台拨付托管收益开关。
+	 */
+	@PreAuthorize("@ss.hasPermi('xms:userinfo:edit')")
+	@Log(title = "用户拨付托管收益开关", businessType = BusinessType.UPDATE)
+	@PutMapping("/grantHostingRewardSwitch")
+	@RepeatSubmit
+	public AjaxResult grantHostingRewardSwitch(@RequestBody GrantHostingRewardSwitchBo req) {
+		return xmsUserInfoService.updateGrantHostingRewardSwitch(req);
 	}
 
 

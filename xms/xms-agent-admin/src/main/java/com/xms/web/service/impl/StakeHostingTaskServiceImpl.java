@@ -78,6 +78,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	private static final BigDecimal PERCENT_DIVISOR = new BigDecimal("100");
 	private static final BigDecimal TWO = new BigDecimal("2");
 	private static final String SQL_VALID_NUM1 = "UPDATE t_user_money SET update_time=?,gt_id=?,valid_num1=valid_num1+?,source_code=?,source_type=?,source_id=? WHERE id=? ";
+	private static final String SQL_VALID_NUM3 = "UPDATE t_user_money SET update_time=?,gt_id=?,valid_num3=valid_num3+?,source_code=?,source_type=?,source_id=? WHERE id=? ";
 
 	private final IStakeHostingOrderService stakeHostingOrderService;
 	private final IStakeHostingDailyTeamPerformanceService stakeHostingDailyTeamPerformanceService;
@@ -171,7 +172,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		TeamRewardCollectContext teamRewardContext = new TeamRewardCollectContext();
 		for (StaticRewardResult result : staticRewardResults) {
 			if (result.shouldDistributeTeamReward()) {
-				// 用户购买单按净静态收益继续发放托管动态奖励，后台拨付单在结果对象内静默跳过。
+				// 用户购买单动态收益进入可用USDT；后台拨付单仅在用户开关开启后触发动态，且进入拨付收益USDT。
 				distributeTeamReward(result.order, result.grossReward, result.baseStaticRate, result.afiAccelerateRate,
 					result.actualStaticRate, result.serviceFeeRatio, result.serviceFee, result.netReward, rewardDay, now,
 					teamRewardContext);
@@ -596,6 +597,11 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * @return 本轮发放结果；为空表示订单级幂等抢占失败
 	 */
 	private StaticRewardResult distributeOne(StakeHostingOrder order, int rewardDay, Date now, StaticRewardCalculateContext context) {
+		if (isGrantOrderRewardDisabled(order, context)) {
+			log.info("后台拨付托管收益开关关闭，跳过静态和动态收益 orderId={}, userId={}, rewardDay={}",
+				order.getId(), order.getUserId(), rewardDay);
+			return null;
+		}
 		// 读取用户指定收益率、纯静态规则或 G7 快照，计算订单当天基础静态收益率。
 		BigDecimal todayRate = calculateStaticRate(order, rewardDay, context);
 		BigDecimal baseGrossReward = order.getStakeUsdtAmount().multiply(todayRate)
@@ -618,6 +624,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.add(reward)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 
+		// 后台拨付单复用 today_reward/total_static_reward 做订单维度累计；
+		// 真正资产入账会在后续批量钱包阶段写入 valid_num3，并使用 47/48 与真实托管收益隔离。
 		// 结算明细记录静态收益、服务费、收益率和 AFI 加速倍率快照，用于后台追溯。
 		StakeHostingRewardSettlement staticSettlement = buildSettlement(order, null, REWARD_TYPE_STATIC_FEE, null, grossReward, serviceFeeRatio,
 			serviceFee, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
@@ -661,6 +669,34 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			&& order.getSourceType() == StakeHostingOrderServiceImpl.SOURCE_USER
 			&& order.getPackageDays() != null
 			&& order.getPackageDays() == 1;
+	}
+
+	/**
+	 * 判断后台拨付托管订单是否因为用户维度收益开关关闭而跳过收益。
+	 *
+	 * @param order 待结算托管订单
+	 * @param context 静态收益计算上下文，已预加载订单用户信息
+	 * @return true 表示后台拨付单且用户未开启收益开关，本轮不发静态也不触发动态
+	 */
+	private boolean isGrantOrderRewardDisabled(StakeHostingOrder order, StaticRewardCalculateContext context) {
+		if (!isAdminGrantOrder(order)) {
+			return false;
+		}
+		UserInfo userInfo = context.userMap.get(order.getUserId());
+		return userInfo == null
+			|| userInfo.getGrantHostingRewardEnabled() == null
+			|| userInfo.getGrantHostingRewardEnabled() != 1;
+	}
+
+	/**
+	 * 判断订单是否为后台拨付托管订单。
+	 *
+	 * @param order 托管订单
+	 * @return true 表示 `source_type=1` 后台拨付订单
+	 */
+	private boolean isAdminGrantOrder(StakeHostingOrder order) {
+		return order.getSourceType() != null
+			&& order.getSourceType() == StakeHostingOrderServiceImpl.SOURCE_ADMIN;
 	}
 
 	/**
@@ -822,13 +858,14 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 批量发放托管静态净收益并记录奖励流水。
 	 *
+	 * <p>用户购买订单继续进入 `valid_num1`，钱包来源类型为31；后台拨付订单在用户开关开启后
+	 * 进入 `valid_num3` 拨付收益USDT，钱包来源类型为47。订单本身仍复用 todayReward/totalStaticReward
+	 * 做订单维度累计，资产字段和 sourceType 负责区分真实收益与拨付收益。</p>
 	 *
-	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param results 本轮静态收益计算结果
+	 * @param now 本轮任务时间
 	 */
 	private void grantStaticRewards(List<StaticRewardResult> results, Date now) {
 		if (CollectionUtil.isEmpty(results)) {
@@ -841,25 +878,36 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			if (result.netReward.compareTo(BigDecimal.ZERO) <= 0) {
 				continue;
 			}
+			boolean grantReward = isAdminGrantOrder(result.order);
 			String gtId = IDUtils.getSnowflakeStr();
-			// Business processing note.
+			// 用户购买单进入可用USDT；后台拨付单进入拨付收益USDT，避免和真实托管收益资产混淆。
 			UserMoney userMoney = new UserMoney();
 			userMoney.setId(result.order.getUserId());
-			userMoney.setValidNum1(result.netReward);
+			if (grantReward) {
+				userMoney.setValidNum3(result.netReward);
+			} else {
+				userMoney.setValidNum1(result.netReward);
+			}
 			userMoney.setGtId(gtId);
 			userMoney.setSourceCode(result.order.getOrderNo());
-			userMoney.setSourceId(result.order.getUserId());
-			userMoney.setSourceType(ConstantType.user_money_log_source_type.type_31);
+			userMoney.setSourceId(grantReward ? result.order.getId() : result.order.getUserId());
+			userMoney.setSourceType(grantReward
+				? ConstantType.user_money_log_source_type.type_47
+				: ConstantType.user_money_log_source_type.type_31);
 			userMoney.setUpdateTime(now);
 			userMoneyList.add(userMoney);
 
-			// Business processing note.
+			// 奖励记录同样用独立币种和来源类型隔离后台拨付托管静态收益。
 			RewardRecord rewardRecord = new RewardRecord();
 			rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
 			rewardRecord.setUserId(result.order.getUserId());
 			rewardRecord.setAmount(result.netReward);
-			rewardRecord.setCoinType(ConstantType.user_money_coin_type.type_1);
-			rewardRecord.setSourceType(ConstantType.xms_reward_record_source_type.type_27);
+			rewardRecord.setCoinType(grantReward
+				? ConstantType.user_money_coin_type.type_3
+				: ConstantType.user_money_coin_type.type_1);
+			rewardRecord.setSourceType(grantReward
+				? ConstantType.xms_reward_record_source_type.type_47
+				: ConstantType.xms_reward_record_source_type.type_27);
 			rewardRecord.setSourceOrderCode(result.order.getOrderNo());
 			rewardRecord.setSourceUserId(result.order.getUserId());
 			rewardRecord.setGtId(gtId);
@@ -874,15 +922,16 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * flush 静态收益钱包增量和奖励记录。
 	 *
-	 *
-	 *
-	 *
+	 * @param userMoneyList 待入账钱包增量，可能同时包含 valid_num1 和 valid_num3
+	 * @param rewardRecordList 待保存奖励记录
 	 */
 	private void flushStaticRewardBatch(List<UserMoney> userMoneyList, List<RewardRecord> rewardRecordList) {
 		if (CollectionUtil.isNotEmpty(userMoneyList)) {
-			// Business processing note.
-			batchUpdateMoneyValid1(userMoneyList);
+			// 静态收益批量入账按资产字段分流：真实托管收益进 valid_num1，后台拨付收益进 valid_num3。
+			batchUpdateRewardMoney(userMoneyList);
+			batchUpdateRewardMoney(userMoneyList);
 			userMoneyList.clear();
 		}
 		if (CollectionUtil.isNotEmpty(rewardRecordList)) {
@@ -1001,13 +1050,16 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		}
 
 		/**
+		 * 判断本次静态收益结果是否需要继续触发团队动态奖励。
 		 *
+		 * <p>用户购买单始终按原规则触发；后台拨付单只有在前置用户开关校验通过并产生静态收益结果后才会走到这里。</p>
 		 *
-		 *
+		 * @return true 表示净静态收益大于0且订单来源允许触发动态奖励
 		 */
 		private boolean shouldDistributeTeamReward() {
 			return order.getSourceType() != null
-				&& order.getSourceType() == StakeHostingOrderServiceImpl.SOURCE_USER
+				&& (order.getSourceType() == StakeHostingOrderServiceImpl.SOURCE_USER
+					|| order.getSourceType() == StakeHostingOrderServiceImpl.SOURCE_ADMIN)
 				&& netReward.compareTo(BigDecimal.ZERO) > 0;
 		}
 	}
@@ -1643,6 +1695,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 *
 	 *
 	 *
+	 * 收集团队动态奖励的钱包增量、奖励记录和结算明细。
+	 *
+	 * <p>用户购买订单按直推/极差/平级来源类型进入 `valid_num1`；后台拨付订单触发的动态奖励统一使用
+	 * sourceType=48 进入上级用户 `valid_num3` 拨付收益USDT，并且不累计到普通动态奖励汇总表。</p>
 	 */
 	private void collectTeamReward(TeamRewardCollectContext context, StakeHostingOrder order, Long receiveUserId, int rewardType, Integer rewardLevel,
 								   BigDecimal rewardBase, BigDecimal ratioPercent, BigDecimal rewardAmount,
@@ -1653,17 +1709,24 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		if (rewardAmount.compareTo(BigDecimal.ZERO) <= 0) {
 			return;
 		}
-		int moneySourceType = rewardType == REWARD_TYPE_DIRECT ? ConstantType.user_money_log_source_type.type_32
+		boolean grantReward = isAdminGrantOrder(order);
+		int moneySourceType = grantReward ? ConstantType.user_money_log_source_type.type_48
+			: rewardType == REWARD_TYPE_DIRECT ? ConstantType.user_money_log_source_type.type_32
 			: rewardType == REWARD_TYPE_DIFF ? ConstantType.user_money_log_source_type.type_33
 			: ConstantType.user_money_log_source_type.type_34;
-		int rewardSourceType = rewardType == REWARD_TYPE_DIRECT ? ConstantType.xms_reward_record_source_type.type_28
+		int rewardSourceType = grantReward ? ConstantType.xms_reward_record_source_type.type_48
+			: rewardType == REWARD_TYPE_DIRECT ? ConstantType.xms_reward_record_source_type.type_28
 			: rewardType == REWARD_TYPE_DIFF ? ConstantType.xms_reward_record_source_type.type_29
 			: ConstantType.xms_reward_record_source_type.type_30;
 		String gtId = IDUtils.getSnowflakeStr();
-		// Business processing note.
+		// 用户购买单动态奖励进入可用USDT；后台拨付单触发的动态奖励进入拨付收益USDT。
 		UserMoney userMoney = new UserMoney();
 		userMoney.setId(receiveUserId);
-		userMoney.setValidNum1(rewardAmount);
+		if (grantReward) {
+			userMoney.setValidNum3(rewardAmount);
+		} else {
+			userMoney.setValidNum1(rewardAmount);
+		}
 		userMoney.setGtId(gtId);
 		userMoney.setSourceCode(order.getOrderNo());
 		userMoney.setSourceId(order.getUserId());
@@ -1671,19 +1734,23 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		userMoney.setUpdateTime(now);
 		context.userMoneyList.add(userMoney);
 
-		// Business processing note.
+		// 奖励记录使用独立币种和来源类型，后台可按 sourceType=48 区分拨付动态收益。
 		RewardRecord rewardRecord = new RewardRecord();
 		rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
 		rewardRecord.setUserId(receiveUserId);
 		rewardRecord.setAmount(rewardAmount);
-		rewardRecord.setCoinType(ConstantType.user_money_coin_type.type_1);
+		rewardRecord.setCoinType(grantReward
+			? ConstantType.user_money_coin_type.type_3
+			: ConstantType.user_money_coin_type.type_1);
 		rewardRecord.setSourceType(rewardSourceType);
 		rewardRecord.setSourceOrderCode(order.getOrderNo());
 		rewardRecord.setSourceUserId(order.getUserId());
 		rewardRecord.setGtId(gtId);
 		rewardRecord.setCreateTime(now);
 		context.rewardRecordList.add(rewardRecord);
-		collectTeamRewardSummary(context, receiveUserId, rewardType, rewardAmount);
+		if (!grantReward) {
+			collectTeamRewardSummary(context, receiveUserId, rewardType, rewardAmount);
+		}
 		context.settlementList.add(buildSettlement(order, receiveUserId, rewardType, rewardLevel, rewardBase, ratioPercent, rewardAmount,
 			grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 			serviceFeeRatio, serviceFee, netReward, ARRIVAL_YES, null, rewardDay, now));
@@ -1739,8 +1806,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			return;
 		}
 		if (CollectionUtil.isNotEmpty(context.userMoneyList)) {
-			// Business processing note.
-			batchUpdateMoneyValid1(context.userMoneyList);
+			// 团队动态奖励按来源订单分流钱包字段，后台拨付动态收益进入 valid_num3。
+			batchUpdateRewardMoney(context.userMoneyList);
 		}
 		if (CollectionUtil.isNotEmpty(context.rewardRecordList)) {
 			rewardRecordService.saveBatch(context.rewardRecordList);
@@ -1754,14 +1821,65 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 按钱包资产字段批量发放托管奖励。
 	 *
+	 * <p>真实用户购买托管收益写入 `valid_num1`；后台拨付托管静态/动态收益写入
+	 * `valid_num3` 拨付收益USDT。调用方必须提前设置好金额字段、sourceType、sourceCode 和 gtId。</p>
 	 *
+	 * @param userMoneyList 待批量入账的钱包增量
+	 */
+	private void batchUpdateRewardMoney(List<UserMoney> userMoneyList) {
+		if (CollectionUtil.isEmpty(userMoneyList)) {
+			return;
+		}
+		List<UserMoney> validNum1List = userMoneyList.stream()
+			.filter(item -> item.getValidNum1() != null && item.getValidNum1().compareTo(BigDecimal.ZERO) != 0)
+			.collect(Collectors.toList());
+		List<UserMoney> validNum3List = userMoneyList.stream()
+			.filter(item -> item.getValidNum3() != null && item.getValidNum3().compareTo(BigDecimal.ZERO) != 0)
+			.collect(Collectors.toList());
+		batchUpdateMoneyValid1(validNum1List);
+		batchUpdateMoneyValid3(validNum3List);
+	}
+
+	/**
+	 * 批量增加用户拨付收益USDT余额。
 	 *
+	 * @param userMoneyList 待写入 `valid_num3` 的钱包增量
+	 */
+	private void batchUpdateMoneyValid3(List<UserMoney> userMoneyList) {
+		if (CollectionUtil.isEmpty(userMoneyList)) {
+			return;
+		}
+		int[] rows = jdbcTemplate.batchUpdate(SQL_VALID_NUM3, new BatchPreparedStatementSetter() {
+			@Override
+			public void setValues(PreparedStatement ps, int i) throws SQLException {
+				UserMoney userMoney = userMoneyList.get(i);
+				ps.setTimestamp(1, new java.sql.Timestamp(userMoney.getUpdateTime().getTime()));
+				ps.setString(2, userMoney.getGtId());
+				ps.setBigDecimal(3, userMoney.getValidNum3());
+				ps.setString(4, userMoney.getSourceCode());
+				ps.setInt(5, userMoney.getSourceType());
+				ps.setLong(6, userMoney.getSourceId());
+				ps.setLong(7, userMoney.getId());
+			}
+
+			@Override
+			public int getBatchSize() {
+				return userMoneyList.size();
+			}
+		});
+		if (ArrayUtil.contains(rows, 0)) {
+			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+			log.error("101 grant reward USDT batch update failed");
+			throw new ServiceException("101 grant reward USDT batch update failed");
+		}
+	}
+
+	/**
+	 * 批量增加用户可用USDT余额。
 	 *
-	 *
-	 *
-	 *
-	 *
+	 * @param userMoneyList 待写入 `valid_num1` 的钱包增量
 	 */
 	private void batchUpdateMoneyValid1(List<UserMoney> userMoneyList) {
 		if (CollectionUtil.isEmpty(userMoneyList)) {

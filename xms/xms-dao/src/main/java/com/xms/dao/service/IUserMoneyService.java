@@ -1,6 +1,7 @@
 package com.xms.dao.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.xms.dao.entity.bo.GrantRewardTransferBo;
 import com.xms.dao.entity.bo.UserMoneyValidNum4Bo;
 import com.xms.dao.entity.domain.UserMoney;
 import com.xms.dao.entity.domain.UserMoneyLog;
@@ -32,6 +33,14 @@ public interface IUserMoneyService extends IService<UserMoney> {
 	 * @return
 	 */
 	public int updateUserMoney(UserMoneyVo userMoneyVo);
+
+	/**
+	 * 后台将用户拨付收益USDT转入可用USDT。
+	 *
+	 * @param req 转移用户和金额
+	 * @return 1表示转移成功
+	 */
+	int transferGrantRewardToUsdt(GrantRewardTransferBo req);
 
 	/**
 	 * 查询链信值余额大于sourceThreshold的钱包用户

@@ -228,6 +228,9 @@ public class BizRechargeServiceImpl implements BizRechargeService {
 		if (req.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
 			return ResultPista.fail("充值金额不能小于0");
 		}
+		if (req.getCoinType() == null || (req.getCoinType() != 1 && req.getCoinType() != 2)) {
+			return ResultPista.fail(ResponseCode.CODE_300);
+		}
 		//设置金额
 		req.setAmount(req.getAmount().setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
 
@@ -237,7 +240,7 @@ public class BizRechargeServiceImpl implements BizRechargeService {
 		if (queryRecord != null) {
 			return ResultPista.data("success");
 		}
-		Integer rechargeCoinType = req.getCoinType() == 1? ConstantType.user_money_coin_type.type_1:
+		Integer rechargeCoinType = req.getCoinType() == 1 ? ConstantType.user_money_coin_type.type_1 :
 			ConstantType.user_money_coin_type.type_2;
 
 		UserInfo userInfo = userInfoService.lambdaQuery()

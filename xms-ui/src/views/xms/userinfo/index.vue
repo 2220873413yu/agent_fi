@@ -421,6 +421,20 @@
         </template>
       </el-table-column>
 
+      <el-table-column align="center" label="拨付收益开关" width="120">
+        <template slot-scope="scope">
+          <el-switch
+            v-hasPermi="['xms:userinfo:edit']"
+            :value="Number(scope.row.grantHostingRewardEnabled || 0)"
+            :active-value="1"
+            :inactive-value="0"
+            active-color="#13ce66"
+            inactive-color="#dcdfe6"
+            @change="handleGrantHostingRewardSwitch(scope.row, $event)"
+          />
+        </template>
+      </el-table-column>
+
 <!--      <el-table-column label="我的算力" align="center" prop="performanceV1" width="150"/>-->
 <!--      <el-table-column label="业绩相关(BOOMAI)" align="center" width="150">
         <template slot-scope="scope">
@@ -694,6 +708,7 @@ import {
   delUserinfo,
   addUserinfo,
   updateUserinfo,
+  updateGrantHostingRewardSwitch,
   changeGoogleCode,
   closeTeamMining
 } from "@/api/xms/userinfo";
@@ -927,6 +942,20 @@ export default {
           }
         }
       });
+    },
+    /** 修改用户维度后台拨付托管收益开关 */
+    handleGrantHostingRewardSwitch(row, enabled) {
+      const oldValue = Number(row.grantHostingRewardEnabled || 0)
+      const nextValue = Number(enabled)
+      updateGrantHostingRewardSwitch({
+        userId: row.userId,
+        enabled: nextValue
+      }).then(() => {
+        row.grantHostingRewardEnabled = nextValue
+        this.$modal.msgSuccess(nextValue === 1 ? '拨付收益已开启' : '拨付收益已关闭')
+      }).catch(() => {
+        row.grantHostingRewardEnabled = oldValue
+      })
     },
     /** 托管指定收益率只允许输入非负数字。 */
     onStakeHostingStaticRateInput() {

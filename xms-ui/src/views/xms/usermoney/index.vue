@@ -86,6 +86,7 @@
 <!--        <el-table-column align="center" label="用户编码" prop="userCode"/>-->
         <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="USDT" prop="validNum1" sortable="custom" />
         <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="AFI" prop="validNum2" sortable="custom" />
+        <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="拨付收益USDT" prop="validNum3" sortable="custom" />
 <!--
         <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="OORT" prop="validNum3" sortable="custom"/>
         <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="锁定USDT" prop="validNum4" sortable="custom"/>
@@ -116,6 +117,14 @@
               type="text"
               @click="handleUpdate(scope.row)"
             >平台扣拨</el-button>
+            <el-button
+              v-if="Number(scope.row.validNum3 || 0) > 0"
+              v-hasPermi="['xms:usermoney:edit']"
+              icon="el-icon-sort"
+              size="mini"
+              type="text"
+              @click="handleTransferGrantReward(scope.row)"
+            >拨付资产转移</el-button>
             <!-- <el-button
               size="mini"
               type="text"
@@ -175,11 +184,30 @@
           <el-button style="width: 100px;" @click="cancel">取 消</el-button>
         </div>
       </el-dialog>
+
+      <!-- 拨付收益USDT转可用USDT对话框 -->
+      <el-dialog :close-on-click-modal="false" :title="transferTitle" :visible.sync="transferOpen" append-to-body width="500px">
+        <el-form ref="transferForm" :model="transferForm" :rules="transferRules" class="custom-form" label-width="130px">
+          <el-form-item label="钱包地址">
+            <el-input v-model="transferForm.account" disabled />
+          </el-form-item>
+          <el-form-item label="可转移余额">
+            <el-input v-model="transferForm.availableGrantReward" disabled />
+          </el-form-item>
+          <el-form-item label="转移数量" prop="transferAmount">
+            <el-input v-model="transferForm.transferAmount" placeholder="请输入转移数量" type="number" />
+          </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+          <el-button style="width: 100px;" type="primary" @click="submitTransferGrantReward">确 定</el-button>
+          <el-button style="width: 100px;" @click="cancelTransfer">取 消</el-button>
+        </div>
+      </el-dialog>
     </div>
   </template>
 
   <script>
-  import { listUsermoney, getUsermoney, delUsermoney, addUsermoney, updateUsermoney } from "@/api/xms/usermoney";
+  import { listUsermoney, getUsermoney, delUsermoney, addUsermoney, updateUsermoney, transferGrantReward } from "@/api/xms/usermoney";
   import { getSystemAuth } from "@/api/system/config";
   import {sendCode} from "@/api/system/user";
   import {sendEmailCode} from "@/api/login";
@@ -188,6 +216,19 @@
     name: "Usermoney",
     dicts: ['t_user_money_log_coin_type'],
     data() {
+      const validateTransferAmount = (rule, value, callback) => {
+        const amount = Number(value)
+        const maxAmount = Number(this.transferForm.availableGrantReward || 0)
+        if (!value && value !== 0) {
+          callback(new Error("请输入转移数量"))
+        } else if (amount <= 0) {
+          callback(new Error("转移数量必须大于0"))
+        } else if (amount > maxAmount) {
+          callback(new Error("转移数量不能大于可转移余额"))
+        } else {
+          callback()
+        }
+      }
       return {
         // 遮罩层
         loading: true,
@@ -208,6 +249,8 @@
         title: "",
         // 是否显示弹出层
         open: false,
+        // 是否显示拨付资产转移弹出层
+        transferOpen: false,
         // 查询参数
         queryParams: {
           pageNum: 1,
@@ -219,6 +262,8 @@
         defaultSort: {prop: 'id', order: 'descending'},
         // 表单参数
         form: {},
+        // 拨付资产转移表单参数
+        transferForm: {},
         // 表单校验
         rules: {
           userId: [
@@ -232,6 +277,13 @@
           ],
           autoCode: [
             { required: true, message: "验证码不能为空", trigger: "blur" }
+          ]
+        },
+        transferTitle: "",
+        transferRules: {
+          transferAmount: [
+            { required: true, message: "请输入转移数量", trigger: "blur" },
+            { validator: validateTransferAmount, trigger: "blur" }
           ]
         },
         isCounting: false,
@@ -276,6 +328,11 @@
         this.open = false;
         this.reset();
       },
+      // 取消拨付资产转移按钮
+      cancelTransfer() {
+        this.transferOpen = false;
+        this.resetTransfer();
+      },
       // 表单重置
       reset() {
         this.form = {
@@ -302,6 +359,16 @@
           emailCode: null
         };
         this.resetForm("form");
+      },
+      // 拨付资产转移表单重置
+      resetTransfer() {
+        this.transferForm = {
+          userId: null,
+          account: null,
+          availableGrantReward: null,
+          transferAmount: null
+        };
+        this.resetForm("transferForm");
       },
       /** 搜索按钮操作 */
       handleQuery() {
@@ -335,6 +402,18 @@
           this.title = "修改用户钱包";
         });
       },
+      /** 拨付资产转移按钮操作 */
+      handleTransferGrantReward(row) {
+        this.resetTransfer();
+        this.transferForm = {
+          userId: row.id,
+          account: row.account,
+          availableGrantReward: row.validNum3,
+          transferAmount: null
+        };
+        this.transferOpen = true;
+        this.transferTitle = "拨付收益USDT转可用USDT";
+      },
       /** 提交按钮 */
       submitForm() {
         this.$refs["form"].validate(valid => {
@@ -352,6 +431,21 @@
                 this.getList();
               });
             }
+          }
+        });
+      },
+      /** 提交拨付收益USDT转可用USDT */
+      submitTransferGrantReward() {
+        this.$refs["transferForm"].validate(valid => {
+          if (valid) {
+            transferGrantReward({
+              userId: this.transferForm.userId,
+              transferAmount: this.transferForm.transferAmount
+            }).then(response => {
+              this.$modal.msgSuccess("转移成功");
+              this.transferOpen = false;
+              this.getList();
+            });
           }
         });
       },

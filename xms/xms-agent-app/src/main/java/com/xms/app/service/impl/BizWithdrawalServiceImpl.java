@@ -202,6 +202,9 @@ public class BizWithdrawalServiceImpl implements BizWithdrawalService {
 	public int addWithdrawal(WithdrawalVo req, Long userId){
 
 		req.setChangeBalance(req.getChangeBalance().setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
+		if (req.getCoinType() != null && ConstantType.user_money_coin_type.type_3 == req.getCoinType()) {
+			throw new ServiceException(ResponseCode.CODE_300);
+		}
 		//查询提现信息
 		WithdrawalConfig withdrawalConfig = withdrawalConfigService.lambdaQuery()
 			.eq(WithdrawalConfig::getCoinType, req.getCoinType())

@@ -8,6 +8,7 @@ import com.xms.common.core.domain.AjaxResult;
 import com.xms.common.core.page.TableDataInfo;
 import com.xms.common.enums.BusinessType;
 import com.xms.common.utils.poi.ExcelUtil;
+import com.xms.dao.entity.bo.GrantRewardTransferBo;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.entity.domain.UserMoney;
 import com.xms.dao.entity.vo.UserMoneyVo;
@@ -126,6 +127,19 @@ public class UserMoneyController extends BaseController {
 		//谷歌验证码验证
 		userService.pubValidate(userMoneyVo.getAutoCode());
 		return toAjax(userMoneyService.updateUserMoney(userMoneyVo));
+	}
+
+	/**
+	 * 后台将用户拨付收益USDT转入可用USDT。
+	 *
+	 * <p>该接口只处理资产字段迁移，权限复用用户钱包编辑权限，但操作日志单独区分为拨付收益转可用USDT。</p>
+	 */
+	@PreAuthorize("@ss.hasPermi('xms:usermoney:edit')")
+	@Log(title = "拨付收益转可用USDT", businessType = BusinessType.UPDATE)
+	@PutMapping("/transferGrantReward")
+	@RepeatSubmit
+	public AjaxResult transferGrantReward(@RequestBody GrantRewardTransferBo req) {
+		return toAjax(userMoneyService.transferGrantRewardToUsdt(req));
 	}
 
 	/*	*//**

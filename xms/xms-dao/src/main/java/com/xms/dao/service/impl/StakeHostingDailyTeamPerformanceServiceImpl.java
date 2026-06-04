@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.date.DateUtil;
 import com.xms.common.constant.ConstantStatic;
 import com.xms.common.constant.ConstantSys;
+import com.xms.common.constant.Constants;
 import com.xms.common.exception.ServiceException;
 import com.xms.dao.domain.StakeHostingDailyTeamPerformance;
 import com.xms.dao.domain.StakeHostingOrder;
@@ -15,6 +16,7 @@ import com.xms.dao.service.*;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,6 +58,7 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 	private final UserRelationService userRelationService;
 	private final IStakeHostingStaticRateConfigService staticRateConfigService;
 	private final ISysParaService iSysParaService;
+	private final Environment environment;
 
 	/**
 	 * 查询后台G7每日快照列表。
@@ -139,6 +142,7 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public void prepareDailySnapshots(Integer rewardDay, List<Long> rewardUserIds) {
+		moveG7SnapshotsBackOneDayForTest();
 		// 1. 合并“当天已有团队新增记录的用户”和“本轮101订单用户”，确保没推广的订单用户也有纯静态快照。
 		Set<Long> userIds = new LinkedHashSet<>();
 		List<Long> statUserIds = baseMapper.selectUserIdsByStatDay(rewardDay);
@@ -158,6 +162,49 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		for (Long userId : userIds) {
 			prepareOneSnapshot(userId, rewardDay, yesterdayTeamNewMap.get(userId), recentSnapshotMap.get(userId), pureStaticRateBeforeReturnPercent);
 		}
+	}
+
+	/**
+	 * 测试环境按开关将G7历史快照整体往前移动一天。
+	 *
+	 * <p>该方法只在非 prod 且系统参数 {@code kaixxguanxx=1} 时执行，用于本地/测试环境模拟连续多天G7历史数据。
+	 * 它只移动今天以前记录的 `stat_day` 和 `update_time`，不重算 `previous_team_tvl/current_team_tvl/g_day/g_smooth/base_static_rate/rate_source`，
+	 * 也不修改 `calc_status`。移动顺序按 `user_id + stat_day` 升序，尽量避开 `uk_user_day(user_id, stat_day)` 唯一索引冲突。</p>
+	 */
+	private void moveG7SnapshotsBackOneDayForTest() {
+		String profile = environment.getProperty(Constants.ACTIVE_PROFILES_PROPERTY);
+		if (Constants.ACTIVE_PROPERTY_PROD.equalsIgnoreCase(profile)) {
+			return;
+		}
+		String flag = iSysParaService.getValue(ConstantSys.kaixxguanxx);
+		if (!"1".equals(flag)) {
+			return;
+		}
+		Integer today = statDay(new Date());
+		List<StakeHostingDailyTeamPerformance> rows = lambdaQuery()
+			.lt(StakeHostingDailyTeamPerformance::getStatDay, today)
+			.eq(StakeHostingDailyTeamPerformance::getDeleted, 0)
+			.orderByAsc(StakeHostingDailyTeamPerformance::getUserId)
+			.orderByAsc(StakeHostingDailyTeamPerformance::getStatDay)
+			.orderByAsc(StakeHostingDailyTeamPerformance::getId)
+			.list();
+		if (CollectionUtil.isEmpty(rows)) {
+			log.info("G7测试快照日期回退跳过，没有今天以前的快照记录 profile={}, today={}", profile, today);
+			return;
+		}
+		Date now = new Date();
+		for (StakeHostingDailyTeamPerformance row : rows) {
+			Integer newStatDay = previousDay(row.getStatDay());
+			boolean updated = lambdaUpdate()
+				.eq(StakeHostingDailyTeamPerformance::getId, row.getId())
+				.set(StakeHostingDailyTeamPerformance::getStatDay, newStatDay)
+				.set(StakeHostingDailyTeamPerformance::getUpdateTime, now)
+				.update();
+			if (!updated) {
+				throw new ServiceException("G7测试快照日期回退失败，id=" + row.getId());
+			}
+		}
+		log.info("G7测试快照日期回退完成 profile={}, today={}, count={}", profile, today, rows.size());
 	}
 
 	/**

@@ -152,6 +152,11 @@ public class ConstantSys {
 	public static final String PURE_STATIC_RATE_AFTER_RETURN_PERCENT = "PURE_STATIC_RATE_AFTER_RETURN_PERCENT";
 
 	/**
+	 * 测试环境G7历史快照日期回退开关，1表示每次准备快照前将今天以前的快照整体往前移动一天。
+	 */
+	public static final String kaixxguanxx = "kaixxguanxx";
+
+	/**
 	 * Polymarket内部下单最低AFI数量，历史兼容参数。
 	 */
 	public static final String POLYMARKET_MIN_ORDER_AFI_AMOUNT = "POLYMARKET_MIN_ORDER_AFI_AMOUNT";

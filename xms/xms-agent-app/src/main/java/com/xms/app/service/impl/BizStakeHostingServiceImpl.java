@@ -205,7 +205,12 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		if (!ResultPista.isSuccess(resultPista)) {
 			throw new ServiceException(resultPista.getMsg());
 		}
-		stakeHostingOrderService.stopUserOneDayAutoReinvestOrder(SecurityUtils.getFrontUserId(), req.getOrderId());
+		UserInfo userInfo = userInfoService.lambdaQuery()
+				.eq(UserInfo::getUserId, SecurityUtils.getFrontUserId())
+				.select(UserInfo::getAccount,UserInfo::getUserId)
+				.one();
+		checkWallet(req.getRandomNum(), req.getSignature(), userInfo.getAccount(), xmsRedis);
+		stakeHostingOrderService.stopUserOneDayAutoReinvestOrder(userInfo.getUserId(), req.getOrderId());
 		return ResultPista.data("success");
 	}
 

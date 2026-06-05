@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.xms.common.annotation.Excel;
 import com.xms.common.core.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -148,4 +149,20 @@ public class NodePackageOrderCancel extends BaseEntity {
 	/** 取消结束时间查询条件，格式yyyy-MM-dd HH:mm:ss。 */
 	@TableField(exist = false)
 	private String endCancelTime;
+
+	/** 创建者 */
+	@JsonIgnore
+	@TableField(exist = false)
+	private String createBy;
+
+	/** 更新者 */
+	@JsonIgnore
+	@TableField(exist = false)
+	private String updateBy;
+	@JsonIgnore
+	@TableField(exist = false)
+	private Integer deleted;
+	@JsonIgnore
+	@TableField(exist = false)
+	private String remark;
 }

@@ -241,6 +241,19 @@
       </el-table-column>
       <el-table-column align="center" label="用户ID" prop="userId"/>
       <el-table-column label="备注" align="center" prop="remark" />
+      <el-table-column align="center" label="拨付收益开关" width="120">
+        <template slot-scope="scope">
+          <el-switch
+            v-hasPermi="['xms:userinfo:edit']"
+            :value="Number(scope.row.grantHostingRewardEnabled || 0)"
+            :active-value="1"
+            :inactive-value="0"
+            active-color="#13ce66"
+            inactive-color="#dcdfe6"
+            @change="handleGrantHostingRewardSwitch(scope.row, $event)"
+          />
+        </template>
+      </el-table-column>
 <!--      <el-table-column align="center" label="用户编码" prop="userCode" />-->
 
 <!--      <el-table-column label="昵称" align="center" prop="nickName" />
@@ -421,19 +434,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column align="center" label="拨付收益开关" width="120">
-        <template slot-scope="scope">
-          <el-switch
-            v-hasPermi="['xms:userinfo:edit']"
-            :value="Number(scope.row.grantHostingRewardEnabled || 0)"
-            :active-value="1"
-            :inactive-value="0"
-            active-color="#13ce66"
-            inactive-color="#dcdfe6"
-            @change="handleGrantHostingRewardSwitch(scope.row, $event)"
-          />
-        </template>
-      </el-table-column>
+
 
 <!--      <el-table-column label="我的算力" align="center" prop="performanceV1" width="150"/>-->
 <!--      <el-table-column label="业绩相关(BOOMAI)" align="center" width="150">

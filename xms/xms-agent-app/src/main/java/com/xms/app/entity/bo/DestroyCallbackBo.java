@@ -34,7 +34,7 @@ public class DestroyCallbackBo {
 	/**
 	 * 充值币种 0:afi,1:usdt
 	 */
-	@NotBlank
+	@NotNull
 	@ValidDiyStatus(values = {0,1}, message = "coinType error")
 	private Integer coinType;
     /**

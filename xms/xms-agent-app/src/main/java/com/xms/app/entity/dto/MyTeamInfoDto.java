@@ -90,10 +90,22 @@ public class MyTeamInfoDto {
 	private Integer directUserCount;
 
 	/**
-	 * 直推收益
+	 * 直推收益(节点直推收益)
 	 */
-	@ApiModelProperty(value = "直推收益")
+	@ApiModelProperty(value = "直推收益(节点直推收益)")
 	private BigDecimal directRewardAmount;
+
+	/**
+	 * 直推托管收益
+	 */
+	@ApiModelProperty(value = "直推托管收益")
+	private BigDecimal directHostingRewardAmount;
+
+	/**
+	 * 间推托管收益
+	 */
+	@ApiModelProperty(value = "间推托管收益")
+	private BigDecimal inferenceNodeReward;
 
 	/**
 	 * 团队收益，等于托管极差奖累计加托管平级奖累计，单位USDT。

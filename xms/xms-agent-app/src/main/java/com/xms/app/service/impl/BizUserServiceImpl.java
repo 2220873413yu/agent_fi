@@ -341,7 +341,9 @@ public class BizUserServiceImpl implements BizUserService {
 	}
 
 
-
+	public static void main(String[] args) {
+		System.out.println(IdUtil.getSnowflakeNextIdStr());
+	}
 	/**
 	 * 我的团队数据
 	 *
@@ -375,15 +377,40 @@ public class BizUserServiceImpl implements BizUserService {
 		BigDecimal diffRewardAmount = rewardSummary == null ? BigDecimal.ZERO : defaultAmount(rewardSummary.getDiffRewardAmount());
 		BigDecimal sameLevelRewardAmount = rewardSummary == null ? BigDecimal.ZERO : defaultAmount(rewardSummary.getSameLevelRewardAmount());
 		BigDecimal globalDividendAmount = rewardSummary == null ? BigDecimal.ZERO : defaultAmount(rewardSummary.getGlobalDividendAmount());
-		BigDecimal directRewardAmount = rewardRecordService.lambdaQuery()
-			.eq(RewardRecord::getUserId, userId)
-			.eq(RewardRecord::getSourceType, 1)
-			.select(RewardRecord::getAmount)
-			.list()
-			.stream()
-			.map(r -> defaultAmount(r.getAmount()))
-			.reduce(BigDecimal.ZERO, BigDecimal::add);
+
+
+
+
 		MyTeamInfoDto dto = new MyTeamInfoDto();
+		List<Integer> teamRewardSourceTypes = Arrays.asList(
+			ConstantType.xms_reward_record_source_type.type_1,
+			ConstantType.xms_reward_record_source_type.type_2,
+			ConstantType.xms_reward_record_source_type.type_28
+		);
+		Map<Integer, BigDecimal> teamRewardAmountMap = rewardRecordService.list(
+			new QueryWrapper<RewardRecord>()
+				.select("source_type", "COALESCE(SUM(amount),0) AS amount")
+				.eq("user_id", userId)
+				.in("source_type", teamRewardSourceTypes)
+				.groupBy("source_type")
+		).stream().collect(Collectors.toMap(
+			RewardRecord::getSourceType,
+			record -> defaultAmount(record.getAmount()),
+			BigDecimal::add
+		));
+
+		//直推收益
+		BigDecimal directRewardAmount = teamRewardAmountMap.getOrDefault(ConstantType.xms_reward_record_source_type.type_1, BigDecimal.ZERO);
+		dto.setDirectRewardAmount(directRewardAmount);
+
+		//间推托管收益
+		BigDecimal inferenceNodeReward = teamRewardAmountMap.getOrDefault(ConstantType.xms_reward_record_source_type.type_2, BigDecimal.ZERO);
+		dto.setInferenceNodeReward(inferenceNodeReward);
+
+		//直推托管收益
+		BigDecimal directHostingRewardAmount = teamRewardAmountMap.getOrDefault(ConstantType.xms_reward_record_source_type.type_28, BigDecimal.ZERO);
+		dto.setDirectHostingRewardAmount(directHostingRewardAmount);
+
 		dto.setCurrentLevel(currentLevel);
 		dto.setTargetLevel(targetLevel);
 		//个人业绩
@@ -404,8 +431,6 @@ public class BizUserServiceImpl implements BizUserService {
 		//进度条
 		dto.setTeamHostingProgress(progressPercent(teamHostingAmount, targetTeamHostingAmount));
 
-		//直推收益
-		dto.setDirectRewardAmount(directRewardAmount);
 
 
 

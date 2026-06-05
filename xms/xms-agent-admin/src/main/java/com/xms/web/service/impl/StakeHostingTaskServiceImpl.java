@@ -1014,7 +1014,6 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		if (CollectionUtil.isNotEmpty(userMoneyList)) {
 			// 静态收益批量入账按资产字段分流：真实托管收益进 valid_num1，后台拨付收益进 valid_num3。
 			batchUpdateRewardMoney(userMoneyList);
-			batchUpdateRewardMoney(userMoneyList);
 			userMoneyList.clear();
 		}
 		if (CollectionUtil.isNotEmpty(rewardRecordList)) {

@@ -35,7 +35,7 @@ export function updateUsermoney(data) {
   })
 }
 
-// 拨付收益USDT转入可用USDT
+// 锁定USDT转入可用USDT
 export function transferGrantReward(data) {
   return request({
     url: '/xms/usermoney/transferGrantReward',

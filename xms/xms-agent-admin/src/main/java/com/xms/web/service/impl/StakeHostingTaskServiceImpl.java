@@ -208,7 +208,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		//    直推、极差、平级只先收集到上下文，真正钱包入账在 flushTeamRewardContext。
 		for (StaticRewardResult result : staticRewardResults) {
 			if (result.shouldDistributeTeamReward()) {
-				// 用户购买单动态收益进入可用USDT；后台拨付单仅在用户开关开启后触发动态，且进入拨付收益USDT。
+				// 用户购买单动态收益进入可用USDT；后台拨付单仅在用户开关开启后触发动态，且进入锁定USDT。
 				distributeTeamReward(result.order, result.grossReward, result.baseStaticRate, result.afiAccelerateRate,
 					result.actualStaticRate, result.serviceFeeRatio, result.serviceFee, result.netReward, rewardDay, now,
 					teamRewardContext);
@@ -944,7 +944,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * 批量发放托管静态净收益并记录奖励流水。
 	 *
 	 * <p>用户购买订单继续进入 `valid_num1`，钱包来源类型为31；后台拨付订单在用户开关开启后
-	 * 进入 `valid_num3` 拨付收益USDT，钱包来源类型为47。订单本身仍复用 todayReward/totalStaticReward
+	 * 进入 `valid_num3` 锁定USDT，钱包来源类型为47。订单本身仍复用 todayReward/totalStaticReward
 	 * 做订单维度累计，资产字段和 sourceType 负责区分真实收益与拨付收益。</p>
 	 *
 	 * @param results 本轮静态收益计算结果
@@ -963,7 +963,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			}
 			boolean grantReward = isAdminGrantOrder(result.order);
 			String gtId = IDUtils.getSnowflakeStr();
-			// 用户购买单进入可用USDT；后台拨付单进入拨付收益USDT，避免和真实托管收益资产混淆。
+			// 用户购买单进入可用USDT；后台拨付单进入锁定USDT，避免和真实托管收益资产混淆。
 			UserMoney userMoney = new UserMoney();
 			userMoney.setId(result.order.getUserId());
 			if (grantReward) {
@@ -980,7 +980,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			userMoney.setUpdateTime(now);
 			userMoneyList.add(userMoney);
 
-			// 奖励记录同样用独立币种和来源类型隔离后台拨付托管静态收益。
+			// 奖励记录同样用独立币种和来源类型隔离锁定USDT静态收益。
 			RewardRecord rewardRecord = new RewardRecord();
 			rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
 			rewardRecord.setUserId(result.order.getUserId());
@@ -1368,7 +1368,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 *
 	 * <p>动态奖励分两段：先给直属上级发直推奖，再按有效上级链计算极差/平级奖。
 	 * 用户购买单动态奖励进入可用USDT；后台拨付单只有开关开启并产生静态收益后才会进入这里，
-	 * 且动态奖励进入拨付收益USDT。</p>
+	 * 且动态奖励进入锁定USDT。</p>
 	 *
 	 * @param order 产生静态收益的托管订单
 	 * @param grossReward 静态毛收益
@@ -1804,7 +1804,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * 收集团队动态奖励的钱包增量、奖励记录和结算明细。
 	 *
 	 * <p>用户购买订单按直推/极差/平级来源类型进入 `valid_num1`；后台拨付订单触发的动态奖励统一使用
-	 * sourceType=48 进入上级用户 `valid_num3` 拨付收益USDT，并且不累计到普通动态奖励汇总表。</p>
+	 * sourceType=48 进入上级用户 `valid_num3` 锁定USDT，并且不累计到普通动态奖励汇总表。</p>
 	 *
 	 * @param context 团队奖励收集上下文
 	 * @param order 静态收益来源订单
@@ -1845,7 +1845,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			: rewardType == REWARD_TYPE_DIFF ? ConstantType.xms_reward_record_source_type.type_29
 			: ConstantType.xms_reward_record_source_type.type_30;
 		String gtId = IDUtils.getSnowflakeStr();
-		// 用户购买单动态奖励进入可用USDT；后台拨付单触发的动态奖励进入拨付收益USDT。
+		// 用户购买单动态奖励进入可用USDT；后台拨付单触发的动态奖励进入锁定USDT。
 		UserMoney userMoney = new UserMoney();
 		userMoney.setId(receiveUserId);
 		if (grantReward) {
@@ -1903,7 +1903,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	/**
 	 * 汇总用户购买单的极差和平级奖励统计。
 	 *
-	 * <p>后台拨付订单动态收益进入拨付收益USDT，不计入普通团队奖励汇总；
+	 * <p>后台拨付订单动态收益进入锁定USDT，不计入普通团队奖励汇总；
 	 * 因此调用方只在非后台拨付订单时调用本方法。</p>
 	 *
 	 * @param context 团队奖励收集上下文
@@ -1960,7 +1960,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * 按钱包资产字段批量发放托管奖励。
 	 *
 	 * <p>真实用户购买托管收益写入 `valid_num1`；后台拨付托管静态/动态收益写入
-	 * `valid_num3` 拨付收益USDT。调用方必须提前设置好金额字段、sourceType、sourceCode 和 gtId。</p>
+	 * `valid_num3` 锁定USDT。调用方必须提前设置好金额字段、sourceType、sourceCode 和 gtId。</p>
 	 *
 	 * @param userMoneyList 待批量入账的钱包增量
 	 */
@@ -1975,13 +1975,13 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		List<UserMoney> validNum3List = userMoneyList.stream()
 			.filter(item -> item.getValidNum3() != null && item.getValidNum3().compareTo(BigDecimal.ZERO) != 0)
 			.collect(Collectors.toList());
-		// valid_num1 写可用USDT，valid_num3 写拨付收益USDT，两边都带 gtId/sourceCode/sourceType/sourceId 供流水追踪。
+		// valid_num1 写可用USDT，valid_num3 写锁定USDT，两边都带 gtId/sourceCode/sourceType/sourceId 供流水追踪。
 		batchUpdateMoneyValid1(validNum1List);
 		batchUpdateMoneyValid3(validNum3List);
 	}
 
 	/**
-	 * 批量增加用户拨付收益USDT余额。
+	 * 批量增加用户锁定USDT余额。
 	 *
 	 * @param userMoneyList 待写入 `valid_num3` 的钱包增量
 	 */

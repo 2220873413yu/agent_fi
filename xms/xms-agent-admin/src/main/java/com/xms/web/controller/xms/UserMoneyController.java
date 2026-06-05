@@ -130,12 +130,12 @@ public class UserMoneyController extends BaseController {
 	}
 
 	/**
-	 * 后台将用户拨付收益USDT转入可用USDT。
+	 * 后台将用户锁定USDT转入可用USDT。
 	 *
-	 * <p>该接口只处理资产字段迁移，权限复用用户钱包编辑权限，但操作日志单独区分为拨付收益转可用USDT。</p>
+	 * <p>该接口只处理资产字段迁移，权限复用用户钱包编辑权限，但操作日志单独区分为锁定USDT转可用USDT。</p>
 	 */
 	@PreAuthorize("@ss.hasPermi('xms:usermoney:edit')")
-	@Log(title = "拨付收益转可用USDT", businessType = BusinessType.UPDATE)
+	@Log(title = "锁定USDT转可用USDT", businessType = BusinessType.UPDATE)
 	@PutMapping("/transferGrantReward")
 	@RepeatSubmit
 	public AjaxResult transferGrantReward(@RequestBody GrantRewardTransferBo req) {

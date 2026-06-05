@@ -70,11 +70,11 @@ public class UserMoneyServiceImpl extends ServiceImpl<UserMoneyMapper, UserMoney
 	}
 
 	/**
-	 * 后台将拨付收益USDT转入用户可用USDT。
+	 * 后台将锁定USDT转入用户可用USDT。
 	 *
 	 * <p>该操作是同一用户钱包字段迁移，不是充值、提现或平台扣拨。方法按用户ID加Redis锁，
 	 * 在同一事务内通过钱包框架一次性扣减 `valid_num3` 并增加 `valid_num1`，Canal后续按同一个
-	 * transferNo/sourceType=49 生成拨付收益USDT扣减和可用USDT增加两条流水。</p>
+	 * transferNo/sourceType=49 生成锁定USDT扣减和可用USDT增加两条流水。</p>
 	 *
 	 * @param req 转移用户和转移金额，金额单位USDT
 	 * @return 1表示转移成功
@@ -98,7 +98,7 @@ public class UserMoneyServiceImpl extends ServiceImpl<UserMoneyMapper, UserMoney
 		}
 		BigDecimal grantRewardBalance = userMoney.getValidNum3() == null ? BigDecimal.ZERO : userMoney.getValidNum3();
 		if (grantRewardBalance.compareTo(transferAmount) < 0) {
-			throw new ServiceException("拨付收益USDT余额不足");
+			throw new ServiceException("锁定USDT余额不足");
 		}
 
 		// 同一个transferNo/sourceType追踪本次字段迁移，Canal会拆成coinType=3扣减和coinType=1入账两条流水。
@@ -124,7 +124,7 @@ public class UserMoneyServiceImpl extends ServiceImpl<UserMoneyMapper, UserMoney
 		int rows = userWalletServiceImpl.updateWallet(updateUserWalletVo);
 		if (rows != 1) {
 			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-			throw new ServiceException("拨付收益USDT余额不足");
+			throw new ServiceException("锁定USDT余额不足");
 		}
 		return 1;
 	}

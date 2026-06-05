@@ -86,7 +86,7 @@
 <!--        <el-table-column align="center" label="用户编码" prop="userCode"/>-->
         <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="USDT" prop="validNum1" sortable="custom" />
         <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="AFI" prop="validNum2" sortable="custom" />
-        <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="拨付收益USDT" prop="validNum3" sortable="custom" />
+        <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="锁定USDT" prop="validNum3" sortable="custom" />
 <!--
         <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="OORT" prop="validNum3" sortable="custom"/>
         <el-table-column :sort-orders="['descending', 'ascending']" align="center" label="锁定USDT" prop="validNum4" sortable="custom"/>
@@ -124,7 +124,7 @@
               size="mini"
               type="text"
               @click="handleTransferGrantReward(scope.row)"
-            >拨付资产转移</el-button>
+            >锁定资产转移</el-button>
             <!-- <el-button
               size="mini"
               type="text"
@@ -185,7 +185,7 @@
         </div>
       </el-dialog>
 
-      <!-- 拨付收益USDT转可用USDT对话框 -->
+      <!-- 锁定USDT转可用USDT对话框 -->
       <el-dialog :close-on-click-modal="false" :title="transferTitle" :visible.sync="transferOpen" append-to-body width="500px">
         <el-form ref="transferForm" :model="transferForm" :rules="transferRules" class="custom-form" label-width="130px">
           <el-form-item label="钱包地址">
@@ -249,7 +249,7 @@
         title: "",
         // 是否显示弹出层
         open: false,
-        // 是否显示拨付资产转移弹出层
+        // 是否显示锁定资产转移弹出层
         transferOpen: false,
         // 查询参数
         queryParams: {
@@ -262,7 +262,7 @@
         defaultSort: {prop: 'id', order: 'descending'},
         // 表单参数
         form: {},
-        // 拨付资产转移表单参数
+        // 锁定资产转移表单参数
         transferForm: {},
         // 表单校验
         rules: {
@@ -328,7 +328,7 @@
         this.open = false;
         this.reset();
       },
-      // 取消拨付资产转移按钮
+      // 取消锁定资产转移按钮
       cancelTransfer() {
         this.transferOpen = false;
         this.resetTransfer();
@@ -360,7 +360,7 @@
         };
         this.resetForm("form");
       },
-      // 拨付资产转移表单重置
+      // 锁定资产转移表单重置
       resetTransfer() {
         this.transferForm = {
           userId: null,
@@ -402,7 +402,7 @@
           this.title = "修改用户钱包";
         });
       },
-      /** 拨付资产转移按钮操作 */
+      /** 锁定资产转移按钮操作 */
       handleTransferGrantReward(row) {
         this.resetTransfer();
         this.transferForm = {
@@ -412,7 +412,7 @@
           transferAmount: null
         };
         this.transferOpen = true;
-        this.transferTitle = "拨付收益USDT转可用USDT";
+        this.transferTitle = "锁定USDT转可用USDT";
       },
       /** 提交按钮 */
       submitForm() {
@@ -434,7 +434,7 @@
           }
         });
       },
-      /** 提交拨付收益USDT转可用USDT */
+      /** 提交锁定USDT转可用USDT */
       submitTransferGrantReward() {
         this.$refs["transferForm"].validate(valid => {
           if (valid) {

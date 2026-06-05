@@ -35,7 +35,7 @@ public interface IUserMoneyService extends IService<UserMoney> {
 	public int updateUserMoney(UserMoneyVo userMoneyVo);
 
 	/**
-	 * 后台将用户拨付收益USDT转入可用USDT。
+	 * 后台将用户锁定USDT转入可用USDT。
 	 *
 	 * @param req 转移用户和金额
 	 * @return 1表示转移成功

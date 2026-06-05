@@ -5,7 +5,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 /**
- * 后台拨付收益USDT转可用USDT请求。
+ * 后台锁定USDT转可用USDT请求。
  */
 @Data
 public class GrantRewardTransferBo {

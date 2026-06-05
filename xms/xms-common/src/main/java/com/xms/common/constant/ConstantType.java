@@ -90,9 +90,9 @@ public class ConstantType {
 		public static final int type_31 = 31;
 		//节点认购AFI线性释放
 		public static final int type_32 = 32;
-		//后台拨付托管静态收益
+		//锁定USDT静态收益
 		public static final int type_47 = 47;
-		//后台拨付托管动态收益
+		//锁定USDT动态收益
 		public static final int type_48 = 48;
 	}
 
@@ -181,9 +181,9 @@ public class ConstantType {
 		public static final int type_45 = 45;
 		//托管购买扣款
 		public static final int type_46 = 46;
-		//锁定usdt静态收益 后台拨付托管静态收益
+		//锁定USDT静态收益
 		public static final int type_47 = 47;
-		//锁定usdt动态收益 后台拨付托管动态收益
+		//锁定USDT动态收益
 		public static final int type_48 = 48;
 		//锁定usdt转可用USDT
 		public static final int type_49 = 49;

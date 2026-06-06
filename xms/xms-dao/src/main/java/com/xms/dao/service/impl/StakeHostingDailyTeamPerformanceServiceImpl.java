@@ -308,7 +308,7 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		// 但当前业务口径不是有效托管存量，而是“收益归属日当天伞下新增托管USDT”。
 		BigDecimal currentTvl = nvl(snapshot.getTeamNewAmount())
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
-		// 单日G值只比较今日新增和昨日新增：昨日为0时返回0%，否则按增长率公式计算并限制正向最大200%。
+		// 单日G值只比较今日新增和昨日新增：昨日和今日都为0时返回0%，否则按增长率公式计算并限制正向最大200%。
 		BigDecimal gDay = calculateGDay(previousTvl, currentTvl);
 		// 历史G值取 rewardDay 前最近最多6个已计算快照，用于和当天G值一起做最多7天平滑。
 		List<BigDecimal> previousGDays = extractGDays(previousSnapshots);
@@ -377,8 +377,8 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 	 * 按G7规则计算单日团队新增业绩增长率。
 	 *
 	 * <p>本方法只比较“今日团队新增业绩”和“昨日团队新增业绩”，不使用累计团队业绩，
-	 * 也不扣减订单到期金额。昨日新增为0时直接按0%处理，避免从0增长导致G值异常放大；
-	 * 昨日新增大于0时使用 max(昨日新增, 100) 作为分母做低基数保护。
+	 * 也不扣减订单到期金额。昨日和今日新增都为0时按0%处理；其他情况统一使用
+	 * max(昨日新增, 100) 作为分母做低基数保护。
 	 * 正向增长最高封顶200%，负增长不做下限截断。</p>
 	 *
 	 * @param previousTvl 昨日团队新增托管USDT金额
@@ -389,11 +389,11 @@ public class StakeHostingDailyTeamPerformanceServiceImpl
 		// 业绩金额允许上游没有记录，统一按0处理，避免后续BigDecimal计算空指针。
 		previousTvl = nvl(previousTvl);
 		currentTvl = nvl(currentTvl);
-		// 昨日没有新增业绩时，本日G_day固定为0%，不把首日新增放大成超高增长率。
-		if (previousTvl.compareTo(BigDecimal.ZERO) == 0) {
+		// 昨日和今日都没有新增业绩时，本日G_day固定为0%。
+		if (previousTvl.compareTo(BigDecimal.ZERO) == 0 && currentTvl.compareTo(BigDecimal.ZERO) == 0) {
 			return BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
 		}
-		// 低基数保护：昨日新增小于100U时，分母按100U计算，降低小额波动对收益率的影响。
+		// 低基数保护：昨日新增小于100U时，分母按100U计算，包含昨日为0但今日有新增的场景。
 		BigDecimal denominator = previousTvl.max(LOW_BASE);
 		// G_day = (今日新增 - 昨日新增) / max(昨日新增, 100) * 100%，结果单位是百分比。
 		BigDecimal gDay = currentTvl.subtract(previousTvl).multiply(HUNDRED)

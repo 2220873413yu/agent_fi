@@ -37,6 +37,9 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class XmsUserInfoServiceImpl implements XmsUserInfoService {
+	private static final String NODE_LEVEL_DICT_TYPE = "t_node_plan_node_level";
+	private static final String GAME_LEVEL_DICT_TYPE = "t_user_info_game_level";
+
 	@Autowired
 	private XmsRedis xmsRedis;
 
@@ -210,13 +213,8 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 		if (currentUser == null) {
 			throw new ServiceException("查询的用户不存在");
 		}
-		Map<Integer, String> nodeLevelMap = this.userInfoMapper.selectDictDataByType("t_node_plan_node_level")
-			.stream()
-			.collect(Collectors.toMap(
-				data -> Integer.parseInt(data.getDictValue()),
-				SysDictData::getDictLabel,
-				(existing, replacement) -> existing  // 或选择一个策略来处理冲突
-			));
+		Map<Integer, String> nodeLevelMap = loadDictMap(NODE_LEVEL_DICT_TYPE);
+		Map<Integer, String> gameLevelMap = loadDictMap(GAME_LEVEL_DICT_TYPE);
 		List<UserInfo> userList =  userInfoMapper.queryNetBodyChildUser(currentUser.getUserId());
 
 		if(CollectionUtil.isEmpty(userList)){
@@ -226,7 +224,7 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 				tree.setId(user.getUserId());
 				tree.setParentId(user.getInviteUserId());
 				tree.setName(user.getAccount());
-				fillNodeTreeExtra(user, tree, nodeLevelMap);
+				fillNodeTreeExtra(user, tree, nodeLevelMap, gameLevelMap);
 			}));
 		}
 		userList.addFirst(currentUser);
@@ -237,29 +235,42 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 			tree.setId(user.getUserId());
 			tree.setParentId(user.getParentId());
 			tree.setName(user.getAccount());
-			fillNodeTreeExtra(user, tree, nodeLevelMap);
+			fillNodeTreeExtra(user, tree, nodeLevelMap, gameLevelMap);
 		}));
 	}
 
-	private void fillNodeTreeExtra(UserInfo user, Tree<Long> tree, Map<Integer, String> nodeLevelMap) {
+	private void fillNodeTreeExtra(UserInfo user, Tree<Long> tree, Map<Integer, String> nodeLevelMap,
+								   Map<Integer, String> gameLevelMap) {
+		//remark
+		tree.putExtra("remark", user.getRemark());
 		//钱包地址
 		tree.putExtra("account", user.getAccount());
+		//用户ID
+		tree.putExtra("userId", user.getUserId());
 		//节点等级
-		tree.putExtra("level", nodeLevelMap.get(user.getNodeLevel()));
-		//直推节点数量
-		tree.putExtra("subNodePerformance", user.getSubNodePerformance());
-		//团队节点数量
-		tree.putExtra("nodeTeamPerformance", user.getNodeTeamPerformance());
-		//直推用户数保留给前端判断是否还有子节点
+		tree.putExtra("level", dictLabel(nodeLevelMap, user.getNodeLevel()));
+		//团队等级(真)
+		tree.putExtra("gameLevel", dictLabel(gameLevelMap, user.getGameLevel()));
+		//团队等级(后台)
+		tree.putExtra("adminGameLevel", dictLabel(gameLevelMap, user.getAdminGameLevel()));
+		//直推人数
 		tree.putExtra("subNum", user.getSubNum());
+		//团队人数
+		tree.putExtra("umbrellaNum", user.getUmbrellaNum());
+		//团队节点数量
+		tree.putExtra("nodeTeamPerformance", defaultAmount(user.getNodeTeamPerformance()));
 		//增加团队节点支付
 		BigDecimal umbrellaNodePerformance = defaultAmount(user.getUmbrellaNodePerformance());
 		BigDecimal adminUmbrellaNodePerformance = defaultAmount(user.getAdminUmbrellaNodePerformance());
 		tree.putExtra("umbrellaNodePerformance", umbrellaNodePerformance);
-		//增加节点金额(用户购买的+后台拨付的)
+		//团队节点金额
 		tree.putExtra("allUmbrellaNodePerformance", umbrellaNodePerformance.add(adminUmbrellaNodePerformance));
-		//团队用户数
-		tree.putExtra("umbrellaNum", user.getUmbrellaNum());
+		//自身托管
+		tree.putExtra("performance", defaultAmount(user.getPerformance()));
+		//团队托管
+		tree.putExtra("umbrellaPerformance", defaultAmount(user.getUmbrellaPerformance()));
+		//小区托管
+		tree.putExtra("communityPerformance", defaultAmount(user.getCommunityPerformance()));
 	}
 
 	/**
@@ -286,19 +297,14 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 			throw new ServiceException("查询的用户不存在");
 		}
 
-		Map<Integer, String> nodeLevelMap = this.userInfoMapper.selectDictDataByType("t_node_plan_node_level")
-			.stream()
-			.collect(Collectors.toMap(
-				data -> Integer.parseInt(data.getDictValue()),
-				SysDictData::getDictLabel,
-				(existing, replacement) -> existing
-			));
+		Map<Integer, String> nodeLevelMap = loadDictMap(NODE_LEVEL_DICT_TYPE);
+		Map<Integer, String> gameLevelMap = loadDictMap(GAME_LEVEL_DICT_TYPE);
 
 		// 导出页面“所有数据”按后端网体查询范围导出，不依赖前端是否已展开节点。
 		List<UserInfo> userList = userInfoMapper.queryNetBodyAllChildUser(currentUser.getUserId());
 		userList.addFirst(currentUser);
 		return userList.stream()
-			.map(user -> buildNetBodyExportDto(user, nodeLevelMap))
+			.map(user -> buildNetBodyExportDto(user, nodeLevelMap, gameLevelMap))
 			.collect(Collectors.toList());
 	}
 
@@ -307,24 +313,46 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 	 *
 	 * @param user 用户信息
 	 * @param nodeLevelMap 节点等级字典映射
+	 * @param gameLevelMap 团队等级字典映射
 	 * @return Excel导出行DTO
 	 */
-	private UserNetBodyExportDto buildNetBodyExportDto(UserInfo user, Map<Integer, String> nodeLevelMap) {
+	private UserNetBodyExportDto buildNetBodyExportDto(UserInfo user, Map<Integer, String> nodeLevelMap,
+													   Map<Integer, String> gameLevelMap) {
 		BigDecimal umbrellaNodePerformance = defaultAmount(user.getUmbrellaNodePerformance());
 		BigDecimal adminUmbrellaNodePerformance = defaultAmount(user.getAdminUmbrellaNodePerformance());
 		UserNetBodyExportDto dto = new UserNetBodyExportDto();
-		dto.setUserId(user.getUserId());
+		dto.setRemark(user.getRemark());
 		dto.setAccount(user.getAccount());
-		dto.setNodeLevel(nodeLevelMap.get(user.getNodeLevel()));
+		dto.setUserId(user.getUserId());
+		dto.setNodeLevel(dictLabel(nodeLevelMap, user.getNodeLevel()));
+		dto.setGameLevel(dictLabel(gameLevelMap, user.getGameLevel()));
+		dto.setAdminGameLevel(dictLabel(gameLevelMap, user.getAdminGameLevel()));
 		dto.setSubNum(user.getSubNum());
 		dto.setUmbrellaNum(user.getUmbrellaNum());
-		dto.setSubNodePerformance(defaultAmount(user.getSubNodePerformance()));
 		dto.setNodeTeamPerformance(defaultAmount(user.getNodeTeamPerformance()));
 		dto.setUmbrellaNodePerformance(umbrellaNodePerformance);
-		dto.setAdminUmbrellaNodePerformance(adminUmbrellaNodePerformance);
 		dto.setAllUmbrellaNodePerformance(umbrellaNodePerformance.add(adminUmbrellaNodePerformance));
-		dto.setCreateTime(user.getCreateTime());
+		dto.setPerformance(defaultAmount(user.getPerformance()));
+		dto.setUmbrellaPerformance(defaultAmount(user.getUmbrellaPerformance()));
+		dto.setCommunityPerformance(defaultAmount(user.getCommunityPerformance()));
 		return dto;
+	}
+
+	private Map<Integer, String> loadDictMap(String dictType) {
+		return this.userInfoMapper.selectDictDataByType(dictType)
+			.stream()
+			.collect(Collectors.toMap(
+				data -> Integer.parseInt(data.getDictValue()),
+				SysDictData::getDictLabel,
+				(existing, replacement) -> existing
+			));
+	}
+
+	private String dictLabel(Map<Integer, String> dictMap, Integer value) {
+		if (value == null) {
+			return null;
+		}
+		return dictMap.getOrDefault(value, String.valueOf(value));
 	}
 
 	/**

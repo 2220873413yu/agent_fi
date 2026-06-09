@@ -1,14 +1,14 @@
--- G7 静态日利率口径调整增量 SQL
+-- G7 静态日利率每日新增口径注释修正历史 SQL
 -- 说明：
--- 1. 本次不新增字段、不改字段类型、不新建表。
--- 2. G7 已改为“今日团队新增业绩 vs 昨日团队新增业绩”口径。
--- 3. 以下 SQL 只修正数据库字段注释和表注释，避免继续误解为“有效托管 TVL / 到期扣减”。
+-- 1. 本脚本用于旧“每日新增业绩”实现阶段。
+-- 2. 总业绩TVL改造后，previous_team_tvl/current_team_tvl 仅保留为新增业绩审计字段。
+-- 3. 新规则字段请执行 stake_hosting_g7_total_performance.sql。
 
 ALTER TABLE `t_stake_hosting_daily_team_performance`
   MODIFY COLUMN `team_expired_amount` decimal(20,6) NOT NULL DEFAULT '0.000000'
-    COMMENT '当天伞下团队到期托管USDT金额，当前不参与G7静态日利率',
+    COMMENT '当天伞下团队到期托管USDT金额，历史/审计字段，不参与新G7公式',
   MODIFY COLUMN `previous_team_tvl` decimal(20,6) NOT NULL DEFAULT '0.000000'
-    COMMENT '昨日伞下团队新增托管USDT金额，字段名沿用previous_team_tvl',
+    COMMENT '昨日伞下团队新增托管USDT金额，旧字段/审计',
   MODIFY COLUMN `current_team_tvl` decimal(20,6) NOT NULL DEFAULT '0.000000'
-    COMMENT '当日伞下团队新增托管USDT金额，字段名沿用current_team_tvl',
-  COMMENT = '托管G7每日团队新增业绩与收益率快照表';
+    COMMENT '当日伞下团队新增托管USDT金额，旧字段/审计',
+  COMMENT = '托管G7每日团队业绩与收益率快照表';

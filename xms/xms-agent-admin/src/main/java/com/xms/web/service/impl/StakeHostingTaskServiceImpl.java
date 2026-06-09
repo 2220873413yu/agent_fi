@@ -1279,6 +1279,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.stakeHostingStaticRate(user == null ? null : user.getStakeHostingStaticRate())
 			.previousTeamTvl(snapshot == null ? null : snapshot.getPreviousTeamTvl())
 			.currentTeamTvl(snapshot == null ? null : snapshot.getCurrentTeamTvl())
+			.previousTeamTotalPerformance(snapshot == null ? null : snapshot.getPreviousTeamTotalPerformance())
+			.currentTeamTotalPerformance(snapshot == null ? null : snapshot.getCurrentTeamTotalPerformance())
 			.teamNewAmount(snapshot == null ? null : snapshot.getTeamNewAmount())
 			.teamExpiredAmount(snapshot == null ? null : snapshot.getTeamExpiredAmount())
 			.gDay(snapshot == null ? null : snapshot.getGDay())

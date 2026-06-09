@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 托管G7每日团队新增业绩与静态收益率快照Controller。
+ * 托管G7每日团队业绩与静态收益率快照Controller。
  *
  * <p>该后台页面只提供查询和导出能力，用于核对101任务或测试任务生成的G_day、Gsmooth和基础静态收益率，
  * 不允许后台直接新增、修改或删除快照数据。</p>
@@ -36,7 +36,7 @@ public class StakeHostingDailyTeamPerformanceController extends BaseController {
 	}
 
 	/**
-	 * 查询托管G7每日团队新增业绩与静态收益率快照列表。
+	 * 查询托管G7每日团队业绩与静态收益率快照列表。
 	 *
 	 * @param performance 查询条件，支持用户ID、钱包地址、统计日、收益率来源和计算状态
 	 * @return 分页后的G7每日快照列表
@@ -50,7 +50,7 @@ public class StakeHostingDailyTeamPerformanceController extends BaseController {
 	}
 
 	/**
-	 * 导出托管G7每日团队新增业绩与静态收益率快照。
+	 * 导出托管G7每日团队业绩与静态收益率快照。
 	 *
 	 * @param response HTTP响应
 	 * @param performance 查询条件

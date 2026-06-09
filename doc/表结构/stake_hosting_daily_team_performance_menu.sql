@@ -55,7 +55,7 @@ WHERE NOT EXISTS (
 SELECT @stakeHostingRootId := menu_id FROM sys_menu WHERE menu_name = '托管管理' AND parent_id = @stakeHostingRootParentId AND menu_type = 'M' LIMIT 1;
 
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
-SELECT 'G7每日快照', @stakeHostingRootId, 12, 'stakeHostingDailyTeamPerformance', 'xms/stakeHostingDailyTeamPerformance/index', 1, 0, 'C', '0', '0', 'xms:stakeHostingDailyTeamPerformance:list', 'chart', 'admin', sysdate(), '', null, '托管G7每日团队新增业绩与静态收益率快照菜单'
+SELECT 'G7每日快照', @stakeHostingRootId, 12, 'stakeHostingDailyTeamPerformance', 'xms/stakeHostingDailyTeamPerformance/index', 1, 0, 'C', '0', '0', 'xms:stakeHostingDailyTeamPerformance:list', 'chart', 'admin', sysdate(), '', null, '托管G7每日团队业绩与静态收益率快照菜单'
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @stakeHostingRootId AND perms = 'xms:stakeHostingDailyTeamPerformance:list');
 
 SELECT @dailyTeamPerformanceMenuId := menu_id FROM sys_menu WHERE parent_id = @stakeHostingRootId AND perms = 'xms:stakeHostingDailyTeamPerformance:list' LIMIT 1;

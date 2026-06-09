@@ -1,6 +1,6 @@
 -- 托管静态收益率 G7 增量脚本
 -- 只做增量变更，不修改历史建表 SQL。
--- 口径：G7 使用伞下团队托管 USDT 金额，不使用套餐积分系数。
+-- 口径：G7 使用 t_user_info.umbrella_performance 保存的团队总业绩(质押量)，不使用套餐积分系数。
 
 ALTER TABLE `t_stake_hosting_order`
     ADD COLUMN `g7_new_performance_status` int NOT NULL DEFAULT '0' COMMENT 'G7团队新增统计状态 0未处理 1已处理' AFTER `weekly_performance_time`,
@@ -18,8 +18,10 @@ CREATE TABLE `t_stake_hosting_daily_team_performance` (
   `stat_day` int NOT NULL COMMENT '统计日期，格式yyyyMMdd',
   `team_new_amount` decimal(20,6) NOT NULL DEFAULT '0.000000' COMMENT '当天伞下团队新增托管USDT金额',
   `team_expired_amount` decimal(20,6) NOT NULL DEFAULT '0.000000' COMMENT '当天伞下团队到期托管USDT金额',
-  `previous_team_tvl` decimal(20,6) NOT NULL DEFAULT '0.000000' COMMENT '昨日伞下团队有效托管USDT TVL',
-  `current_team_tvl` decimal(20,6) NOT NULL DEFAULT '0.000000' COMMENT '当日伞下团队有效托管USDT TVL',
+  `previous_team_tvl` decimal(20,6) NOT NULL DEFAULT '0.000000' COMMENT '昨日伞下团队新增托管USDT金额，旧字段/审计',
+  `current_team_tvl` decimal(20,6) NOT NULL DEFAULT '0.000000' COMMENT '当日伞下团队新增托管USDT金额，旧字段/审计',
+  `previous_team_total_performance` decimal(20,6) NOT NULL DEFAULT '0.000000' COMMENT '昨日团队总业绩(质押量)',
+  `current_team_total_performance` decimal(20,6) NOT NULL DEFAULT '0.000000' COMMENT '今日团队总业绩(质押量)',
   `g_day` decimal(10,4) NOT NULL DEFAULT '0.0000' COMMENT '单日增长率，单位%',
   `g_smooth` decimal(10,4) NOT NULL DEFAULT '0.0000' COMMENT '最近最多7天滚动平均增长率，单位%',
   `base_static_rate` decimal(10,4) NOT NULL DEFAULT '0.5000' COMMENT '命中基础静态收益率，单位%',
@@ -34,7 +36,7 @@ CREATE TABLE `t_stake_hosting_daily_team_performance` (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE KEY `uk_user_day` (`user_id`, `stat_day`) USING BTREE,
   KEY `idx_stat_day` (`stat_day`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci ROW_FORMAT=DYNAMIC COMMENT='托管G7每日团队TVL与收益率快照表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci ROW_FORMAT=DYNAMIC COMMENT='托管G7每日团队业绩与收益率快照表';
 
 CREATE TABLE `t_stake_hosting_static_rate_config` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',

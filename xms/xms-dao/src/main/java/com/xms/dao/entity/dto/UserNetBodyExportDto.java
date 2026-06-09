@@ -1,11 +1,9 @@
 package com.xms.dao.entity.dto;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.xms.common.annotation.Excel;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.util.Date;
 
 /**
  * 网体关系树导出DTO。
@@ -15,37 +13,45 @@ import java.util.Date;
 @Data
 public class UserNetBodyExportDto {
 
-	@Excel(name = "用户ID", sort = 1)
-	private Long userId;
+	@Excel(name = "备注", sort = 1, width = 30)
+	private String remark;
 
 	@Excel(name = "钱包地址", sort = 2, width = 40)
 	private String account;
 
-	@Excel(name = "节点等级", sort = 3)
+	@Excel(name = "用户ID", sort = 3)
+	private Long userId;
+
+	@Excel(name = "节点等级", sort = 4)
 	private String nodeLevel;
 
-	@Excel(name = "直推人数", sort = 4)
+	@Excel(name = "团队等级(真)", sort = 5)
+	private String gameLevel;
+
+	@Excel(name = "团队等级(后台)", sort = 6)
+	private String adminGameLevel;
+
+	@Excel(name = "直推人数", sort = 7)
 	private Integer subNum;
 
-	@Excel(name = "团队人数", sort = 5)
+	@Excel(name = "团队人数", sort = 8)
 	private Integer umbrellaNum;
 
-	@Excel(name = "直推节点数量", sort = 6)
-	private BigDecimal subNodePerformance;
-
-	@Excel(name = "团队节点数量", sort = 7)
+	@Excel(name = "团队节点数量", sort = 9)
 	private BigDecimal nodeTeamPerformance;
 
-	@Excel(name = "团队节点支付", sort = 8)
+	@Excel(name = "团队节点支付", sort = 10)
 	private BigDecimal umbrellaNodePerformance;
 
-	@Excel(name = "后台拨付团队节点业绩", sort = 9)
-	private BigDecimal adminUmbrellaNodePerformance;
-
-	@Excel(name = "团队节点金额", sort = 10)
+	@Excel(name = "团队节点金额", sort = 11)
 	private BigDecimal allUmbrellaNodePerformance;
 
-	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-	@Excel(name = "创建时间", sort = 11, width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
-	private Date createTime;
+	@Excel(name = "自身托管", sort = 12)
+	private BigDecimal performance;
+
+	@Excel(name = "团队托管", sort = 13)
+	private BigDecimal umbrellaPerformance;
+
+	@Excel(name = "小区托管", sort = 14)
+	private BigDecimal communityPerformance;
 }

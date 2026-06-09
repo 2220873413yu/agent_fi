@@ -8,13 +8,13 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * 托管G7每日团队新增业绩与收益率快照Mapper接口
+ * 托管G7每日团队业绩与收益率快照Mapper接口
  *
  * @author xms
  */
 public interface StakeHostingDailyTeamPerformanceMapper extends XmsMapper<StakeHostingDailyTeamPerformance> {
 	/**
-	 * 查询托管G7每日团队新增业绩与静态收益率快照列表。
+	 * 查询托管G7每日团队业绩与静态收益率快照列表。
 	 *
 	 * @param performance 查询条件
 	 * @return G7每日快照列表
@@ -38,7 +38,7 @@ public interface StakeHostingDailyTeamPerformanceMapper extends XmsMapper<StakeH
 	/**
 	 * 累加用户某天的伞下团队到期托管USDT金额。
 	 *
-	 * @deprecated G7静态日利率已改为每日新增对比口径，订单到期金额不再参与G7。
+	 * @deprecated G7静态日利率已改为团队总业绩口径，到期审计字段不再参与G7公式。
 	 *
 	 * @param userId 上级用户ID
 	 * @param account 上级钱包地址快照
@@ -99,9 +99,9 @@ public interface StakeHostingDailyTeamPerformanceMapper extends XmsMapper<StakeH
 																	   @Param("beginStatDay") Integer beginStatDay);
 
 	/**
-	 * 批量查询多个用户某一天的团队新增业绩。
+	 * 批量查询多个用户某一天的G7快照。
 	 *
-	 * <p>用于G7快照计算昨日新增业绩，避免在用户循环中逐个查昨日记录。</p>
+	 * <p>用于G7快照计算昨日团队总业绩和昨日新增审计值，避免在用户循环中逐个查昨日记录。</p>
 	 *
 	 * @param userIds 用户ID集合
 	 * @param statDay 统计日期，格式yyyyMMdd
@@ -119,9 +119,42 @@ public interface StakeHostingDailyTeamPerformanceMapper extends XmsMapper<StakeH
 	List<Long> selectUserIdsByStatDay(@Param("statDay") Integer statDay);
 
 	/**
+	 * 查询当前团队总业绩大于0的用户ID。
+	 *
+	 * <p>G7总业绩TVL是存量状态指标。即使当天没有购买事件，只要用户当前仍有团队总业绩，
+	 * 也需要生成当天G7快照，避免快照断档。</p>
+	 *
+	 * @return 用户ID列表
+	 */
+	List<Long> selectUserIdsWithUmbrellaPerformance();
+
+	/**
+	 * 查询指定日期已计算快照中团队总业绩大于0的用户ID。
+	 *
+	 * <p>用于捕捉今天团队总业绩归零或下降的负增长场景，避免只查当前umbrella_performance时漏算。</p>
+	 *
+	 * @param statDay 统计日期，格式yyyyMMdd
+	 * @return 用户ID列表
+	 */
+	List<Long> selectUserIdsWithYesterdayTeamTotalPerformance(@Param("statDay") Integer statDay);
+
+	/**
+	 * 查询最近一段自然日内发生过真实G7事件的用户ID。
+	 *
+	 * <p>真实事件指团队总业绩发生变化，或存在团队新增/到期审计金额。该查询用于团队总业绩归零后继续生成
+	 * 最多7天平滑窗口快照，避免仅查询任意历史快照导致快照自己续自己。</p>
+	 *
+	 * @param startDay 起始统计日期，包含，格式yyyyMMdd
+	 * @param endDay 结束统计日期，不包含，格式yyyyMMdd
+	 * @return 用户ID列表
+	 */
+	List<Long> selectUserIdsWithRecentG7Event(@Param("startDay") Integer startDay,
+											  @Param("endDay") Integer endDay);
+
+	/**
 	 * 查询某个快照时间点用户伞下有效托管USDT TVL。
 	 *
-	 * @deprecated G7静态日利率已改为每日新增对比口径，不再回查有效托管余额。
+	 * @deprecated G7静态日利率已改为直接读取 t_user_info.umbrella_performance，不再回查订单汇总。
 	 *
 	 * @param userId 用户ID
 	 * @param snapshotTime 快照时间，格式yyyyMMddHHmmss

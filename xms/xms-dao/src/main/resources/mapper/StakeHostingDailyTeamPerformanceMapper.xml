@@ -13,6 +13,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="teamExpiredAmount" column="team_expired_amount" />
         <result property="previousTeamTvl" column="previous_team_tvl" />
         <result property="currentTeamTvl" column="current_team_tvl" />
+        <result property="previousTeamTotalPerformance" column="previous_team_total_performance" />
+        <result property="currentTeamTotalPerformance" column="current_team_total_performance" />
         <result property="gDay" column="g_day" />
         <result property="gSmooth" column="g_smooth" />
         <result property="baseStaticRate" column="base_static_rate" />
@@ -28,9 +30,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectStakeHostingDailyTeamPerformanceVo">
         select id, user_id, account, stat_day, team_new_amount, team_expired_amount,
-               previous_team_tvl, current_team_tvl, g_day, g_smooth, base_static_rate,
-               rate_source, calc_status, create_by, create_time, update_by, update_time,
-               remark, deleted
+               previous_team_tvl, current_team_tvl, previous_team_total_performance,
+               current_team_total_performance, g_day, g_smooth, base_static_rate,
+               rate_source, calc_status, create_by, create_time, update_by,
+               update_time, remark, deleted
         from t_stake_hosting_daily_team_performance
     </sql>
 
@@ -109,9 +112,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectRecentGDayBeforeBatch" resultMap="StakeHostingDailyTeamPerformanceResult">
         select id, user_id, account, stat_day, team_new_amount, team_expired_amount,
-               previous_team_tvl, current_team_tvl, g_day, g_smooth, base_static_rate,
-               rate_source, calc_status, create_by, create_time, update_by, update_time,
-               remark, deleted
+               previous_team_tvl, current_team_tvl, previous_team_total_performance,
+               current_team_total_performance, g_day, g_smooth, base_static_rate,
+               rate_source, calc_status, create_by, create_time, update_by,
+               update_time, remark, deleted
         from (
             select p.*,
                    row_number() over (partition by p.user_id order by p.stat_day desc) as rn
@@ -144,6 +148,36 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from t_stake_hosting_daily_team_performance
         where stat_day = #{statDay}
           and deleted = 0
+    </select>
+
+    <select id="selectUserIdsWithUmbrellaPerformance" resultType="java.lang.Long">
+        select user_id
+        from t_user_info
+        where deleted = 0
+          and ifnull(umbrella_performance, 0) &gt; 0
+    </select>
+
+    <select id="selectUserIdsWithYesterdayTeamTotalPerformance" resultType="java.lang.Long">
+        select user_id
+        from t_stake_hosting_daily_team_performance
+        where stat_day = #{statDay}
+          and calc_status = 1
+          and deleted = 0
+          and ifnull(current_team_total_performance, 0) &gt; 0
+    </select>
+
+    <select id="selectUserIdsWithRecentG7Event" resultType="java.lang.Long">
+        select distinct user_id
+        from t_stake_hosting_daily_team_performance
+        where stat_day &gt;= #{startDay}
+          and stat_day &lt; #{endDay}
+          and calc_status = 1
+          and deleted = 0
+          and (
+              ifnull(current_team_total_performance, 0) &lt;&gt; ifnull(previous_team_total_performance, 0)
+              or ifnull(team_new_amount, 0) &gt; 0
+              or ifnull(team_expired_amount, 0) &gt; 0
+          )
     </select>
 
     <select id="selectTeamTvlAt" resultType="java.math.BigDecimal">

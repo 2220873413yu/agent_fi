@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 /**
- * 托管G7每日团队新增业绩与收益率快照对象 t_stake_hosting_daily_team_performance
+ * 托管G7每日团队业绩与收益率快照对象 t_stake_hosting_daily_team_performance
  *
  * @author xms
  */
@@ -57,40 +57,50 @@ public class StakeHostingDailyTeamPerformance extends BaseEntity {
 	@ApiModelProperty(value = "当天伞下团队到期托管USDT金额，当前不参与G7静态日利率")
 	private BigDecimal teamExpiredAmount;
 
-	/** 昨日伞下团队新增托管USDT金额，字段名沿用 previous_team_tvl */
+	/** 昨日伞下团队新增托管USDT金额，字段名沿用 previous_team_tvl，保留为审计字段 */
 	@Excel(name = "昨日团队新增USDT", sort = 6)
-	@ApiModelProperty(value = "昨日伞下团队新增托管USDT金额，字段名沿用 previous_team_tvl")
+	@ApiModelProperty(value = "昨日伞下团队新增托管USDT金额，字段名沿用 previous_team_tvl，保留为审计字段")
 	private BigDecimal previousTeamTvl;
 
-	/** 当日伞下团队新增托管USDT金额，字段名沿用 current_team_tvl */
+	/** 当日伞下团队新增托管USDT金额，字段名沿用 current_team_tvl，保留为审计字段 */
 	@Excel(name = "当日团队新增USDT", sort = 7)
-	@ApiModelProperty(value = "当日伞下团队新增托管USDT金额，字段名沿用 current_team_tvl")
+	@ApiModelProperty(value = "当日伞下团队新增托管USDT金额，字段名沿用 current_team_tvl，保留为审计字段")
 	private BigDecimal currentTeamTvl;
 
-	/** 单日增长率，单位% */
-	@Excel(name = "单日增长率", sort = 8)
-	@ApiModelProperty(value = "单日增长率，单位%")
+	/** 昨日团队总业绩(质押量)，来自昨日快照的 current_team_total_performance */
+	@Excel(name = "昨日团队总业绩", sort = 8)
+	@ApiModelProperty(value = "昨日团队总业绩(质押量)")
+	private BigDecimal previousTeamTotalPerformance;
+
+	/** 今日团队总业绩(质押量)，来自 t_user_info.umbrella_performance */
+	@Excel(name = "今日团队总业绩", sort = 9)
+	@ApiModelProperty(value = "今日团队总业绩(质押量)")
+	private BigDecimal currentTeamTotalPerformance;
+
+	/** 单日团队总业绩增长率，单位% */
+	@Excel(name = "单日增长率", sort = 10)
+	@ApiModelProperty(value = "单日团队总业绩增长率，单位%")
 	@JsonProperty("gDay")
 	private BigDecimal gDay;
 
 	/** 最近最多7天滚动平均增长率，单位% */
-	@Excel(name = "G7滚动增长率", sort = 9)
+	@Excel(name = "G7滚动增长率", sort = 11)
 	@ApiModelProperty(value = "最近最多7天滚动平均增长率，单位%")
 	@JsonProperty("gSmooth")
 	private BigDecimal gSmooth;
 
 	/** 命中基础静态收益率，单位% */
-	@Excel(name = "基础静态收益率", sort = 10)
+	@Excel(name = "基础静态收益率", sort = 12)
 	@ApiModelProperty(value = "命中基础静态收益率，单位%")
 	private BigDecimal baseStaticRate;
 
 	/** 收益率来源 0未计算 1G7区间 2指定收益率 3未推广特殊规则 */
-	@Excel(name = "收益率来源", sort = 11)
+	@Excel(name = "收益率来源", sort = 13)
 	@ApiModelProperty(value = "收益率来源 0未计算 1G7区间 2指定收益率 3未推广特殊规则")
 	private Integer rateSource;
 
 	/** 计算状态 0未计算 1已计算 */
-	@Excel(name = "计算状态", sort = 12)
+	@Excel(name = "计算状态", sort = 14)
 	@ApiModelProperty(value = "计算状态 0未计算 1已计算")
 	private Integer calcStatus;
 

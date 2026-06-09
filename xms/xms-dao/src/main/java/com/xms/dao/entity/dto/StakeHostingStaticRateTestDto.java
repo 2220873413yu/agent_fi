@@ -33,11 +33,17 @@ public class StakeHostingStaticRateTestDto {
 	/** 用户长期指定托管静态收益率，单位% */
 	private BigDecimal stakeHostingStaticRate;
 
-	/** 昨日伞下团队新增托管金额，单位USDT；字段名沿用 previous_team_tvl */
+	/** 昨日伞下团队新增托管金额，单位USDT；字段名沿用 previous_team_tvl，审计字段 */
 	private BigDecimal previousTeamTvl;
 
-	/** 当日伞下团队新增托管金额，单位USDT；字段名沿用 current_team_tvl */
+	/** 当日伞下团队新增托管金额，单位USDT；字段名沿用 current_team_tvl，审计字段 */
 	private BigDecimal currentTeamTvl;
+
+	/** 昨日团队总业绩(质押量)，单位USDT */
+	private BigDecimal previousTeamTotalPerformance;
+
+	/** 今日团队总业绩(质押量)，单位USDT */
+	private BigDecimal currentTeamTotalPerformance;
 
 	/** 当日伞下团队新增托管金额，单位USDT */
 	private BigDecimal teamNewAmount;
@@ -45,10 +51,10 @@ public class StakeHostingStaticRateTestDto {
 	/** 当日伞下团队到期托管金额，单位USDT；当前不参与G7静态日利率 */
 	private BigDecimal teamExpiredAmount;
 
-	/** 单日团队新增业绩增长率，单位% */
+	/** 单日团队总业绩增长率，单位% */
 	private BigDecimal gDay;
 
-	/** 最近最多7天团队新增业绩平均增长率，单位% */
+	/** 最近最多7天团队总业绩平均增长率，单位% */
 	private BigDecimal gSmooth;
 
 	/** G7快照命中的基础静态收益率，单位% */

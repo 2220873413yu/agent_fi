@@ -54,10 +54,12 @@
       <el-table-column label="用户ID" align="center" prop="userId" width="110" />
       <el-table-column label="钱包地址" align="center" prop="account" min-width="180" show-overflow-tooltip />
       <el-table-column label="统计日期" align="center" prop="statDay" width="110" />
-      <el-table-column label="团队新增USDT" align="center" prop="teamNewAmount" width="130" />
-      <el-table-column label="团队到期USDT" align="center" prop="teamExpiredAmount" width="130" />
-      <el-table-column label="昨日团队新增" align="center" prop="previousTeamTvl" width="130" />
-      <el-table-column label="今日团队新增" align="center" prop="currentTeamTvl" width="130" />
+      <el-table-column label="团队新增(审计)" align="center" prop="teamNewAmount" width="130" />
+      <el-table-column label="团队到期(审计)" align="center" prop="teamExpiredAmount" width="130" />
+      <el-table-column label="昨日新增(审计)" align="center" prop="previousTeamTvl" width="130" />
+      <el-table-column label="今日新增(审计)" align="center" prop="currentTeamTvl" width="130" />
+      <el-table-column label="昨日团队总业绩" align="center" prop="previousTeamTotalPerformance" width="150" />
+      <el-table-column label="今日团队总业绩" align="center" prop="currentTeamTotalPerformance" width="150" />
       <el-table-column label="G_day" align="center" prop="gDay" width="100">
         <template slot-scope="scope">
           <span>{{ formatPercent(scope.row.gDay) }}</span>

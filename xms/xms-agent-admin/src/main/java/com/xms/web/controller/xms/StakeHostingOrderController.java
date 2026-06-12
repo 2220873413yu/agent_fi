@@ -8,8 +8,10 @@ import com.xms.common.core.page.TableDataInfo;
 import com.xms.common.enums.BusinessType;
 import com.xms.common.utils.poi.ExcelUtil;
 import com.xms.dao.domain.StakeHostingOrder;
+import com.xms.dao.entity.bo.StakeHostingGrantRewardSwitchBo;
 import com.xms.dao.entity.dto.StakeHostingOrderListDto;
 import com.xms.dao.service.IStakeHostingOrderService;
+import com.xms.web.service.StakeHostingOrderAdminService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -26,9 +28,12 @@ import java.util.List;
 @RequestMapping("/xms/stakeHostingOrder")
 public class StakeHostingOrderController extends BaseController {
 	private final IStakeHostingOrderService stakeHostingOrderService;
+	private final StakeHostingOrderAdminService stakeHostingOrderAdminService;
 
-	public StakeHostingOrderController(IStakeHostingOrderService stakeHostingOrderService) {
+	public StakeHostingOrderController(IStakeHostingOrderService stakeHostingOrderService,
+									   StakeHostingOrderAdminService stakeHostingOrderAdminService) {
 		this.stakeHostingOrderService = stakeHostingOrderService;
+		this.stakeHostingOrderAdminService = stakeHostingOrderAdminService;
 	}
 
 	/**
@@ -89,6 +94,28 @@ public class StakeHostingOrderController extends BaseController {
 	@RepeatSubmit
 	public AjaxResult edit(@RequestBody StakeHostingOrder stakeHostingOrder) {
 		return toAjax(stakeHostingOrderService.updateById(stakeHostingOrder));
+	}
+
+	/**
+	 * 后台取消运行中的托管订单。
+	 */
+	@PreAuthorize("@ss.hasPermi('xms:stakeHostingOrder:edit')")
+	@Log(title = "取消托管订单", businessType = BusinessType.UPDATE)
+	@PutMapping("/cancel/{id}")
+	@RepeatSubmit
+	public AjaxResult cancel(@PathVariable("id") Long id) {
+		return toAjax(stakeHostingOrderAdminService.cancelHostingOrder(id));
+	}
+
+	/**
+	 * 修改后台拨付托管订单收益开关。
+	 */
+	@PreAuthorize("@ss.hasPermi('xms:stakeHostingOrder:edit')")
+	@Log(title = "拨付托管收益开关", businessType = BusinessType.UPDATE)
+	@PutMapping("/grantRewardSwitch")
+	@RepeatSubmit
+	public AjaxResult grantRewardSwitch(@RequestBody StakeHostingGrantRewardSwitchBo req) {
+		return toAjax(stakeHostingOrderAdminService.updateGrantRewardSwitch(req));
 	}
 
 	/**

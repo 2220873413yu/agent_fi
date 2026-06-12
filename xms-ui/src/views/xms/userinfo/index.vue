@@ -241,19 +241,6 @@
       </el-table-column>
       <el-table-column align="center" label="用户ID" prop="userId"/>
       <el-table-column label="备注" align="center" prop="remark" />
-      <el-table-column align="center" label="拨付收益开关" width="120">
-        <template slot-scope="scope">
-          <el-switch
-            v-hasPermi="['xms:userinfo:edit']"
-            :value="Number(scope.row.grantHostingRewardEnabled || 0)"
-            :active-value="1"
-            :inactive-value="0"
-            active-color="#13ce66"
-            inactive-color="#dcdfe6"
-            @change="handleGrantHostingRewardSwitch(scope.row, $event)"
-          />
-        </template>
-      </el-table-column>
 <!--      <el-table-column align="center" label="用户编码" prop="userCode" />-->
 
 <!--      <el-table-column label="昵称" align="center" prop="nickName" />
@@ -403,6 +390,12 @@
         </template>
       </el-table-column>
 
+      <el-table-column align="center" label="本周新增小区业绩" width="150">
+        <template slot-scope="scope">
+          {{ scope.row.weeklyNewCommunityPerformance || 0 }}
+        </template>
+      </el-table-column>
+
       <el-table-column align="center" label="全球分红权重" width="190">
         <template slot-scope="scope">
           <div class="exchange-info" style="text-align: left;">
@@ -410,6 +403,12 @@
             团队权重: {{ scope.row.globalDividendUmbrellaWeight || 0 }}<br>
             小区权重: {{ scope.row.globalDividendCommunityWeight || 0 }}
           </div>
+        </template>
+      </el-table-column>
+
+      <el-table-column align="center" label="本周新增小区分红权重" width="170">
+        <template slot-scope="scope">
+          {{ scope.row.weeklyNewCommunityDividendWeight || 0 }}
         </template>
       </el-table-column>
 
@@ -709,7 +708,6 @@ import {
   delUserinfo,
   addUserinfo,
   updateUserinfo,
-  updateGrantHostingRewardSwitch,
   changeGoogleCode,
   closeTeamMining
 } from "@/api/xms/userinfo";
@@ -943,20 +941,6 @@ export default {
           }
         }
       });
-    },
-    /** 修改用户维度后台拨付托管收益开关 */
-    handleGrantHostingRewardSwitch(row, enabled) {
-      const oldValue = Number(row.grantHostingRewardEnabled || 0)
-      const nextValue = Number(enabled)
-      updateGrantHostingRewardSwitch({
-        userId: row.userId,
-        enabled: nextValue
-      }).then(() => {
-        row.grantHostingRewardEnabled = nextValue
-        this.$modal.msgSuccess(nextValue === 1 ? '拨付收益已开启' : '拨付收益已关闭')
-      }).catch(() => {
-        row.grantHostingRewardEnabled = oldValue
-      })
     },
     /** 托管指定收益率只允许输入非负数字。 */
     onStakeHostingStaticRateInput() {

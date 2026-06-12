@@ -542,7 +542,6 @@ public class RedisStreamBizJobServiceImpl implements IRedisStreamBizJobService {
 				}
 			}
 
-			//闂傚倸鐡ㄧ敮瑙勭附閺嵮冃?
 			// 间推奖励发给邀请人的上级，比例取该间推用户当前节点等级配置。
 			if(inviteUserInfo.getInviteUserId()!=null){
 				UserInfo indirectUserInfo = userInfoService.lambdaQuery()

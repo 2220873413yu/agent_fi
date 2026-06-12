@@ -100,11 +100,3 @@ export function offTeamWithdrawal(userId,bizType) {
   })
 }
 
-// 修改用户维度后台拨付托管收益开关
-export function updateGrantHostingRewardSwitch(data) {
-  return request({
-    url: '/xms/userinfo/grantHostingRewardSwitch',
-    method: 'put',
-    data: data
-  })
-}

@@ -76,11 +76,19 @@ public class StakeHostingOrderListDto extends BaseEntity {
 	@ApiModelProperty(value = "订单来源 0:用户购买 1:后台拨付")
 	private Integer sourceType;
 
-	@Excel(name = "支付状态", sort = 13, dictType = "t_stake_hosting_order_pay_status")
+	@Excel(name = "拨付收益开关", sort = 13, dictType = "biz_enabled_status")
+	@ApiModelProperty(value = "后台拨付托管收益开关 0:关闭 1:开启")
+	private Integer grantRewardEnabled;
+
+	@Excel(name = "拨付收益分配方式", sort = 14)
+	@ApiModelProperty(value = "后台拨付托管收益分配方式 1:静态动态进锁定USDT 2:静态进锁定USDT动态进可用USDT")
+	private Integer grantRewardMode;
+
+	@Excel(name = "支付状态", sort = 15, dictType = "t_stake_hosting_order_pay_status")
 	@ApiModelProperty(value = "支付状态 0:待支付 1:支付成功")
 	private Integer payStatus;
 
-	@Excel(name = "业务状态", sort = 14, dictType = "t_stake_hosting_order_status")
+	@Excel(name = "业务状态", sort = 16, dictType = "t_stake_hosting_order_status")
 	@ApiModelProperty(value = "业务状态 0:未开始 1:产出中 2:已完成 3:已暂停")
 	private Integer status;
 

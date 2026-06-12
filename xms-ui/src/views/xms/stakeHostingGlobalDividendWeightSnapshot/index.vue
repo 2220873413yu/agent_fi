@@ -10,6 +10,16 @@
       <el-form-item label="周开始" prop="weekStartTime">
         <el-input v-model="queryParams.weekStartTime" placeholder="yyyyMMddHHmmss" clearable @keyup.enter.native="handleQuery" />
       </el-form-item>
+      <el-form-item label="分红等级" prop="dividendLevel">
+        <el-select v-model="queryParams.dividendLevel" placeholder="请选择分红等级" clearable>
+          <el-option
+            v-for="dict in dict.type.t_user_info_game_level"
+            :key="dict.value"
+            :label="dict.label"
+            :value="parseInt(dict.value)"
+          />
+        </el-select>
+      </el-form-item>
       <el-form-item label="状态" prop="settleStatus">
         <el-select v-model="queryParams.settleStatus" placeholder="请选择状态" clearable>
           <el-option
@@ -52,7 +62,14 @@
       <el-table-column label="团队权重" align="center" prop="umbrellaWeight" width="120" />
       <el-table-column label="本期小区权重" align="center" prop="communityWeight" width="130" />
       <el-table-column label="上期小区权重" align="center" prop="previousCommunityWeight" width="130" />
+      <el-table-column label="本期小区业绩" align="center" prop="currentCommunityPerformance" width="130" />
+      <el-table-column label="上一期小区业绩" align="center" prop="previousCommunityPerformance" width="140" />
       <el-table-column label="本期分红权重" align="center" prop="dividendWeight" width="130" />
+      <el-table-column label="本期分红等级" align="center" prop="dividendLevel" width="120">
+        <template slot-scope="scope">
+          <dict-tag :options="dict.type.t_user_info_game_level" :value="scope.row.dividendLevel" />
+        </template>
+      </el-table-column>
       <el-table-column label="状态" align="center" prop="settleStatus" width="110">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.t_stake_hosting_global_dividend_weight_snapshot_settle_status" :value="scope.row.settleStatus" />
@@ -80,7 +97,7 @@ import { listStakeHostingGlobalDividendWeightSnapshot } from '@/api/xms/stakeHos
 
 export default {
   name: 'StakeHostingGlobalDividendWeightSnapshot',
-  dicts: ['t_stake_hosting_global_dividend_weight_snapshot_settle_status'],
+  dicts: ['t_stake_hosting_global_dividend_weight_snapshot_settle_status', 't_user_info_game_level'],
   data() {
     return {
       loading: true,
@@ -93,6 +110,7 @@ export default {
         userId: null,
         account: null,
         weekStartTime: null,
+        dividendLevel: null,
         settleStatus: null,
         batchNo: null
       }

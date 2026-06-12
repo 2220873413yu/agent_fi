@@ -14,7 +14,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="umbrellaWeight" column="umbrella_weight" />
         <result property="communityWeight" column="community_weight" />
         <result property="previousCommunityWeight" column="previous_community_weight" />
+        <result property="currentCommunityPerformance" column="current_community_performance" />
+        <result property="previousCommunityPerformance" column="previous_community_performance" />
         <result property="dividendWeight" column="dividend_weight" />
+        <result property="dividendLevel" column="dividend_level" />
         <result property="settleStatus" column="settle_status" />
         <result property="batchNo" column="batch_no" />
         <result property="createBy" column="create_by" />
@@ -27,7 +30,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectStakeHostingGlobalDividendWeightSnapshotVo">
         select id, user_id, account, week_start_time, week_end_time, self_weight, umbrella_weight,
-               community_weight, previous_community_weight, dividend_weight, settle_status, batch_no,
+               community_weight, previous_community_weight, current_community_performance,
+               previous_community_performance, dividend_weight, dividend_level, settle_status, batch_no,
                create_by, create_time, update_by, update_time, remark, deleted
         from t_stake_hosting_global_dividend_weight_snapshot
     </sql>
@@ -38,6 +42,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="userId != null"> and user_id = #{userId}</if>
             <if test="account != null and account != ''"> and account = #{account}</if>
             <if test="weekStartTime != null"> and week_start_time = #{weekStartTime}</if>
+            <if test="dividendLevel != null"> and dividend_level = #{dividendLevel}</if>
             <if test="settleStatus != null"> and settle_status = #{settleStatus}</if>
             <if test="batchNo != null and batchNo != ''"> and batch_no = #{batchNo}</if>
             and deleted = 0
@@ -47,7 +52,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectLatestBeforeWeek" resultMap="StakeHostingGlobalDividendWeightSnapshotResult">
         select s.id, s.user_id, s.account, s.week_start_time, s.week_end_time, s.self_weight, s.umbrella_weight,
-               s.community_weight, s.previous_community_weight, s.dividend_weight, s.settle_status, s.batch_no,
+               s.community_weight, s.previous_community_weight, s.current_community_performance,
+               s.previous_community_performance, s.dividend_weight, s.dividend_level, s.settle_status, s.batch_no,
                s.create_by, s.create_time, s.update_by, s.update_time, s.remark, s.deleted
         from t_stake_hosting_global_dividend_weight_snapshot s
         inner join (
@@ -64,7 +70,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <insert id="batchUpsert">
         insert into t_stake_hosting_global_dividend_weight_snapshot (
             user_id, account, week_start_time, week_end_time, self_weight, umbrella_weight,
-            community_weight, previous_community_weight, dividend_weight, settle_status,
+            community_weight, previous_community_weight, current_community_performance,
+            previous_community_performance, dividend_weight, dividend_level, settle_status,
             batch_no, create_time, update_time, deleted
         )
         values
@@ -72,8 +79,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             (
                 #{item.userId}, #{item.account}, #{item.weekStartTime}, #{item.weekEndTime},
                 #{item.selfWeight}, #{item.umbrellaWeight}, #{item.communityWeight},
-                #{item.previousCommunityWeight}, #{item.dividendWeight}, #{item.settleStatus},
-                #{item.batchNo}, #{item.createTime}, #{item.updateTime}, 0
+                #{item.previousCommunityWeight}, #{item.currentCommunityPerformance},
+                #{item.previousCommunityPerformance}, #{item.dividendWeight},
+                #{item.dividendLevel}, #{item.settleStatus}, #{item.batchNo},
+                #{item.createTime}, #{item.updateTime}, 0
             )
         </foreach>
         on duplicate key update
@@ -83,7 +92,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             umbrella_weight = values(umbrella_weight),
             community_weight = values(community_weight),
             previous_community_weight = values(previous_community_weight),
+            current_community_performance = values(current_community_performance),
+            previous_community_performance = values(previous_community_performance),
             dividend_weight = values(dividend_weight),
+            dividend_level = values(dividend_level),
             settle_status = values(settle_status),
             batch_no = values(batch_no),
             update_time = values(update_time),

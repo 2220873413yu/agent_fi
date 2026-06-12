@@ -92,7 +92,7 @@ public class ConstantType {
 		public static final int type_32 = 32;
 		//锁定USDT静态收益
 		public static final int type_47 = 47;
-		//锁定USDT动态收益
+		//拨付托管动态收益
 		public static final int type_48 = 48;
 	}
 
@@ -183,7 +183,7 @@ public class ConstantType {
 		public static final int type_46 = 46;
 		//锁定USDT静态收益
 		public static final int type_47 = 47;
-		//锁定USDT动态收益
+		//拨付托管动态收益
 		public static final int type_48 = 48;
 		//锁定usdt转可用USDT
 		public static final int type_49 = 49;

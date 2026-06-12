@@ -3,7 +3,6 @@ package com.xms.web.service;
 import cn.hutool.core.lang.tree.Tree;
 import com.xms.common.core.domain.AjaxResult;
 import com.xms.dao.entity.bo.TeamUsersBo;
-import com.xms.dao.entity.bo.GrantHostingRewardSwitchBo;
 import com.xms.dao.entity.bo.UserInfoReqBo;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.entity.dto.UserNetBodyExportDto;
@@ -56,14 +55,6 @@ public interface XmsUserInfoService
 	 * @return
 	 */
 	public AjaxResult updateUserInfo(UserInfoReqBo userInfo);
-
-	/**
-	 * 修改用户维度后台拨付托管收益开关。
-	 *
-	 * @param req 开关请求，包含用户ID和开关值，0关闭、1开启
-	 * @return 修改结果
-	 */
-	AjaxResult updateGrantHostingRewardSwitch(GrantHostingRewardSwitchBo req);
 
 	/**
 	 * 查询网体-树结构方法

@@ -166,15 +166,29 @@ public class UserInfo extends BaseXmsEntity {
 	private BigDecimal globalDividendCommunityWeight;
 
 	/**
+	 * 上周小区全球分行权重
+	 */
+	@TableField(exist = false)
+	private BigDecimal snapshotCommunityWeight;
+
+	/**
+	 * 本周新增小区业绩 = 当前小区业绩 - 上一期小区业绩快照。
+	 */
+	@TableField(exist = false)
+	@ApiModelProperty(value = "本周新增小区业绩")
+	private BigDecimal weeklyNewCommunityPerformance;
+
+	/**
+	 * 本周新增小区分红权重 = 当前小区分红权重 - 上一期小区分红权重快照。
+	 */
+	@TableField(exist = false)
+	@ApiModelProperty(value = "本周新增小区分红权重")
+	private BigDecimal weeklyNewCommunityDividendWeight;
+
+	/**
 	 * 托管指定静态收益率，单位%，0表示按G7规则
 	 */
 	private BigDecimal stakeHostingStaticRate;
-
-	/**
-	 * 后台拨付托管收益开关 0:关闭 1:开启
-	 */
-	@Excel(name = "后台拨付托管收益开关", sort = 11, dictType = "biz_enabled_status")
-	private Integer grantHostingRewardEnabled;
 
 	/**
 	 * OpenAI聊天扣费状态 0:未扣费 1:已扣费
@@ -182,23 +196,23 @@ public class UserInfo extends BaseXmsEntity {
 	private Integer openAiPaidStatus;
 
 	/**
-	 * 团队节点业绩(销售额)
+	 * 团队节点销售额，包含真实购买 + 后台拨付
 	 */
-	@Excel(name = "团队节点业绩(销售额)", sort = 7)
+	@Excel(name = "团队节点销售额", sort = 7)
 	private BigDecimal umbrellaNodePerformance;
 
 
 	/**
-	 * 直推节点业绩(销售额)
+	 * 直推节点销售额，包含真实购买 + 后台拨付
 	 */
-	@Excel(name = "直推节点业绩(销售额)", sort = 7)
+	@Excel(name = "直推节点销售额", sort = 7)
 	private BigDecimal subUmbrellaNodePerformance;
 
 
 	/**
-	 * 后台拨付节点团队业绩(销售额)
+	 * 后台拨付节点金额子集，只做来源审计
 	 */
-	@Excel(name = "后台拨付节点团队业绩(销售额)", sort = 7)
+	@Excel(name = "后台拨付节点金额审计", sort = 7)
 	private BigDecimal adminUmbrellaNodePerformance;
 
 

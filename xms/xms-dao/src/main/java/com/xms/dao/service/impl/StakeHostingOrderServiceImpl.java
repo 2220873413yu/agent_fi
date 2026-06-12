@@ -59,6 +59,8 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	public static final int PRINCIPAL_RETURN_WAIT = 0;
 	public static final int PRINCIPAL_RETURN_DONE = 1;
 	public static final int PRINCIPAL_RETURN_NOT_REQUIRED = 2;
+	public static final int GRANT_REWARD_MODE_LOCKED = 1;
+	public static final int GRANT_REWARD_MODE_DYNAMIC_AVAILABLE = 2;
 	private static final int DAILY_WAIT_PAY_LIMIT = 10;
 
 	private final IStakeHostingPackageService stakeHostingPackageService;
@@ -278,6 +280,8 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		// 赠送订单跳过待支付状态，直接记录实付金额、生效时间和待处理的 G7 状态。
 		StakeHostingOrder order = buildBaseOrder(userInfo, hostingPackage, req.getStakeUsdtAmount(), createDay);
 		order.setSourceType(SOURCE_ADMIN);
+		order.setGrantRewardEnabled(0);
+		order.setGrantRewardMode(resolveGrantRewardMode(req.getGrantRewardMode()));
 		order.setPayStatus(PAY_SUCCESS);
 		order.setStatus(STATUS_RUNNING);
 		order.setPayAmount(req.getStakeUsdtAmount().setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
@@ -293,6 +297,16 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		// 事务提交后再发送托管生效消息，避免消费者读取到未提交订单。
 		sendStakeHostingEffectiveAfterCommit(order.getId());
 		return 1;
+	}
+
+	private int resolveGrantRewardMode(Integer grantRewardMode) {
+		if (grantRewardMode == null) {
+			return GRANT_REWARD_MODE_LOCKED;
+		}
+		if (grantRewardMode != GRANT_REWARD_MODE_LOCKED && grantRewardMode != GRANT_REWARD_MODE_DYNAMIC_AVAILABLE) {
+			throw new ServiceException("后台拨付托管收益分配方式不正确");
+		}
+		return grantRewardMode;
 	}
 
 	/**

@@ -93,6 +93,18 @@
 
     <el-table v-loading="loading" :data="stakeHostingOrderList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+        <template slot-scope="scope">
+          <el-button
+            v-if="scope.row.payStatus == 1 && scope.row.status == 1"
+            v-hasPermi="['xms:stakeHostingOrder:edit']"
+            size="mini"
+            type="text"
+            icon="el-icon-edit"
+            @click="handleCancelHostingOrder(scope.row)"
+          >取消托管订单</el-button>
+        </template>
+      </el-table-column>
       <el-table-column label="订单号" align="center" prop="orderNo" width="180" />
       <el-table-column label="用户ID" align="center" prop="userId" width="100" />
       <el-table-column label="钱包地址" align="center" prop="account" width="180" />
@@ -104,6 +116,28 @@
       <el-table-column label="来源" align="center" prop="sourceType">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.t_stake_hosting_order_source_type" :value="scope.row.sourceType" />
+        </template>
+      </el-table-column>
+      <el-table-column label="拨付收益开关" align="center" prop="grantRewardEnabled" width="130">
+        <template slot-scope="scope">
+          <el-switch
+            v-if="scope.row.sourceType == 1"
+            v-hasPermi="['xms:stakeHostingOrder:edit']"
+            :value="Number(scope.row.grantRewardEnabled || 0)"
+            :active-value="1"
+            :inactive-value="0"
+            :disabled="scope.row.payStatus != 1 || scope.row.status != 1"
+            active-color="#13ce66"
+            inactive-color="#dcdfe6"
+            @change="handleGrantRewardSwitch(scope.row, $event)"
+          />
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="拨付收益方式" align="center" prop="grantRewardMode" width="190">
+        <template slot-scope="scope">
+          <span v-if="scope.row.sourceType == 1">{{ formatGrantRewardMode(scope.row.grantRewardMode) }}</span>
+          <span v-else>-</span>
         </template>
       </el-table-column>
       <el-table-column label="支付状态" align="center" prop="payStatus">
@@ -188,6 +222,16 @@
             @input="onIntegerInput('stakeUsdtAmount')"
           />
         </el-form-item>
+        <el-form-item label="收益分配方式" prop="grantRewardMode">
+          <el-select v-model="form.grantRewardMode" placeholder="请选择收益分配方式" style="width: 100%">
+            <el-option
+              v-for="item in grantRewardModeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button type="primary" @click="submitForm">确 定</el-button>
@@ -198,7 +242,7 @@
 </template>
 
 <script>
-import { listStakeHostingOrder, addStakeHostingOrder } from '@/api/xms/stakeHostingOrder'
+import { listStakeHostingOrder, addStakeHostingOrder, cancelStakeHostingOrder, updateGrantRewardSwitch } from '@/api/xms/stakeHostingOrder'
 import { listStakeHostingPackage } from '@/api/xms/stakeHostingPackage'
 
 export default {
@@ -220,6 +264,10 @@ export default {
       total: 0,
       stakeHostingOrderList: [],
       packageOptions: [],
+      grantRewardModeOptions: [
+        { value: 1, label: '静态动态进锁定USDT' },
+        { value: 2, label: '静态进锁定USDT，动态进可用USDT' }
+      ],
       title: '',
       open: false,
       daterangeCreateTime: [],
@@ -238,7 +286,8 @@ export default {
       rules: {
         account: [{ required: true, message: '钱包地址不能为空', trigger: 'blur' }],
         packageId: [{ required: true, message: '托管套餐不能为空', trigger: 'change' }],
-        stakeUsdtAmount: [{ required: true, message: '托管金额不能为空', trigger: 'blur' }]
+        stakeUsdtAmount: [{ required: true, message: '托管金额不能为空', trigger: 'blur' }],
+        grantRewardMode: [{ required: true, message: '收益分配方式不能为空', trigger: 'change' }]
       }
     }
   },
@@ -266,6 +315,11 @@ export default {
       }
       return value + '%'
     },
+    formatGrantRewardMode(value) {
+      const mode = Number(value || 1)
+      const option = this.grantRewardModeOptions.find(item => item.value === mode)
+      return option ? option.label : '静态动态进锁定USDT'
+    },
     getPackageOptions() {
       listStakeHostingPackage({ pageNum: 1, pageSize: 100, status: 1 }).then(response => {
         this.packageOptions = response.rows || []
@@ -280,6 +334,7 @@ export default {
         account: null,
         packageId: null,
         stakeUsdtAmount: null,
+        grantRewardMode: 1,
         remark: null
       }
       this.resetForm('form')
@@ -312,6 +367,38 @@ export default {
             this.getList()
           })
         }
+      })
+    },
+    handleCancelHostingOrder(row) {
+      this.$confirm('确认取消该托管订单吗？真实购买订单将退还本金，后台拨付订单不退本金。', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        return cancelStakeHostingOrder(row.id)
+      }).then(() => {
+        this.$modal.msgSuccess('取消托管成功')
+        this.getList()
+      }).catch(() => {})
+    },
+    handleGrantRewardSwitch(row, enabled) {
+      const oldValue = Number(row.grantRewardEnabled || 0)
+      const nextValue = Number(enabled)
+      const actionText = nextValue === 1 ? '开启' : '关闭'
+      this.$confirm(`确认${actionText}该后台拨付托管订单收益吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        return updateGrantRewardSwitch({
+          orderId: row.id,
+          grantRewardEnabled: nextValue
+        })
+      }).then(() => {
+        row.grantRewardEnabled = nextValue
+        this.$modal.msgSuccess(`拨付收益已${actionText}`)
+      }).catch(() => {
+        row.grantRewardEnabled = oldValue
       })
     },
     handleExport() {

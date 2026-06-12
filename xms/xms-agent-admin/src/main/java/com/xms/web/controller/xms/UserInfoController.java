@@ -14,7 +14,6 @@ import com.xms.common.utils.CollectionUtil;
 import com.xms.common.utils.poi.ExcelUtil;
 import com.xms.dao.domain.*;
 import com.xms.dao.entity.domain.UserRelation;
-import com.xms.dao.entity.bo.GrantHostingRewardSwitchBo;
 import com.xms.dao.entity.bo.UserInfoReqBo;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.entity.dto.UserNetBodyExportDto;
@@ -28,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -43,7 +43,8 @@ public class UserInfoController extends BaseController {
 
 	@Autowired
 	private IMiningPackageOrderService miningPackageOrderService;
-
+	@Autowired
+	private IStakeHostingGlobalDividendWeightSnapshotService stakeHostingGlobalDividendWeightSnapshotService;
 	/**
 	 * 查询用户信息列表
 	 */
@@ -52,6 +53,7 @@ public class UserInfoController extends BaseController {
 	public TableDataInfo list(UserInfo userInfo) {
 		startPage();
 		List<UserInfo> list = xmsUserInfoService.selectUserInfoList(userInfo);
+		fillWeeklyCommunityIncrement(list);
 		return getDataTable(list);
 	}
 
@@ -155,21 +157,6 @@ public class UserInfoController extends BaseController {
 	}
 
 	/**
-	 * 修改用户维度后台拨付托管收益开关。
-	 */
-	@PreAuthorize("@ss.hasPermi('xms:userinfo:edit')")
-	@Log(title = "用户拨付托管收益开关", businessType = BusinessType.UPDATE)
-	@PutMapping("/grantHostingRewardSwitch")
-	@RepeatSubmit
-	public AjaxResult grantHostingRewardSwitch(@RequestBody GrantHostingRewardSwitchBo req) {
-		return xmsUserInfoService.updateGrantHostingRewardSwitch(req);
-	}
-
-
-
-
-
-	/**
 	 * 导出网体关系树页面当前查询口径下的所有数据。
 	 *
 	 * <p>该导出使用独立DTO承载页面字段，不复用UserInfo，避免影响用户信息列表导出。</p>
@@ -221,5 +208,60 @@ public class UserInfoController extends BaseController {
 		}
 		bizType =bizType == 0 ? 0:1;
 		return success();
+	}
+
+	/**
+	 * 补充本周新增小区业绩和本周新增小区分红权重。
+	 *
+	 * <p>上一期口径取当前最新一条全球分红权重快照的 weekStartTime。没有快照或没有用户对应快照时，
+	 * 上一期小区业绩、上一期小区分红权重都按 0 处理，结果允许为负数。</p>
+	 *
+	 * @param list 当前分页用户列表
+	 */
+	private void fillWeeklyCommunityIncrement(List<UserInfo> list) {
+		if (CollectionUtil.isEmpty(list)) {
+			return;
+		}
+		Map<Long, StakeHostingGlobalDividendWeightSnapshot> snapshotMap = Collections.emptyMap();
+		StakeHostingGlobalDividendWeightSnapshot latestSnapshot = stakeHostingGlobalDividendWeightSnapshotService.lambdaQuery()
+			.eq(StakeHostingGlobalDividendWeightSnapshot::getDeleted, 0)
+			.orderByDesc(StakeHostingGlobalDividendWeightSnapshot::getWeekStartTime)
+			.select(StakeHostingGlobalDividendWeightSnapshot::getWeekStartTime)
+			.last("limit 1")
+			.one();
+		if (latestSnapshot != null && latestSnapshot.getWeekStartTime() != null) {
+			Set<Long> userIds = list.stream()
+				.map(UserInfo::getUserId)
+				.filter(Objects::nonNull)
+				.collect(Collectors.toSet());
+			if (!userIds.isEmpty()) {
+				snapshotMap = stakeHostingGlobalDividendWeightSnapshotService.lambdaQuery()
+					.eq(StakeHostingGlobalDividendWeightSnapshot::getDeleted, 0)
+					.eq(StakeHostingGlobalDividendWeightSnapshot::getWeekStartTime, latestSnapshot.getWeekStartTime())
+					.in(StakeHostingGlobalDividendWeightSnapshot::getUserId, userIds)
+					.select(StakeHostingGlobalDividendWeightSnapshot::getUserId,
+						StakeHostingGlobalDividendWeightSnapshot::getCommunityWeight,
+						StakeHostingGlobalDividendWeightSnapshot::getCurrentCommunityPerformance)
+					.list()
+					.stream()
+					.collect(Collectors.toMap(StakeHostingGlobalDividendWeightSnapshot::getUserId,
+						Function.identity(), (a, b) -> a));
+			}
+		}
+		for (UserInfo info : list) {
+			StakeHostingGlobalDividendWeightSnapshot snapshot = snapshotMap.get(info.getUserId());
+			BigDecimal previousCommunityPerformance = snapshot == null
+				? BigDecimal.ZERO
+				: defaultAmount(snapshot.getCurrentCommunityPerformance());
+			BigDecimal previousCommunityWeight = snapshot == null
+				? BigDecimal.ZERO
+				: defaultAmount(snapshot.getCommunityWeight());
+			info.setWeeklyNewCommunityPerformance(defaultAmount(info.getCommunityPerformance()).subtract(previousCommunityPerformance));
+			info.setWeeklyNewCommunityDividendWeight(defaultAmount(info.getGlobalDividendCommunityWeight()).subtract(previousCommunityWeight));
+		}
+	}
+
+	private BigDecimal defaultAmount(BigDecimal amount) {
+		return amount == null ? BigDecimal.ZERO : amount;
 	}
 }

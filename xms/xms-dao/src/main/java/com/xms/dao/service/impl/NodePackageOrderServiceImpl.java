@@ -104,18 +104,24 @@ public class NodePackageOrderServiceImpl extends XmsDataServiceImpl<NodePackageO
 		}
 		List<Long> parentIds = userInfo.getParentIds();
 		if(CollectionUtil.isNotEmpty(parentIds)){
-			BigDecimal p1 = nodePackage.getPrice().subtract(queryOrder.getOrderValueUsdt());
+			BigDecimal p1 = defaultAmount(nodePackage.getPrice()).subtract(defaultAmount(queryOrder.getOrderValueUsdt()));
 			//直推
 			userInfoService.lambdaUpdate()
 				.eq(UserInfo::getUserId, userInfo.getInviteUserId())
-				.setSql("sub_umbrella_node_performance = sub_umbrella_node_performance + " + p1)
+				.setSql(buildAmountAdjustSql("sub_umbrella_node_performance", p1))
 				.update();
 
 			//修改团队业绩
 			userInfoService.lambdaUpdate()
 				.in(UserInfo::getUserId, parentIds)
-				.setSql("umbrella_node_performance = umbrella_node_performance + " + p1)
+				.setSql(buildAmountAdjustSql("umbrella_node_performance", p1))
 				.update();
+			if (Integer.valueOf(NODE_ORDER_SOURCE_ADMIN_GRANT).equals(queryOrder.getSourceType())) {
+				userInfoService.lambdaUpdate()
+					.in(UserInfo::getUserId, parentIds)
+					.setSql(buildAmountAdjustSql("admin_umbrella_node_performance", p1))
+					.update();
+			}
 		}
 		return 1;
 	}
@@ -312,6 +318,7 @@ public class NodePackageOrderServiceImpl extends XmsDataServiceImpl<NodePackageO
 			rollbackUserBuyAmountPerformance(userInfo, parentIds, orderAmount);
 		}
 		if (Integer.valueOf(NODE_ORDER_SOURCE_ADMIN_GRANT).equals(order.getSourceType())) {
+			rollbackUserBuyAmountPerformance(userInfo, parentIds, orderAmount);
 			rollbackAdminGrantAmountPerformance(parentIds, orderAmount);
 		}
 	}
@@ -357,6 +364,15 @@ public class NodePackageOrderServiceImpl extends XmsDataServiceImpl<NodePackageO
 	 */
 	private BigDecimal defaultAmount(BigDecimal amount) {
 		return amount == null ? BigDecimal.ZERO : amount;
+	}
+
+	private String buildAmountAdjustSql(String fieldName, BigDecimal amount) {
+		BigDecimal adjustAmount = defaultAmount(amount);
+		if (adjustAmount.compareTo(BigDecimal.ZERO) >= 0) {
+			return fieldName + " = IFNULL(" + fieldName + ", 0) + " + adjustAmount.toPlainString();
+		}
+		return fieldName + " = GREATEST(IFNULL(" + fieldName + ", 0) - "
+			+ adjustAmount.abs().toPlainString() + ", 0)";
 	}
 
 	/**
@@ -485,11 +501,13 @@ public class NodePackageOrderServiceImpl extends XmsDataServiceImpl<NodePackageO
 			userInfoService.lambdaUpdate()
 				.eq(UserInfo::getUserId, userInfo.getInviteUserId())
 				.setSql("sub_node_performance = sub_node_performance + 1")
+				.setSql(buildAmountAdjustSql("sub_umbrella_node_performance", nodePackage.getPrice()))
 				.update();
 			userInfoService.lambdaUpdate()
 				.in(UserInfo::getUserId, userInfo.getParentIds())
 				.setSql("node_team_performance = node_team_performance + 1")
-				.setSql("admin_umbrella_node_performance = admin_umbrella_node_performance + "+ nodePackage.getPrice())
+				.setSql(buildAmountAdjustSql("umbrella_node_performance", nodePackage.getPrice()))
+				.setSql(buildAmountAdjustSql("admin_umbrella_node_performance", nodePackage.getPrice()))
 				.update();
 		}
 		return 1;

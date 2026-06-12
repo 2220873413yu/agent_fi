@@ -10,7 +10,6 @@ import com.xms.common.core.domain.entity.SysDictData;
 import com.xms.common.exception.ServiceException;
 import com.xms.common.utils.CollectionUtil;
 import com.xms.common.utils.TreeBuildUtils;
-import com.xms.dao.entity.bo.GrantHostingRewardSwitchBo;
 import com.xms.dao.entity.bo.TeamUsersBo;
 import com.xms.dao.entity.bo.UserInfoReqBo;
 import com.xms.dao.entity.domain.UserInfo;
@@ -152,49 +151,6 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 	}
 
 	/**
-	 * 修改用户维度后台拨付托管收益开关。
-	 *
-	 * <p>该开关只影响 `source_type=1` 的后台拨付托管订单是否参与静态和动态收益发放；
-	 * 用户真实购买订单不受影响。这里不复用普通用户信息编辑接口，方便后台操作日志单独区分。</p>
-	 *
-	 * @param req 开关请求，包含用户ID和开关值，0关闭、1开启
-	 * @return 修改结果
-	 */
-	@Override
-	@Transactional(rollbackFor = Exception.class)
-	public AjaxResult updateGrantHostingRewardSwitch(GrantHostingRewardSwitchBo req) {
-		if (req == null || req.getUserId() == null) {
-			throw new ServiceException("用户不能为空");
-		}
-		Integer enabled = req.getEnabled();
-		if (enabled == null || (enabled != 0 && enabled != 1)) {
-			throw new ServiceException("拨付托管收益开关值不正确");
-		}
-		UserInfo queryUserInfo = userInfoService.lambdaQuery()
-			.eq(UserInfo::getUserId, req.getUserId())
-			.one();
-		if (queryUserInfo == null) {
-			throw new ServiceException("用户不存在");
-		}
-
-		// 只更新拨付托管收益开关，不影响普通用户资料编辑字段。
-		UserInfo updateUser = new UserInfo();
-		updateUser.setUserId(req.getUserId());
-		updateUser.setGrantHostingRewardEnabled(enabled);
-		updateUser.setUpdateTime(new java.util.Date());
-		int rows = this.userInfoMapper.updateById(updateUser);
-		if (rows != 1) {
-			throw new ServiceException("修改拨付托管收益开关失败");
-		}
-
-		// 开关影响结算读取到的用户状态，变更后清理用户状态缓存。
-		String key = ConstantStatic.USER_STATUS + queryUserInfo.getUserId() + ":";
-		xmsRedis.del(key);
-		redissonTemplate.sendCleanCacheWithDelay(key);
-		return AjaxResult.success();
-	}
-
-	/**
 	 * 查询网体-树结构方法
 	 * @param userId
 	 * @return
@@ -261,10 +217,9 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 		tree.putExtra("nodeTeamPerformance", defaultAmount(user.getNodeTeamPerformance()));
 		//增加团队节点支付
 		BigDecimal umbrellaNodePerformance = defaultAmount(user.getUmbrellaNodePerformance());
-		BigDecimal adminUmbrellaNodePerformance = defaultAmount(user.getAdminUmbrellaNodePerformance());
 		tree.putExtra("umbrellaNodePerformance", umbrellaNodePerformance);
 		//团队节点金额
-		tree.putExtra("allUmbrellaNodePerformance", umbrellaNodePerformance.add(adminUmbrellaNodePerformance));
+		tree.putExtra("allUmbrellaNodePerformance", umbrellaNodePerformance);
 		//自身托管
 		tree.putExtra("performance", defaultAmount(user.getPerformance()));
 		//团队托管
@@ -319,7 +274,6 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 	private UserNetBodyExportDto buildNetBodyExportDto(UserInfo user, Map<Integer, String> nodeLevelMap,
 													   Map<Integer, String> gameLevelMap) {
 		BigDecimal umbrellaNodePerformance = defaultAmount(user.getUmbrellaNodePerformance());
-		BigDecimal adminUmbrellaNodePerformance = defaultAmount(user.getAdminUmbrellaNodePerformance());
 		UserNetBodyExportDto dto = new UserNetBodyExportDto();
 		dto.setRemark(user.getRemark());
 		dto.setAccount(user.getAccount());
@@ -331,7 +285,7 @@ public class XmsUserInfoServiceImpl implements XmsUserInfoService {
 		dto.setUmbrellaNum(user.getUmbrellaNum());
 		dto.setNodeTeamPerformance(defaultAmount(user.getNodeTeamPerformance()));
 		dto.setUmbrellaNodePerformance(umbrellaNodePerformance);
-		dto.setAllUmbrellaNodePerformance(umbrellaNodePerformance.add(adminUmbrellaNodePerformance));
+		dto.setAllUmbrellaNodePerformance(umbrellaNodePerformance);
 		dto.setPerformance(defaultAmount(user.getPerformance()));
 		dto.setUmbrellaPerformance(defaultAmount(user.getUmbrellaPerformance()));
 		dto.setCommunityPerformance(defaultAmount(user.getCommunityPerformance()));

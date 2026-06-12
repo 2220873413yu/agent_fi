@@ -73,4 +73,10 @@ public interface IAsyncTaskService {
 	 * 每日释放节点认购AFI到用户AFI钱包。
 	 */
 	void releaseNodePackageAfiDaily();
+
+	/**
+	 * 补偿业务(重新计算节点销售业绩)
+	 */
+	void getIdoOrder2();
+
 }

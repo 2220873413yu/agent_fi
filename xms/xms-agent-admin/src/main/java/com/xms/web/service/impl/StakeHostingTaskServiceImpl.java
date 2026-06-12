@@ -138,8 +138,9 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * `last_reward_day` 记录订单最近一次收益归属日，当前不作为强制过滤条件。注意：本地测试期间
 	 * `addDailyTask(executeDay)` 被注释时，同一天重复执行会依赖人工控制，不能当成生产幂等。</p>
 	 *
-	 * <p>钱包口径：用户购买单静态/动态收益进入 `valid_num1`；后台拨付单在用户开关开启后，
-	 * 静态收益用 sourceType=47 入 `valid_num3`，动态收益用 sourceType=48 入上级 `valid_num3`。</p>
+	 * <p>钱包口径：用户购买单静态/动态收益进入 `valid_num1`；后台拨付单在订单开关开启后，
+	 * 静态收益用 sourceType=47 入 `valid_num3`，动态收益用 sourceType=48 按订单收益分配方式选择入上级
+	 * `valid_num3` 或 `valid_num1`。</p>
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
@@ -208,7 +209,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		//    直推、极差、平级只先收集到上下文，真正钱包入账在 flushTeamRewardContext。
 		for (StaticRewardResult result : staticRewardResults) {
 			if (result.shouldDistributeTeamReward()) {
-				// 用户购买单动态收益进入可用USDT；后台拨付单仅在用户开关开启后触发动态，且进入锁定USDT。
+				// 用户购买单动态收益进入可用USDT；后台拨付单仅在订单开关开启后触发动态，并按订单收益分配方式选择可用/锁定USDT。
 				distributeTeamReward(result.order, result.grossReward, result.baseStaticRate, result.afiAccelerateRate,
 					result.actualStaticRate, result.serviceFeeRatio, result.serviceFee, result.netReward, rewardDay, now,
 					teamRewardContext);
@@ -315,31 +316,34 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		batch.setCreateTime(now);
 		stakeHostingGlobalDividendBatchService.save(batch);
 
-		// 5. 按本周快照的 dividend_weight 计算分红明细，同等级内按权重占比分配等级奖池。
-		List<StakeHostingGlobalDividendDetail> details = buildGlobalDividendDetails(batchNo, poolAmount, weekStartTime);
-		BigDecimal actualAmount = BigDecimal.ZERO;
-		for (StakeHostingGlobalDividendDetail detail : details) {
-			actualAmount = actualAmount.add(detail.getRewardAmount());
-		}
-		actualAmount = actualAmount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
-		if (actualAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			log.info("102 weekly global dividend produced no payable detail, batchNo={}, weekStartTime={}", batchNo, weekStartTime);
-			// 6. 无可发用户时仍结束批次并写入任务记录，但不扣减奖池，也不标记快照已参与。
+		// 5. 按本周快照的 dividend_weight 计算用户实发明细，同时统计所有启用等级奖池的本期消耗金额。
+		GlobalDividendBuildResult buildResult = buildGlobalDividendDetails(batchNo, poolAmount, weekStartTime);
+		List<StakeHostingGlobalDividendDetail> details = buildResult.details;
+		BigDecimal actualAmount = buildResult.actualAmount;
+		BigDecimal consumedAmount = buildResult.consumedAmount;
+		if (consumedAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			log.info("102 weekly global dividend produced no consumable level pool, batchNo={}, weekStartTime={}", batchNo, weekStartTime);
+			// 6. 没有任何可消耗等级奖池时仍结束批次并写入任务记录，不扣减奖池。
 			finishGlobalDividendBatch(batch.getId(), actualAmount, 0, now);
 			addWeeklyTask(strDate);
 			return;
 		}
 
-		// 7. 保存分红明细，明细字段 userCommunityPerformance/levelCommunityPerformance 兼容保存分红权重。
-		stakeHostingGlobalDividendDetailService.saveBatch(details);
-		// 8. 逐条发放用户 USDT 钱包并写入 RewardRecord，保持现有全球分红发放链路不变。
-		for (StakeHostingGlobalDividendDetail detail : details) {
-			grantGlobalDividend(batchNo, detail, now);
+		if (CollectionUtil.isNotEmpty(details)) {
+			// 7. 保存分红明细，明细字段 userCommunityPerformance/levelCommunityPerformance 兼容保存分红权重。
+			stakeHostingGlobalDividendDetailService.saveBatch(details);
+			// 8. 逐条发放用户 USDT 钱包并写入 RewardRecord，保持现有全球分红发放链路不变。
+			for (StakeHostingGlobalDividendDetail detail : details) {
+				grantGlobalDividend(batchNo, detail, now);
+			}
+			// 9. 仅将实际生成分红明细的用户快照标记为已参与，并写入本批次号。
+			markWeightSnapshotSettled(batchNo, weekStartTime, details, now);
+		} else {
+			log.info("102 weekly global dividend consumed level pools without payable users, batchNo={}, consumedAmount={}",
+				batchNo, consumedAmount);
 		}
-		// 9. 按实际发放金额扣减全球分红奖池。
-		stakeHostingGlobalDividendPoolService.expenseWeeklyDividend(batchNo, actualAmount, "task102");
-		// 10. 仅将实际生成分红明细的用户快照标记为已参与，并写入本批次号。
-		markWeightSnapshotSettled(batchNo, weekStartTime, details, now);
+		// 10. 按等级配置切出的本期消耗金额扣减奖池；该金额可能大于用户实际到账金额。
+		stakeHostingGlobalDividendPoolService.expenseWeeklyDividend(batchNo, consumedAmount, "task102");
 		// 11. 回写批次实际金额和人数，最后写入 102 完成记录，防止当天重复执行。
 		finishGlobalDividendBatch(batch.getId(), actualAmount, details.size(), now);
 		addWeeklyTask(strDate);
@@ -412,17 +416,21 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		if (CollectionUtil.isEmpty(users)) {
 			return;
 		}
-		// 2. 批量读取每个用户本周之前最近一期快照，作为 previous_community_weight。
-		Map<Long, BigDecimal> previousCommunityWeightMap = stakeHostingGlobalDividendWeightSnapshotService
+		// 2. 批量读取每个用户本周之前最近一期快照，作为上一期权重和上一期小区业绩基准。
+		Map<Long, StakeHostingGlobalDividendWeightSnapshot> previousSnapshotMap = stakeHostingGlobalDividendWeightSnapshotService
 			.selectLatestBeforeWeek(weekStartTime)
 			.stream()
-			.collect(Collectors.toMap(StakeHostingGlobalDividendWeightSnapshot::getUserId,
-				snapshot -> nvl(snapshot.getCommunityWeight()), (a, b) -> a));
+			.collect(Collectors.toMap(StakeHostingGlobalDividendWeightSnapshot::getUserId, snapshot -> snapshot, (a, b) -> a));
 		List<StakeHostingGlobalDividendWeightSnapshot> snapshots = new ArrayList<>(users.size());
 		for (UserInfo user : users) {
 			// 3. 本期分红权重只取小区权重上涨部分，下降或持平都保存快照但 dividend_weight 记 0。
 			BigDecimal communityWeight = nvl(user.getGlobalDividendCommunityWeight());
-			BigDecimal previousCommunityWeight = previousCommunityWeightMap.getOrDefault(user.getUserId(), BigDecimal.ZERO);
+			StakeHostingGlobalDividendWeightSnapshot previousSnapshot = previousSnapshotMap.get(user.getUserId());
+			BigDecimal previousCommunityWeight = previousSnapshot == null ? BigDecimal.ZERO : nvl(previousSnapshot.getCommunityWeight());
+			BigDecimal currentCommunityPerformance = nvl(user.getCommunityPerformance());
+			BigDecimal previousCommunityPerformance = previousSnapshot == null
+				? BigDecimal.ZERO
+				: nvl(previousSnapshot.getCurrentCommunityPerformance());
 			BigDecimal dividendWeight = communityWeight.subtract(previousCommunityWeight)
 				.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 			if (dividendWeight.compareTo(BigDecimal.ZERO) < 0) {
@@ -437,7 +445,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			snapshot.setUmbrellaWeight(nvl(user.getGlobalDividendUmbrellaWeight()));
 			snapshot.setCommunityWeight(communityWeight);
 			snapshot.setPreviousCommunityWeight(previousCommunityWeight);
+			snapshot.setCurrentCommunityPerformance(currentCommunityPerformance);
+			snapshot.setPreviousCommunityPerformance(previousCommunityPerformance);
 			snapshot.setDividendWeight(dividendWeight);
+			snapshot.setDividendLevel(effectiveLevel(user));
 			snapshot.setSettleStatus(GLOBAL_DIVIDEND_SNAPSHOT_NOT_SETTLED);
 			snapshot.setBatchNo(null);
 			snapshot.setCreateTime(now);
@@ -461,16 +472,16 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * @param batchNo 全球分红批次号
 	 * @param poolAmount 本批次计划分红池金额，单位 USDT
 	 * @param weekStartTime 分红周开始时间，格式 yyyyMMddHHmmss
-	 * @return 待保存和发放的分红明细
+	 * @return 待保存和发放的分红明细，以及本期奖池消耗金额
 	 */
-	private List<StakeHostingGlobalDividendDetail> buildGlobalDividendDetails(String batchNo, BigDecimal poolAmount, Long weekStartTime) {
+	private GlobalDividendBuildResult buildGlobalDividendDetails(String batchNo, BigDecimal poolAmount, Long weekStartTime) {
 		// 1. 读取开启全球分红比例的 F 等级配置，等级奖池按该比例从总奖池中切分。
 		List<UserLevelConfig> configs = userLevelConfigService.lambdaQuery()
 			.gt(UserLevelConfig::getLevel, 0)
 			.gt(UserLevelConfig::getGlobalFeeDividendRatio, BigDecimal.ZERO)
 			.list();
 		if (CollectionUtil.isEmpty(configs)) {
-			return new ArrayList<>();
+			return GlobalDividendBuildResult.empty();
 		}
 		// 2. 读取本周正向差值快照，dividend_weight <= 0 的用户本期不参与分红。
 		List<StakeHostingGlobalDividendWeightSnapshot> snapshots = stakeHostingGlobalDividendWeightSnapshotService.lambdaQuery()
@@ -478,34 +489,37 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.eq(StakeHostingGlobalDividendWeightSnapshot::getDeleted, DELETED_NO)
 			.gt(StakeHostingGlobalDividendWeightSnapshot::getDividendWeight, BigDecimal.ZERO)
 			.list();
-		if (CollectionUtil.isEmpty(snapshots)) {
-			return new ArrayList<>();
-		}
-		Map<Long, StakeHostingGlobalDividendWeightSnapshot> snapshotMap = snapshots.stream()
-			.collect(Collectors.toMap(StakeHostingGlobalDividendWeightSnapshot::getUserId, snapshot -> snapshot, (a, b) -> a));
+		Map<Long, StakeHostingGlobalDividendWeightSnapshot> snapshotMap = CollectionUtil.isEmpty(snapshots)
+			? new HashMap<>()
+			: snapshots.stream()
+				.collect(Collectors.toMap(StakeHostingGlobalDividendWeightSnapshot::getUserId, snapshot -> snapshot, (a, b) -> a));
 		// 3. 批量读取正向差值用户中的当前有效用户，未持有有效托管订单的用户保留快照但不分红。
-		List<UserInfo> users = userInfoService.lambdaQuery()
-			.eq(UserInfo::getIsValid, 1)
-			.eq(UserInfo::getDeleted, DELETED_NO)
-			.in(UserInfo::getUserId, new ArrayList<>(snapshotMap.keySet()))
-			.list();
-		if (CollectionUtil.isEmpty(users)) {
-			return new ArrayList<>();
-		}
-		// 4. 按有效 F 等级分组；effectiveLevel 会过滤掉 F0 或无有效等级用户。
-		Map<Integer, List<UserInfo>> userMap = users.stream()
-			.filter(user -> effectiveLevel(user) > 0)
-			.collect(Collectors.groupingBy(this::effectiveLevel));
-		List<StakeHostingGlobalDividendDetail> details = new ArrayList<>();
-		for (UserLevelConfig config : configs) {
-			// 5. 每个等级先计算等级奖池，再按该等级内用户 dividend_weight 占比分配。
-			List<UserInfo> levelUsers = userMap.get(config.getLevel());
-			if (CollectionUtil.isEmpty(levelUsers)) {
-				continue;
+		Map<Integer, List<UserInfo>> userMap = new HashMap<>();
+		if (!snapshotMap.isEmpty()) {
+			List<UserInfo> users = userInfoService.lambdaQuery()
+				.eq(UserInfo::getIsValid, 1)
+				.eq(UserInfo::getDeleted, DELETED_NO)
+				.in(UserInfo::getUserId, new ArrayList<>(snapshotMap.keySet()))
+				.list();
+			if (CollectionUtil.isNotEmpty(users)) {
+				// 4. 按有效 F 等级分组；effectiveLevel 会过滤掉 F0 或无有效等级用户。
+				userMap = users.stream()
+					.filter(user -> effectiveLevel(user) > 0)
+					.collect(Collectors.groupingBy(this::effectiveLevel));
 			}
+		}
+		List<StakeHostingGlobalDividendDetail> details = new ArrayList<>();
+		BigDecimal consumedAmount = BigDecimal.ZERO;
+		for (UserLevelConfig config : configs) {
+			// 5. 每个开启比例的等级奖池都会消耗奖池；有可分用户时再按用户 dividend_weight 占比分配到账。
 			BigDecimal levelPool = poolAmount.multiply(config.getGlobalFeeDividendRatio())
 				.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 			if (levelPool.compareTo(BigDecimal.ZERO) <= 0) {
+				continue;
+			}
+			consumedAmount = consumedAmount.add(levelPool);
+			List<UserInfo> levelUsers = userMap.get(config.getLevel());
+			if (CollectionUtil.isEmpty(levelUsers)) {
 				continue;
 			}
 			BigDecimal levelDividendWeight = levelUsers.stream()
@@ -536,7 +550,29 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 				details.add(detail);
 			}
 		}
-		return details;
+		BigDecimal actualAmount = details.stream()
+			.map(StakeHostingGlobalDividendDetail::getRewardAmount)
+			.reduce(BigDecimal.ZERO, BigDecimal::add)
+			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		return new GlobalDividendBuildResult(details,
+			consumedAmount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew), actualAmount);
+	}
+
+	private static class GlobalDividendBuildResult {
+		private final List<StakeHostingGlobalDividendDetail> details;
+		private final BigDecimal consumedAmount;
+		private final BigDecimal actualAmount;
+
+		private GlobalDividendBuildResult(List<StakeHostingGlobalDividendDetail> details, BigDecimal consumedAmount,
+										  BigDecimal actualAmount) {
+			this.details = details;
+			this.consumedAmount = consumedAmount;
+			this.actualAmount = actualAmount;
+		}
+
+		private static GlobalDividendBuildResult empty() {
+			return new GlobalDividendBuildResult(new ArrayList<>(), BigDecimal.ZERO, BigDecimal.ZERO);
+		}
 	}
 
 	/**
@@ -664,7 +700,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * @return 本轮发放结果；为空表示订单级幂等抢占失败
 	 */
 	private StaticRewardResult distributeOne(StakeHostingOrder order, int rewardDay, Date now, StaticRewardCalculateContext context) {
-		if (isGrantOrderRewardDisabled(order, context)) {
+		if (isGrantOrderRewardDisabled(order)) {
 			log.info("后台拨付托管收益开关关闭，跳过静态和动态收益 orderId={}, userId={}, rewardDay={}",
 				order.getId(), order.getUserId(), rewardDay);
 			return null;
@@ -701,7 +737,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 
 		// 后台拨付单复用 today_reward/total_static_reward 做订单维度累计；
-		// 真正资产入账会在后续批量钱包阶段写入 valid_num3，并使用 47/48 与真实托管收益隔离。
+		// 真正资产入账会在后续批量钱包阶段处理，并使用 47/48 与真实托管收益隔离。
 		// 结算明细记录静态收益、服务费、收益率和 AFI 加速倍率快照，用于后台追溯。
 		StakeHostingRewardSettlement staticSettlement = buildSettlement(order, null, REWARD_TYPE_STATIC_FEE, null, grossReward, serviceFeeRatio,
 			serviceFee, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
@@ -752,20 +788,16 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
-	 * 判断后台拨付托管订单是否因为用户维度收益开关关闭而跳过收益。
+	 * 判断后台拨付托管订单是否因为订单维度收益开关关闭而跳过收益。
 	 *
 	 * @param order 待结算托管订单
-	 * @param context 静态收益计算上下文，已预加载订单用户信息
-	 * @return true 表示后台拨付单且用户未开启收益开关，本轮不发静态也不触发动态
+	 * @return true 表示后台拨付单且订单未开启收益开关，本轮不发静态也不触发动态
 	 */
-	private boolean isGrantOrderRewardDisabled(StakeHostingOrder order, StaticRewardCalculateContext context) {
+	private boolean isGrantOrderRewardDisabled(StakeHostingOrder order) {
 		if (!isAdminGrantOrder(order)) {
 			return false;
 		}
-		UserInfo userInfo = context.userMap.get(order.getUserId());
-		return userInfo == null
-			|| userInfo.getGrantHostingRewardEnabled() == null
-			|| userInfo.getGrantHostingRewardEnabled() != 1;
+		return order.getGrantRewardEnabled() == null || order.getGrantRewardEnabled() != 1;
 	}
 
 	/**
@@ -943,7 +975,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	/**
 	 * 批量发放托管静态净收益并记录奖励流水。
 	 *
-	 * <p>用户购买订单继续进入 `valid_num1`，钱包来源类型为31；后台拨付订单在用户开关开启后
+	 * <p>用户购买订单继续进入 `valid_num1`，钱包来源类型为31；后台拨付订单在订单开关开启后
 	 * 进入 `valid_num3` 锁定USDT，钱包来源类型为47。订单本身仍复用 todayReward/totalStaticReward
 	 * 做订单维度累计，资产字段和 sourceType 负责区分真实收益与拨付收益。</p>
 	 *
@@ -1050,7 +1082,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		context.pureStaticRateBeforeReturnPercent = new BigDecimal(sysParaServiceImpl.getValue(ConstantSys.PURE_STATIC_RATE_BEFORE_RETURN_PERCENT));
 		context.pureStaticRateAfterReturnPercent = new BigDecimal(sysParaServiceImpl.getValue(ConstantSys.PURE_STATIC_RATE_AFTER_RETURN_PERCENT));
 
-		// 2. 预加载订单用户信息，收益率优先级和后台拨付收益开关都依赖用户字段。
+		// 2. 预加载订单用户信息；收益率优先级依赖用户字段，后台拨付收益开关依赖订单字段。
 		List<UserInfo> users = userInfoService.lambdaQuery()
 			.in(UserInfo::getUserId, userIds)
 			.list();
@@ -1134,7 +1166,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		/**
 		 * 判断本次静态收益结果是否需要继续触发团队动态奖励。
 		 *
-		 * <p>用户购买单始终按原规则触发；后台拨付单只有在前置用户开关校验通过并产生静态收益结果后才会走到这里。</p>
+		 * <p>用户购买单始终按原规则触发；后台拨付单只有在前置订单开关校验通过并产生静态收益结果后才会走到这里。</p>
 		 *
 		 * @return true 表示净静态收益大于0且订单来源允许触发动态奖励
 		 */
@@ -1369,7 +1401,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 *
 	 * <p>动态奖励分两段：先给直属上级发直推奖，再按有效上级链计算极差/平级奖。
 	 * 用户购买单动态奖励进入可用USDT；后台拨付单只有开关开启并产生静态收益后才会进入这里，
-	 * 且动态奖励进入锁定USDT。</p>
+	 * 并按订单收益分配方式选择进入可用或锁定USDT。</p>
 	 *
 	 * @param order 产生静态收益的托管订单
 	 * @param grossReward 静态毛收益
@@ -1805,7 +1837,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * 收集团队动态奖励的钱包增量、奖励记录和结算明细。
 	 *
 	 * <p>用户购买订单按直推/极差/平级来源类型进入 `valid_num1`；后台拨付订单触发的动态奖励统一使用
-	 * sourceType=48 进入上级用户 `valid_num3` 锁定USDT，并且不累计到普通动态奖励汇总表。</p>
+	 * sourceType=48，并按订单收益分配方式决定进入上级用户 `valid_num3` 锁定USDT或 `valid_num1` 可用USDT。
+	 * 后台拨付动态收益不累计到普通动态奖励汇总表。</p>
 	 *
 	 * @param context 团队奖励收集上下文
 	 * @param order 静态收益来源订单
@@ -1846,10 +1879,11 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			: rewardType == REWARD_TYPE_DIFF ? ConstantType.xms_reward_record_source_type.type_29
 			: ConstantType.xms_reward_record_source_type.type_30;
 		String gtId = IDUtils.getSnowflakeStr();
-		// 用户购买单动态奖励进入可用USDT；后台拨付单触发的动态奖励进入锁定USDT。
+		boolean grantDynamicRewardToAvailable = grantReward && isGrantOrderDynamicRewardToAvailable(order);
+		// 用户购买单动态奖励进入可用USDT；后台拨付单动态奖励按订单收益分配方式进入可用或锁定USDT。
 		UserMoney userMoney = new UserMoney();
 		userMoney.setId(receiveUserId);
-		if (grantReward) {
+		if (grantReward && !grantDynamicRewardToAvailable) {
 			userMoney.setValidNum3(rewardAmount);
 		} else {
 			userMoney.setValidNum1(rewardAmount);
@@ -1861,12 +1895,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		userMoney.setUpdateTime(now);
 		context.userMoneyList.add(userMoney);
 
-		// 奖励记录使用独立币种和来源类型，后台可按 sourceType=48 区分拨付动态收益。
+		// 奖励记录使用独立来源类型，coinType 与最终入账资产字段保持一致。
 		RewardRecord rewardRecord = new RewardRecord();
 		rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
 		rewardRecord.setUserId(receiveUserId);
 		rewardRecord.setAmount(rewardAmount);
-		rewardRecord.setCoinType(grantReward
+		rewardRecord.setCoinType(grantReward && !grantDynamicRewardToAvailable
 			? ConstantType.user_money_coin_type.type_3
 			: ConstantType.user_money_coin_type.type_1);
 		rewardRecord.setSourceType(rewardSourceType);
@@ -1881,6 +1915,18 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		context.settlementList.add(buildSettlement(order, receiveUserId, rewardType, rewardLevel, rewardBase, ratioPercent, rewardAmount,
 			grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,
 			serviceFeeRatio, serviceFee, netReward, ARRIVAL_YES, null, rewardDay, now));
+	}
+
+	/**
+	 * 判断后台拨付订单动态收益是否进入可用USDT。
+	 *
+	 * @param order 静态收益来源订单
+	 * @return true 表示 mode=2，后台拨付动态收益进入 `valid_num1`
+	 */
+	private boolean isGrantOrderDynamicRewardToAvailable(StakeHostingOrder order) {
+		return order != null
+			&& order.getGrantRewardMode() != null
+			&& order.getGrantRewardMode() == StakeHostingOrderServiceImpl.GRANT_REWARD_MODE_DYNAMIC_AVAILABLE;
 	}
 
 	/**
@@ -1904,7 +1950,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	/**
 	 * 汇总用户购买单的极差和平级奖励统计。
 	 *
-	 * <p>后台拨付订单动态收益进入锁定USDT，不计入普通团队奖励汇总；
+	 * <p>后台拨付订单动态收益按订单收益分配方式进入可用或锁定USDT，不计入普通团队奖励汇总；
 	 * 因此调用方只在非后台拨付订单时调用本方法。</p>
 	 *
 	 * @param context 团队奖励收集上下文
@@ -1943,7 +1989,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			return;
 		}
 		if (CollectionUtil.isNotEmpty(context.userMoneyList)) {
-			// 团队动态奖励按来源订单分流钱包字段，后台拨付动态收益进入 valid_num3。
+			// 团队动态奖励按来源订单和后台拨付模式分流到 valid_num1 或 valid_num3。
 			batchUpdateRewardMoney(context.userMoneyList);
 		}
 		if (CollectionUtil.isNotEmpty(context.rewardRecordList)) {
@@ -1960,8 +2006,9 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	/**
 	 * 按钱包资产字段批量发放托管奖励。
 	 *
-	 * <p>真实用户购买托管收益写入 `valid_num1`；后台拨付托管静态/动态收益写入
-	 * `valid_num3` 锁定USDT。调用方必须提前设置好金额字段、sourceType、sourceCode 和 gtId。</p>
+	 * <p>真实用户购买托管收益写入 `valid_num1`；后台拨付托管静态收益写入 `valid_num3`，
+	 * 后台拨付动态收益按订单收益分配方式写入 `valid_num3` 或 `valid_num1`。调用方必须提前设置好金额字段、
+	 * sourceType、sourceCode 和 gtId。</p>
 	 *
 	 * @param userMoneyList 待批量入账的钱包增量
 	 */
@@ -2064,7 +2111,6 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		private final Map<Long, List<ParentUserTaskVo>> rewardParentUserCache = new HashMap<>();
 		private Map<Integer, BigDecimal> levelRatioMap;
 		private BigDecimal directRewardRatioPercent;
-
 		/**
 		 * 判断当前上下文是否没有任何待落地数据。
 		 *

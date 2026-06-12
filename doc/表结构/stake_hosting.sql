@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS `t_stake_hosting_order` (
   `package_days` int NOT NULL COMMENT '套餐天数快照',
   `stake_usdt_amount` decimal(20,6) NOT NULL DEFAULT 0.000000 COMMENT '托管USDT金额',
   `source_type` int NOT NULL DEFAULT 0 COMMENT '订单来源 0:用户购买 1:后台拨付',
+  `grant_reward_enabled` int NOT NULL DEFAULT 0 COMMENT '后台拨付托管收益开关 0:关闭 1:开启',
+  `grant_reward_mode` int NOT NULL DEFAULT 1 COMMENT '后台拨付托管收益分配方式 1:静态动态进锁定USDT 2:静态进锁定USDT动态进可用USDT',
   `pay_status` int NOT NULL DEFAULT 0 COMMENT '支付状态 0:待支付 1:支付成功',
   `status` int NOT NULL DEFAULT 0 COMMENT '业务状态 0:未开始 1:产出中 2:已完成 3:已暂停',
   `pay_hash` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci NULL DEFAULT NULL COMMENT '支付hash',

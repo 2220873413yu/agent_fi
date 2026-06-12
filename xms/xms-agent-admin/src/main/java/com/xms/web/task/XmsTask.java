@@ -158,6 +158,14 @@ public class XmsTask {
 	}
 
 	/**
+	 * 补偿业务(重新计算节点销售业绩)
+	 */
+	public void getIdoOrder2() {
+		log.info("重新计算节点销售业绩");
+		asyncTaskServiceImpl.getIdoOrder2();
+	}
+
+	/**
 	 * 任务类型101 每日增加算力(订单天数的n次方)
 	 */
 	/**

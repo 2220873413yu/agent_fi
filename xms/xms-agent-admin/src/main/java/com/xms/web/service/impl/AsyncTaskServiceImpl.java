@@ -77,6 +77,8 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	private static final int NODE_RELEASE_STATUS_PENDING = 0;
 	private static final int NODE_RELEASE_STATUS_RELEASING = 1;
 	private static final int NODE_RELEASE_STATUS_FINISHED = 2;
+	private static final int NODE_ORDER_STATUS_PAID = 1;
+	private static final int NODE_ORDER_SOURCE_ADMIN_GRANT = 1;
 	private final AsyncTaskMapper asyncTaskMapper;
 	private final JdbcTemplate jdbcTemplate;
 	private final RenegadeStreamTemplate redisTemplate;
@@ -85,12 +87,10 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	private final SysLogininforMapper sysLogininforMapper;
 	private final IMqTransactionLogService mqTransactionLogServiceImpl;
 	private final UserInfoService userInfoService;
-	private final WithdrawalService withdrawalServiceImpl;
 	private final AsyncDynamicOrderSettlementService asyncDynamicOrderSettlementServiceImpl;
 	private final IMiningPackageOrderService miningPackageOrderService;
 	private final ISysParaService sysParaServiceImpl;
 	private final IRewardRecordService rewardRecordService;
-	private final UserRelationService userRelationService;
 	private final IMiningMgmtFeeConfigService miningMgmtFeeConfigService;
 	private final IStakeOrderService stakeOrderService;
 	private final IStakeReleaseBucketService stakeReleaseBucketService;
@@ -198,6 +198,103 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 		nodePackageReleaseOrderService.saveBatch(insertList);
 		log.info("节点认购AFI线性释放初始化完成：batchNo={}, totalWeight={}, amountPerWeight={}, inserted={}",
 			initBatchNo, totalWeight, amountPerWeight, insertList.size());
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public void getIdoOrder2() {
+		Date now = new Date();
+		userInfoService.lambdaUpdate()
+			.isNotNull(UserInfo::getUserId)
+			.set(UserInfo::getSubUmbrellaNodePerformance, BigDecimal.ZERO)
+			.set(UserInfo::getUmbrellaNodePerformance, BigDecimal.ZERO)
+			.set(UserInfo::getAdminUmbrellaNodePerformance, BigDecimal.ZERO)
+			.set(UserInfo::getUpdateTime, now)
+			.update();
+
+		List<NodePackageOrder> nodePackageOrders = nodePackageOrderService.lambdaQuery()
+			.eq(NodePackageOrder::getStatus, NODE_ORDER_STATUS_PAID)
+			.isNotNull(NodePackageOrder::getUserId)
+			.gt(NodePackageOrder::getOrderValueUsdt, BigDecimal.ZERO)
+			.list();
+		if (CollectionUtil.isEmpty(nodePackageOrders)) {
+			log.info("节点销售额业绩补偿重算完成：无有效节点订单，已清零用户节点销售额字段");
+			return;
+		}
+
+		Set<Long> orderUserIds = nodePackageOrders.stream()
+			.map(NodePackageOrder::getUserId)
+			.filter(Objects::nonNull)
+			.collect(Collectors.toSet());
+		if (CollectionUtil.isEmpty(orderUserIds)) {
+			log.info("节点销售额业绩补偿重算完成：有效节点订单缺少用户ID，已清零用户节点销售额字段");
+			return;
+		}
+
+		Map<Long, UserInfo> orderUserMap = userInfoService.lambdaQuery()
+			.in(UserInfo::getUserId, orderUserIds)
+			.list()
+			.stream()
+			.collect(Collectors.toMap(UserInfo::getUserId, Function.identity(), (a, b) -> a));
+
+		Map<Long, BigDecimal> subNodeSalesMap = new HashMap<>();
+		Map<Long, BigDecimal> umbrellaNodeSalesMap = new HashMap<>();
+		Map<Long, BigDecimal> adminUmbrellaNodeSalesMap = new HashMap<>();
+		int userBuyOrderCount = 0;
+		int adminGrantOrderCount = 0;
+		int missingUserCount = 0;
+		BigDecimal userBuyOrderAmount = BigDecimal.ZERO;
+		BigDecimal adminGrantOrderAmount = BigDecimal.ZERO;
+
+		for (NodePackageOrder order : nodePackageOrders) {
+			BigDecimal orderAmount = nvl(order.getOrderValueUsdt());
+			if (orderAmount.compareTo(BigDecimal.ZERO) <= 0) {
+				continue;
+			}
+			boolean adminGrantOrder = Integer.valueOf(NODE_ORDER_SOURCE_ADMIN_GRANT).equals(order.getSourceType());
+			if (adminGrantOrder) {
+				adminGrantOrderCount++;
+				adminGrantOrderAmount = adminGrantOrderAmount.add(orderAmount);
+			} else {
+				userBuyOrderCount++;
+				userBuyOrderAmount = userBuyOrderAmount.add(orderAmount);
+			}
+
+			UserInfo orderUser = orderUserMap.get(order.getUserId());
+			if (orderUser == null) {
+				missingUserCount++;
+				continue;
+			}
+			addNodeSalesAmount(subNodeSalesMap, orderUser.getInviteUserId(), orderAmount);
+
+			List<Long> parentIds = orderUser.getParentIds();
+			if (CollectionUtil.isEmpty(parentIds)) {
+				continue;
+			}
+			for (Long parentId : parentIds) {
+				addNodeSalesAmount(umbrellaNodeSalesMap, parentId, orderAmount);
+				if (adminGrantOrder) {
+					addNodeSalesAmount(adminUmbrellaNodeSalesMap, parentId, orderAmount);
+				}
+			}
+		}
+
+		Set<Long> affectedUserIds = new LinkedHashSet<>();
+		affectedUserIds.addAll(subNodeSalesMap.keySet());
+		affectedUserIds.addAll(umbrellaNodeSalesMap.keySet());
+		affectedUserIds.addAll(adminUmbrellaNodeSalesMap.keySet());
+		for (Long userId : affectedUserIds) {
+			userInfoService.lambdaUpdate()
+				.eq(UserInfo::getUserId, userId)
+				.set(UserInfo::getSubUmbrellaNodePerformance, nvl(subNodeSalesMap.get(userId)))
+				.set(UserInfo::getUmbrellaNodePerformance, nvl(umbrellaNodeSalesMap.get(userId)))
+				.set(UserInfo::getAdminUmbrellaNodePerformance, nvl(adminUmbrellaNodeSalesMap.get(userId)))
+				.set(UserInfo::getUpdateTime, now)
+				.update();
+		}
+
+		log.info("节点销售额业绩补偿重算完成：真实购买订单数={},真实购买金额={},后台拨付订单数={},后台拨付金额={},影响上级用户数={},缺失订单用户数={}",
+			userBuyOrderCount, userBuyOrderAmount, adminGrantOrderCount, adminGrantOrderAmount, affectedUserIds.size(), missingUserCount);
 	}
 
 	/**
@@ -796,6 +893,14 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	private BigDecimal nvl(BigDecimal value) {
 		return value == null ? BigDecimal.ZERO : value;
 	}
+
+	private void addNodeSalesAmount(Map<Long, BigDecimal> amountMap, Long userId, BigDecimal amount) {
+		if (userId == null || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+			return;
+		}
+		amountMap.merge(userId, amount, BigDecimal::add);
+	}
+
 	/**
 	 * 重新计算等级的补偿任务
 	 */
@@ -819,7 +924,7 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 			}
 			stakeOrderService.callUserLevel(info, userLevelConfigList);
 		}*/
-		userInfoService.lambdaUpdate()
+/*		userInfoService.lambdaUpdate()
 			.set(UserInfo::getUmbrellaNodePerformance, 0)
 			.set(UserInfo::getSubUmbrellaNodePerformance, 0)
 			.set(UserInfo::getAdminUmbrellaNodePerformance, 0)
@@ -854,7 +959,7 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 				}
 
 			}
-		}
+		}*/
 	}
 
 

@@ -64,15 +64,27 @@ public class StakeHostingGlobalDividendWeightSnapshot extends BaseEntity {
 	@ApiModelProperty(value = "Previous weekly community global dividend weight")
 	private BigDecimal previousCommunityWeight;
 
-	@Excel(name = "本期分红权重", sort = 9)
+	@Excel(name = "本期小区业绩", sort = 9)
+	@ApiModelProperty(value = "Current community performance snapshot")
+	private BigDecimal currentCommunityPerformance;
+
+	@Excel(name = "上一期小区业绩", sort = 10)
+	@ApiModelProperty(value = "Previous weekly community performance snapshot")
+	private BigDecimal previousCommunityPerformance;
+
+	@Excel(name = "本期分红权重", sort = 11)
 	@ApiModelProperty(value = "Dividend weight = max(communityWeight - previousCommunityWeight, 0)")
 	private BigDecimal dividendWeight;
 
-	@Excel(name = "状态", sort = 10, dictType = "t_stake_hosting_global_dividend_weight_snapshot_settle_status")
+	@Excel(name = "本期分红等级", sort = 12)
+	@ApiModelProperty(value = "Global dividend level snapshot used for weekly dividend pool")
+	private Integer dividendLevel;
+
+	@Excel(name = "状态", sort = 13, dictType = "t_stake_hosting_global_dividend_weight_snapshot_settle_status")
 	@ApiModelProperty(value = "Settle status 0:not participated 1:participated")
 	private Integer settleStatus;
 
-	@Excel(name = "分红批次", sort = 11, width = 30)
+	@Excel(name = "分红批次", sort = 14, width = 30)
 	@ApiModelProperty(value = "Global dividend batch number")
 	private String batchNo;
 }

@@ -17,6 +17,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="performanceCoefficient" column="performance_coefficient" />
         <result property="performancePoints" column="performance_points" />
         <result property="sourceType" column="source_type" />
+        <result property="grantRewardEnabled" column="grant_reward_enabled" />
+        <result property="grantRewardMode" column="grant_reward_mode" />
         <result property="payStatus" column="pay_status" />
         <result property="status" column="status" />
         <result property="payHash" column="pay_hash" />
@@ -56,6 +58,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="afiPledgeRatio" column="afi_pledge_ratio" />
         <result property="afiAccelerateRate" column="afi_accelerate_rate" />
         <result property="sourceType" column="source_type" />
+        <result property="grantRewardEnabled" column="grant_reward_enabled" />
+        <result property="grantRewardMode" column="grant_reward_mode" />
         <result property="payStatus" column="pay_status" />
         <result property="status" column="status" />
         <result property="payHash" column="pay_hash" />
@@ -80,7 +84,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <sql id="selectStakeHostingOrderVo">
         select id, order_no, user_id, account, package_id, package_name, package_days, stake_usdt_amount, service_fee_ratio,
                performance_coefficient, performance_points,
-               source_type, pay_status, status, pay_hash, pay_amount, pay_time, effective_time, finish_time,
+               source_type, grant_reward_enabled, grant_reward_mode, pay_status, status, pay_hash, pay_amount, pay_time, effective_time, finish_time,
                run_days, today_reward, total_static_reward, is_return_principal, principal_return_status, principal_return_time,
                afi_accelerated, last_reward_day, create_day
         from t_stake_hosting_order
@@ -91,7 +95,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                o.performance_coefficient, o.performance_points,
                afi.pledge_ratio as afi_pledge_ratio,
                afi.accelerate_rate as afi_accelerate_rate,
-               o.source_type, o.pay_status, o.status, o.pay_hash, o.pay_amount, o.pay_time, o.effective_time, o.finish_time,
+               o.source_type, o.grant_reward_enabled, o.grant_reward_mode, o.pay_status, o.status, o.pay_hash, o.pay_amount, o.pay_time, o.effective_time, o.finish_time,
                o.run_days, o.today_reward, o.total_static_reward, o.is_return_principal, o.principal_return_status,
                o.principal_return_time, o.afi_accelerated, o.last_reward_day, o.create_day
         from t_stake_hosting_order o

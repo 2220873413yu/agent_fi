@@ -44,7 +44,7 @@ public class StakeHostingUserRewardSummaryServiceImpl
 	}
 
 	/**
-	 * 累加用户托管极差奖累计金额。
+	 * 累加用户托管级差奖累计金额。
 	 *
 	 * 若用户汇总记录不存在则自动初始化后累加，金额单位为USDT。
 	 *

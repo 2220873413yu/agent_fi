@@ -28,7 +28,7 @@ public class StakeHostingUserRewardSummary extends BaseEntity {
 	@ApiModelProperty(value = "用户ID")
 	private Long userId;
 
-	@ApiModelProperty(value = "托管极差奖累计")
+	@ApiModelProperty(value = "托管级差奖累计")
 	private BigDecimal diffRewardAmount;
 
 	@ApiModelProperty(value = "托管平级奖累计")

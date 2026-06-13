@@ -204,13 +204,15 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	@Transactional(rollbackFor = Exception.class)
 	public void getIdoOrder2() {
 		Date now = new Date();
-		userInfoService.lambdaUpdate()
+		log.info("节点销售额业绩补偿重算开始：准备清零用户节点销售额字段");
+		boolean resetResult = userInfoService.lambdaUpdate()
 			.isNotNull(UserInfo::getUserId)
 			.set(UserInfo::getSubUmbrellaNodePerformance, BigDecimal.ZERO)
 			.set(UserInfo::getUmbrellaNodePerformance, BigDecimal.ZERO)
 			.set(UserInfo::getAdminUmbrellaNodePerformance, BigDecimal.ZERO)
 			.set(UserInfo::getUpdateTime, now)
 			.update();
+		log.info("节点销售额业绩补偿重算：清零用户节点销售额字段完成，result={}", resetResult);
 
 		List<NodePackageOrder> nodePackageOrders = nodePackageOrderService.lambdaQuery()
 			.eq(NodePackageOrder::getStatus, NODE_ORDER_STATUS_PAID)
@@ -230,12 +232,14 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 			log.info("节点销售额业绩补偿重算完成：有效节点订单缺少用户ID，已清零用户节点销售额字段");
 			return;
 		}
+		log.info("节点销售额业绩补偿重算：有效节点订单数={},订单用户数={}", nodePackageOrders.size(), orderUserIds.size());
 
 		Map<Long, UserInfo> orderUserMap = userInfoService.lambdaQuery()
 			.in(UserInfo::getUserId, orderUserIds)
 			.list()
 			.stream()
 			.collect(Collectors.toMap(UserInfo::getUserId, Function.identity(), (a, b) -> a));
+		log.info("节点销售额业绩补偿重算：订单用户加载完成，命中用户数={}", orderUserMap.size());
 
 		Map<Long, BigDecimal> subNodeSalesMap = new HashMap<>();
 		Map<Long, BigDecimal> umbrellaNodeSalesMap = new HashMap<>();
@@ -283,14 +287,24 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 		affectedUserIds.addAll(subNodeSalesMap.keySet());
 		affectedUserIds.addAll(umbrellaNodeSalesMap.keySet());
 		affectedUserIds.addAll(adminUmbrellaNodeSalesMap.keySet());
+		log.info("节点销售额业绩补偿重算：汇总完成，直推影响用户数={},团队影响用户数={},后台拨付审计影响用户数={},准备写回用户数={}",
+			subNodeSalesMap.size(), umbrellaNodeSalesMap.size(), adminUmbrellaNodeSalesMap.size(), affectedUserIds.size());
 		for (Long userId : affectedUserIds) {
-			userInfoService.lambdaUpdate()
+			BigDecimal subNodeSales = nvl(subNodeSalesMap.get(userId));
+			BigDecimal umbrellaNodeSales = nvl(umbrellaNodeSalesMap.get(userId));
+			BigDecimal adminUmbrellaNodeSales = nvl(adminUmbrellaNodeSalesMap.get(userId));
+			boolean updateResult = userInfoService.lambdaUpdate()
 				.eq(UserInfo::getUserId, userId)
-				.set(UserInfo::getSubUmbrellaNodePerformance, nvl(subNodeSalesMap.get(userId)))
-				.set(UserInfo::getUmbrellaNodePerformance, nvl(umbrellaNodeSalesMap.get(userId)))
-				.set(UserInfo::getAdminUmbrellaNodePerformance, nvl(adminUmbrellaNodeSalesMap.get(userId)))
+				.set(UserInfo::getSubUmbrellaNodePerformance, subNodeSales)
+				.set(UserInfo::getUmbrellaNodePerformance, umbrellaNodeSales)
+				.set(UserInfo::getAdminUmbrellaNodePerformance, adminUmbrellaNodeSales)
 				.set(UserInfo::getUpdateTime, now)
 				.update();
+			if (!updateResult) {
+				log.warn("节点销售额业绩补偿重算：用户销售额写回失败，userId={}", userId);
+			}
+			log.debug("节点销售额业绩补偿重算：用户销售额写回，userId={},直推销售额={},团队销售额={},后台拨付审计额={}",
+				userId, subNodeSales, umbrellaNodeSales, adminUmbrellaNodeSales);
 		}
 
 		log.info("节点销售额业绩补偿重算完成：真实购买订单数={},真实购买金额={},后台拨付订单数={},后台拨付金额={},影响上级用户数={},缺失订单用户数={}",

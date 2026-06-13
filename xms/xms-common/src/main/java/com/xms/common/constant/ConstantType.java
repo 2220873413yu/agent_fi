@@ -82,7 +82,7 @@ public class ConstantType {
 		public static final int type_27 = 27;
 		//托管直推奖
 		public static final int type_28 = 28;
-		//托管极差奖
+		//托管级差奖
 		public static final int type_29 = 29;
 		//托管平级奖
 		public static final int type_30 = 30;
@@ -158,7 +158,7 @@ public class ConstantType {
 		public static final int type_31 = 31;
 		//托管直推奖
 		public static final int type_32 = 32;
-		//托管极差奖
+		//托管级差奖
 		public static final int type_33 = 33;
 		//托管平级奖
 		public static final int type_34 = 34;

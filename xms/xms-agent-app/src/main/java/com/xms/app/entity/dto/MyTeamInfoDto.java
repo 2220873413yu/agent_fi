@@ -108,9 +108,9 @@ public class MyTeamInfoDto {
 	private BigDecimal inferenceNodeReward;
 
 	/**
-	 * 团队收益，等于托管极差奖累计加托管平级奖累计，单位USDT。
+	 * 团队收益，等于托管级差奖累计加托管平级奖累计，单位USDT。
 	 */
-	@ApiModelProperty(value = "团队收益，托管极差奖累计+托管平级奖累计")
+	@ApiModelProperty(value = "团队收益，托管级差奖累计+托管平级奖累计")
 	private BigDecimal teamRewardAmount;
 
 	/**
@@ -130,4 +130,14 @@ public class MyTeamInfoDto {
 	 */
 	@ApiModelProperty(value = "自身托管金额")
 	private BigDecimal selfTotalHostingAmount;
+
+	/**
+	 * 本周新增小区分红权重
+	 */
+	private BigDecimal weeklyNewCommunityDividendWeight;
+
+	/**
+	 * 累计静态收益
+	 */
+	private BigDecimal totalStaticReward;
 }

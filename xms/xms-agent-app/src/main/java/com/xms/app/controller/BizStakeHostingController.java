@@ -1,10 +1,7 @@
 package com.xms.app.controller;
 
-import com.xms.app.entity.dto.StakeHostingAfiAccelerateConfigDto;
-import com.xms.app.entity.dto.StakeHostingAfiPledgeDto;
-import com.xms.app.entity.dto.StakeHostingOrderDto;
+import com.xms.app.entity.dto.*;
 import com.xms.app.entity.resp.CreateStakeHostingOrderResp;
-import com.xms.app.entity.dto.StakeHostingPackageDto;
 import com.xms.app.entity.vo.CreateStakeHostingOrderVo;
 import com.xms.app.entity.vo.PledgeStakeHostingAfiVo;
 import com.xms.app.entity.vo.StopStakeHostingOrderVo;
@@ -12,6 +9,7 @@ import com.xms.app.service.BizStakeHostingService;
 import com.xms.common.annotation.RepeatSubmit;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.utils.SecurityUtils;
+import com.xms.dao.domain.RewardRecord;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import jakarta.validation.Valid;
@@ -75,6 +73,19 @@ public class BizStakeHostingController {
 	@GetMapping("/orderList")
 	public ResultPista<List<StakeHostingOrderDto>> orderList(Long lastId, Integer status) {
 		return ResultPista.data(bizStakeHostingService.orderList(lastId, status));
+	}
+
+
+	/**
+	 * 根据托管订单号查询托管订单的静态收益
+	 * @param orderNo 托管订单号
+	 * @param lastId lastId 为空就不传
+	 * @return
+	 */
+	@ApiOperation(value = "查询托管订单的静态收益")
+	@GetMapping("/orderRewardList")
+	public ResultPista<List<OrderRewardDto>> orderRewardList(String orderNo, Long lastId) {
+		return ResultPista.data(bizStakeHostingService.orderRewardList(orderNo,lastId));
 	}
 
 	/**

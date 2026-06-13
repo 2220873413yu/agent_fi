@@ -139,7 +139,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * `addDailyTask(executeDay)` 被注释时，同一天重复执行会依赖人工控制，不能当成生产幂等。</p>
 	 *
 	 * <p>钱包口径：用户购买单静态/动态收益进入 `valid_num1`；后台拨付单在订单开关开启后，
-	 * 静态收益用 sourceType=47 入 `valid_num3`，动态收益用 sourceType=48 按订单收益分配方式选择入上级
+	 * 静态收益用 sourceType=47 入 `valid_num3`，动态收益按直推/极差/平级来源类型记录，并按订单收益分配方式选择入上级
 	 * `valid_num3` 或 `valid_num1`。</p>
 	 */
 	@Override
@@ -1836,8 +1836,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	/**
 	 * 收集团队动态奖励的钱包增量、奖励记录和结算明细。
 	 *
-	 * <p>用户购买订单按直推/极差/平级来源类型进入 `valid_num1`；后台拨付订单触发的动态奖励统一使用
-	 * sourceType=48，并按订单收益分配方式决定进入上级用户 `valid_num3` 锁定USDT或 `valid_num1` 可用USDT。
+	 * <p>用户购买订单和后台拨付订单触发的动态奖励都按直推/极差/平级来源类型记录；后台拨付订单再按订单收益分配方式
+	 * 决定进入上级用户 `valid_num3` 锁定USDT或 `valid_num1` 可用USDT。
 	 * 后台拨付动态收益不累计到普通动态奖励汇总表。</p>
 	 *
 	 * @param context 团队奖励收集上下文
@@ -1868,14 +1868,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			return;
 		}
 		boolean grantReward = isAdminGrantOrder(order);
-		// 1. 按订单来源和奖励类型选择钱包流水 sourceType；后台拨付动态收益必须独立为48。
-		int moneySourceType = grantReward ? ConstantType.user_money_log_source_type.type_48
-			: rewardType == REWARD_TYPE_DIRECT ? ConstantType.user_money_log_source_type.type_32
+		// 1. 动态奖励 sourceType 始终按奖励类型归类；后台拨付只影响最终入账钱包字段。
+		int moneySourceType = rewardType == REWARD_TYPE_DIRECT ? ConstantType.user_money_log_source_type.type_32
 			: rewardType == REWARD_TYPE_DIFF ? ConstantType.user_money_log_source_type.type_33
 			: ConstantType.user_money_log_source_type.type_34;
-		// 2. 奖励记录 sourceType 与钱包 sourceType 对齐，方便后台按真实收益/拨付收益拆分统计。
-		int rewardSourceType = grantReward ? ConstantType.xms_reward_record_source_type.type_48
-			: rewardType == REWARD_TYPE_DIRECT ? ConstantType.xms_reward_record_source_type.type_28
+		// 2. 奖励记录 sourceType 与钱包 sourceType 的奖励类型保持一致，后台拨付不再单独写48。
+		int rewardSourceType = rewardType == REWARD_TYPE_DIRECT ? ConstantType.xms_reward_record_source_type.type_28
 			: rewardType == REWARD_TYPE_DIFF ? ConstantType.xms_reward_record_source_type.type_29
 			: ConstantType.xms_reward_record_source_type.type_30;
 		String gtId = IDUtils.getSnowflakeStr();
@@ -1895,7 +1893,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		userMoney.setUpdateTime(now);
 		context.userMoneyList.add(userMoney);
 
-		// 奖励记录使用独立来源类型，coinType 与最终入账资产字段保持一致。
+		// 奖励记录 coinType 与最终入账资产字段保持一致。
 		RewardRecord rewardRecord = new RewardRecord();
 		rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
 		rewardRecord.setUserId(receiveUserId);

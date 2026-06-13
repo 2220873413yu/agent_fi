@@ -49,7 +49,7 @@ public class UserInfo extends BaseXmsEntity {
 
 
 	/**
-	 * 用户编码
+	 * 用户编码(废弃暂时不用)
 	 */
 	//@Excel(name = "用户编码", sort = 2)
 	private String userCode;
@@ -82,7 +82,7 @@ public class UserInfo extends BaseXmsEntity {
 	/**
 	 * 是否有效用户：0=无未完成托管订单，1=持有未完成托管订单
 	 */
-	//@Excel(name = "是否有效用户", sort = 4,dictType = "t_user_info_is_valid")
+	@Excel(name = "是否持有未出局的矿机", sort = 4,dictType = "t_user_info_is_valid")
 	private Integer isValid;
 
 	/**
@@ -99,22 +99,22 @@ public class UserInfo extends BaseXmsEntity {
 	private Long inviteUserId;
 
 	/**
-	 * 用户等级 (0:暂无,1:区代,2:县代,3:省代)
+	 * 真实等级 (0:暂无,1:区代,2:县代,3:省代)
 	 */
-	//@Excel(name = "用户等级", sort = 8, dictType = "t_user_info_game_level")
+	@Excel(name = "真实等级", sort = 5, dictType = "t_user_info_game_level")
 	private Integer gameLevel;
 
 	/**
-	 * 赠送等级 (0:暂无,1:区代,2:县代,3:省代)
+	 * 节点赠送 (0:暂无,1:区代,2:县代,3:省代)
 	 * 查询用户详情、查询直推用户列表时作为保底等级参与展示。
 	 */
-	//@Excel(name = "赠送等级", sort = 9, dictType = "t_user_info_game_level")
+	@Excel(name = "节点赠送", sort = 5, dictType = "t_user_info_game_level")
 	private Integer minGameLevel;
 
 	/**
-	 * 管理员保底等级 (0:暂无,1:F1,2:F2,3:F3,4:F4,5:F5,6:F6,7:F7,8:F8,9:F9)
+	 * 后台保底 (0:暂无,1:F1,2:F2,3:F3,4:F4,5:F5,6:F6,7:F7,8:F8,9:F9)
 	 */
-	//@Excel(name = "管理员保底等级", sort = 10, dictType = "t_user_info_game_level")
+	@Excel(name = "后台保底", sort = 5, dictType = "t_user_info_game_level")
 	private Integer adminGameLevel;
 
 	/**
@@ -130,84 +130,17 @@ public class UserInfo extends BaseXmsEntity {
 	private Integer umbrellaNum;
 
 	/**
-	 * 我的业绩(质押量)
+	 * 直推节点销售额，包含真实购买 + 后台拨付
 	 */
-	//@Excel(name = "我的业绩(质押量)", sort = 12)
-	private BigDecimal performance;
-	/**
-	 * 小区业绩
-	 */
-	//@Excel(name = "小区业绩", sort = 14)
-	private BigDecimal communityPerformance;
-	/**
-	 * 团队业绩(质押量)
-	 */
-	//@Excel(name = "团队业绩(质押量)", sort = 15)
-	private BigDecimal umbrellaPerformance;
+	@Excel(name = "直推节点销售额", sort = 7)
+	private BigDecimal subUmbrellaNodePerformance;
 
-	/**
-	 * 团队托管业绩兼容字段
-	 */
-	private BigDecimal performanceMining;
-
-	/**
-	 * 我的全球分红权重.
-	 */
-	private BigDecimal globalDividendWeight;
-
-	/**
-	 * 团队全球分红权重.
-	 */
-	private BigDecimal globalDividendUmbrellaWeight;
-
-	/**
-	 * 小区全球分红权重.
-	 */
-	private BigDecimal globalDividendCommunityWeight;
-
-	/**
-	 * 上周小区全球分行权重
-	 */
-	@TableField(exist = false)
-	private BigDecimal snapshotCommunityWeight;
-
-	/**
-	 * 本周新增小区业绩 = 当前小区业绩 - 上一期小区业绩快照。
-	 */
-	@TableField(exist = false)
-	@ApiModelProperty(value = "本周新增小区业绩")
-	private BigDecimal weeklyNewCommunityPerformance;
-
-	/**
-	 * 本周新增小区分红权重 = 当前小区分红权重 - 上一期小区分红权重快照。
-	 */
-	@TableField(exist = false)
-	@ApiModelProperty(value = "本周新增小区分红权重")
-	private BigDecimal weeklyNewCommunityDividendWeight;
-
-	/**
-	 * 托管指定静态收益率，单位%，0表示按G7规则
-	 */
-	private BigDecimal stakeHostingStaticRate;
-
-	/**
-	 * OpenAI聊天扣费状态 0:未扣费 1:已扣费
-	 */
-	private Integer openAiPaidStatus;
 
 	/**
 	 * 团队节点销售额，包含真实购买 + 后台拨付
 	 */
 	@Excel(name = "团队节点销售额", sort = 7)
 	private BigDecimal umbrellaNodePerformance;
-
-
-	/**
-	 * 直推节点销售额，包含真实购买 + 后台拨付
-	 */
-	@Excel(name = "直推节点销售额", sort = 7)
-	private BigDecimal subUmbrellaNodePerformance;
-
 
 	/**
 	 * 后台拨付节点金额子集，只做来源审计
@@ -217,16 +150,94 @@ public class UserInfo extends BaseXmsEntity {
 
 
 	/**
+	 * 我的业绩(质押业绩)
+	 */
+	@Excel(name = "个人质押(质押业绩)", sort = 7)
+	private BigDecimal performance;
+
+	/**
+	 * 团队业绩(质押业绩)
+	 */
+	@Excel(name = "团队质押(质押业绩)", sort = 7)
+	private BigDecimal umbrellaPerformance;
+
+	/**
+	 * 小区质押(质押业绩)
+	 */
+	@Excel(name = "小区质押(质押业绩)", sort = 7)
+	private BigDecimal communityPerformance;
+
+
+	/**
+	 * 团队托管业绩兼容字段(目前没用到)
+	 */
+	private BigDecimal performanceMining;
+
+	/**
+	 * 本周新增小区业绩 = 当前小区业绩 - 上一期小区业绩快照。
+	 */
+	@TableField(exist = false)
+	@Excel(name = "本周新增小区业绩", sort = 7)
+	private BigDecimal weeklyNewCommunityPerformance;
+
+
+	/**
+	 * 本周新增小区分红权重 = 当前小区分红权重 - 上一期小区分红权重快照。
+	 */
+	@TableField(exist = false)
+	@Excel(name = "本周新增小区分红权重", sort = 7)
+	private BigDecimal weeklyNewCommunityDividendWeight;
+
+	/**
+	 * 个人权重(全球分红)
+	 */
+	@Excel(name = "个人权重(全球分红)", sort = 7)
+	private BigDecimal globalDividendWeight;
+
+	/**
+	 * 团队权重(全球分红)
+	 */
+	@Excel(name = "团队权重(全球分红)", sort = 7)
+	private BigDecimal globalDividendUmbrellaWeight;
+
+	/**
+	 * 小区权重(全球分红)
+	 */
+	@Excel(name = "小区权重(全球分红)", sort = 7)
+	private BigDecimal globalDividendCommunityWeight;
+
+	/**
+	 * 上周小区全球分行权重
+	 */
+	@TableField(exist = false)
+	private BigDecimal snapshotCommunityWeight;
+
+	/**
 	 *状态 1 正常 2 冻结
 	 */
 	@Excel(name = "账户状态", sort = 8,dictType = "t_user_info_status")
 	private Integer status;
 
-
-
 	/** 提现开关(1.关 2.开) */
 	@Excel(name = "USDT提现开关",dictType = "biz_open_or_close",sort = 9)
 	private Integer withdrawalOpenOrClose;
+
+	/**
+	 * 托管指定静态收益率，单位%，0表示按G7规则
+	 */
+	@Excel(name = "托管指定静态收益率", sort = 8)
+	private BigDecimal stakeHostingStaticRate;
+
+	/**
+	 * 后台用户备注
+	 */
+	@Excel(name = "备注", sort = 9, width = 40)
+	private String remark;
+
+	/**
+	 * OpenAI聊天扣费状态 0:未扣费 1:已扣费
+	 */
+	private Integer openAiPaidStatus;
 
 	/**
 	 * 头像 废弃
@@ -241,14 +252,11 @@ public class UserInfo extends BaseXmsEntity {
 	private String email;
 
 
-
-
 	/**
 	 * 直推业绩(托管量)
 	 */
 	//@Excel(name = "直推业绩(废弃)", sort = 13)
 	private BigDecimal subPerformance;
-
 
 
 	@TableField(exist = false)
@@ -289,15 +297,6 @@ public class UserInfo extends BaseXmsEntity {
 	 * 最后登录ip
 	 */
 	private String lastLoginIp;
-
-	/**
-	 * 后台用户备注
-	 */
-	@Excel(name = "备注", sort = 10, width = 40)
-	@ApiModelProperty(value = "后台用户备注")
-	private String remark;
-
-
 
 	/**
 	 * 删除标志 0正常 1删除

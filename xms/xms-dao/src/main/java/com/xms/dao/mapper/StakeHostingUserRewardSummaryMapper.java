@@ -29,7 +29,7 @@ public interface StakeHostingUserRewardSummaryMapper extends XmsMapper<StakeHost
 	int initUser(@Param("userId") Long userId);
 
 	/**
-	 * 累加托管极差奖累计金额。
+	 * 累加托管级差奖累计金额。
 	 *
 	 * @param userId 用户ID
 	 * @param amount 本次极差奖金额，单位USDT

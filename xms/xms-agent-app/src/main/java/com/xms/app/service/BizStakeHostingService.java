@@ -1,15 +1,13 @@
 package com.xms.app.service;
 
 import com.xms.app.entity.bo.StakeOrderBo;
-import com.xms.app.entity.dto.StakeHostingAfiAccelerateConfigDto;
-import com.xms.app.entity.dto.StakeHostingAfiPledgeDto;
-import com.xms.app.entity.dto.StakeHostingOrderDto;
-import com.xms.app.entity.dto.StakeHostingPackageDto;
+import com.xms.app.entity.dto.*;
 import com.xms.app.entity.resp.CreateStakeHostingOrderResp;
 import com.xms.app.entity.vo.CreateStakeHostingOrderVo;
 import com.xms.app.entity.vo.PledgeStakeHostingAfiVo;
 import com.xms.app.entity.vo.StopStakeHostingOrderVo;
 import com.xms.common.core.domain.api.ResultPista;
+import com.xms.dao.domain.RewardRecord;
 
 import java.util.List;
 
@@ -98,4 +96,12 @@ public interface BizStakeHostingService {
 	 * @return success 表示回调处理完成或幂等成功
 	 */
 	ResultPista<String> orderCallback(StakeOrderBo req);
+
+	/**
+	 * 订单静态收益数据
+	 * @param orderNo 托管订单号
+	 * @param lastId
+	 * @return
+	 */
+	List<OrderRewardDto> orderRewardList(String orderNo, Long lastId);
 }

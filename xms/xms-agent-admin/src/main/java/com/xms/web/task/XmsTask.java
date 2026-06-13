@@ -140,30 +140,30 @@ public class XmsTask {
 		log.info("查询没有处理的节点订单");
 		asyncTaskServiceImpl.processOverdueMiningOrders();
 	}
-
-	/**
-	 * 补偿业务(重新计算等级先关)
-	 */
-	public void getIdoOrder() {
-		log.info("重新计算等级相关");
-		asyncTaskServiceImpl.getIdoOrder();
-	}
-
-	/**
-	 * 补偿业务(重新计算等级先关)
-	 */
-	public void getIdoOrder1() {
-		log.info("重新计算等级相关");
-		asyncTaskServiceImpl.getIdoOrder1();
-	}
-
-	/**
-	 * 补偿业务(重新计算节点销售业绩)
-	 */
-	public void getIdoOrder2() {
-		log.info("重新计算节点销售业绩");
-		asyncTaskServiceImpl.getIdoOrder2();
-	}
+//
+//	/**
+//	 * 补偿业务(重新计算等级先关)
+//	 */
+//	public void getIdoOrder() {
+//		log.info("重新计算等级相关");
+//		asyncTaskServiceImpl.getIdoOrder();
+//	}
+//
+//	/**
+//	 * 补偿业务(重新计算等级先关)
+//	 */
+//	public void getIdoOrder1() {
+//		log.info("重新计算等级相关");
+//		asyncTaskServiceImpl.getIdoOrder1();
+//	}
+//
+//	/**
+//	 * 补偿业务(重新计算节点销售业绩)
+//	 */
+//	public void getIdoOrder2() {
+//		log.info("重新计算节点销售业绩");
+//		asyncTaskServiceImpl.getIdoOrder2();
+//	}
 
 	/**
 	 * 任务类型101 每日增加算力(订单天数的n次方)

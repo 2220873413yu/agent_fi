@@ -4,10 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.system.SystemUtil;
 import com.xms.app.entity.bo.StakeOrderBo;
-import com.xms.app.entity.dto.StakeHostingAfiAccelerateConfigDto;
-import com.xms.app.entity.dto.StakeHostingAfiPledgeDto;
-import com.xms.app.entity.dto.StakeHostingOrderDto;
-import com.xms.app.entity.dto.StakeHostingPackageDto;
+import com.xms.app.entity.dto.*;
 import com.xms.app.entity.resp.CreateStakeHostingOrderResp;
 import com.xms.app.entity.vo.CreateStakeHostingOrderVo;
 import com.xms.app.entity.vo.PledgeStakeHostingAfiVo;
@@ -21,11 +18,13 @@ import com.xms.common.constant.SysConstant;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.exception.ServiceException;
 import com.xms.common.result.ResponseCode;
+import com.xms.common.utils.Func;
 import com.xms.common.utils.SecurityUtils;
 import com.xms.common.utils.SignUtil;
 import com.xms.dao.domain.*;
 import com.xms.dao.entity.domain.UserInfo;
 import com.xms.dao.service.*;
+import com.xms.dao.service.impl.RewardRecordServiceImpl;
 import com.xms.dao.service.impl.StakeHostingOrderServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +52,9 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 	private final XmsCommonService xmsCommonServiceImpl;
 	private final XmsRedis xmsRedis;
 	private final BizCommonService bizCommonService;
+
+	@Autowired
+	private  IRewardRecordService rewardRecordServiceImpl;
 
 	@Autowired
 	private  IStakeHostingStaticRateConfigService stakeHostingStaticRateConfigServiceImpl;
@@ -416,5 +418,24 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		// 支付状态推进、金额校验、幂等和后置异步消息均由订单服务统一处理。
 		stakeHostingOrderService.confirmChainPaid(req.getOrderNo(), req.getHash(), req.getAmount());
 		return ResultPista.data("success");
+	}
+
+	@Override
+	public List<OrderRewardDto> orderRewardList(String orderNo, Long lastId) {
+		return rewardRecordServiceImpl.lambdaQuery()
+			.lt(Func.isNotEmpty(lastId), RewardRecord::getId, lastId)
+			.eq(RewardRecord::getUserId,SecurityUtils.getLoginAppUser().getUserId())
+			.eq(RewardRecord::getOrderCode, orderNo)
+			.orderByDesc(RewardRecord::getId)
+			.last(SysConstant.PAGE_LIMIT)
+			.list().stream().map(record -> {
+				OrderRewardDto dto = new OrderRewardDto();
+				dto.setId(record.getId());
+				dto.setOrderCode(record.getOrderCode());
+				dto.setUserId(record.getUserId());
+				dto.setCreateTime(record.getCreateTime());
+				dto.setAmount(record.getAmount());
+				return dto;
+			}).collect(Collectors.toList());
 	}
 }

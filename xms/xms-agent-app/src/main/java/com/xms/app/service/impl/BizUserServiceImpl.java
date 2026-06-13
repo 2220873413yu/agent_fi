@@ -13,6 +13,7 @@ import cn.hutool.json.JSONUtil;
 import cn.hutool.system.SystemUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
@@ -135,6 +136,8 @@ public class BizUserServiceImpl implements BizUserService {
 	@Autowired
 	private IStakeHostingOrderService stakeHostingOrderService;
 
+	@Autowired
+	private IStakeHostingGlobalDividendWeightSnapshotService stakeHostingGlobalDividendWeightSnapshotService;
 
 	@Autowired
 	private XmsRedis xmsRedis;
@@ -433,9 +436,24 @@ public class BizUserServiceImpl implements BizUserService {
 
 
 
+		//本周新增小区分红权重
+		StakeHostingGlobalDividendWeightSnapshot snapshot = stakeHostingGlobalDividendWeightSnapshotService.lambdaQuery()
+			.eq(StakeHostingGlobalDividendWeightSnapshot::getUserId, userId)
+			.select(StakeHostingGlobalDividendWeightSnapshot::getDividendWeight)
+			.orderByDesc(StakeHostingGlobalDividendWeightSnapshot::getId)
+			.last("limit 1")
+			.one();
+		BigDecimal dividendWeight = snapshot == null ? BigDecimal.ZERO : snapshot.getDividendWeight();
+		dto.setWeeklyNewCommunityDividendWeight(userInfo.getGlobalDividendCommunityWeight().subtract(dividendWeight));
 
-
-
+		BigDecimal totalAmount = rewardRecordService.getObj(
+			Wrappers.<RewardRecord>query()
+				.select("IFNULL(SUM(amount), 0)")
+				.eq("user_id", userId)
+				.eq("source_type", ConstantType.xms_reward_record_source_type.type_28),
+			value -> value == null ? BigDecimal.ZERO : new BigDecimal(value.toString())
+		);
+		dto.setTotalStaticReward(totalAmount);
 		dto.setTeamUserCount(userInfo.getUmbrellaNum());
 		dto.setDirectUserCount(userInfo.getSubNum());
 		dto.setTeamRewardAmount(diffRewardAmount.add(sameLevelRewardAmount));

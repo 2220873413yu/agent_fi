@@ -35,6 +35,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="afiAccelerated" column="afi_accelerated" />
         <result property="lastRewardDay" column="last_reward_day" />
         <result property="createDay" column="create_day" />
+        <result property="rewardStartDay" column="reward_start_day" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
         <result property="updateBy" column="update_by" />
@@ -76,6 +77,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="afiAccelerated" column="afi_accelerated" />
         <result property="lastRewardDay" column="last_reward_day" />
         <result property="createDay" column="create_day" />
+        <result property="rewardStartDay" column="reward_start_day" />
         <result property="createTime" column="create_time" />
         <result property="updateTime" column="update_time" />
         <result property="remark" column="remark" />
@@ -86,7 +88,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                performance_coefficient, performance_points,
                source_type, grant_reward_enabled, grant_reward_mode, pay_status, status, pay_hash, pay_amount, pay_time, effective_time, finish_time,
                run_days, today_reward, total_static_reward, is_return_principal, principal_return_status, principal_return_time,
-               afi_accelerated, last_reward_day, create_day
+               afi_accelerated, last_reward_day, create_day, reward_start_day
         from t_stake_hosting_order
     </sql>
 
@@ -97,7 +99,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                afi.accelerate_rate as afi_accelerate_rate,
                o.source_type, o.grant_reward_enabled, o.grant_reward_mode, o.pay_status, o.status, o.pay_hash, o.pay_amount, o.pay_time, o.effective_time, o.finish_time,
                o.run_days, o.today_reward, o.total_static_reward, o.is_return_principal, o.principal_return_status,
-               o.principal_return_time, o.afi_accelerated, o.last_reward_day, o.create_day
+               o.principal_return_time, o.afi_accelerated, o.last_reward_day, o.create_day, o.reward_start_day
         from t_stake_hosting_order o
         left join t_stake_hosting_afi_pledge afi
                on afi.deleted = 0

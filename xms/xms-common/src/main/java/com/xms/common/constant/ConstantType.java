@@ -183,8 +183,6 @@ public class ConstantType {
 		public static final int type_46 = 46;
 		//锁定USDT静态收益
 		public static final int type_47 = 47;
-		//拨付托管动态收益
-		public static final int type_48 = 48;
 		//锁定usdt转可用USDT
 		public static final int type_49 = 49;
 	}

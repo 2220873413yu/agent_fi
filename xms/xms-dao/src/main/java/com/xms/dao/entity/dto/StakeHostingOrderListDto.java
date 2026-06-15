@@ -146,4 +146,8 @@ public class StakeHostingOrderListDto extends BaseEntity {
 
 	/** 创建日期，格式yyyyMMdd */
 	private Integer createDay;
+
+	@Excel(name = "收益发放日期", sort = 28)
+	@ApiModelProperty(value = "收益发放日期，格式yyyyMMdd")
+	private Integer rewardStartDay;
 }

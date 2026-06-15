@@ -123,7 +123,7 @@ public class StakeHostingOrder extends BaseEntity {
 	@Excel(name = "支付时间", sort = 14, width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
 	private Date payTime;
 
-	/** 生效时间；站内USDT支付创建即生效，当前101收益发放以create_day作为收益资格边界 */
+	/** 生效时间；站内USDT支付创建即生效，当前101收益发放以reward_start_day作为最早发放日期边界 */
 	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
 	@Excel(name = "生效时间", sort = 15, width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
 	private Date effectiveTime;
@@ -194,4 +194,9 @@ public class StakeHostingOrder extends BaseEntity {
 
 	/** 创建日期，格式yyyyMMdd */
 	private Integer createDay;
+
+	/** 收益发放日期，格式yyyyMMdd */
+	@Excel(name = "收益发放日期", sort = 25)
+	@ApiModelProperty(value = "收益发放日期，格式yyyyMMdd")
+	private Integer rewardStartDay;
 }

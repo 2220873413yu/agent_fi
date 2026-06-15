@@ -13,6 +13,7 @@ import com.xms.app.service.BizCommonService;
 import com.xms.app.service.BizStakeHostingService;
 import com.xms.common.config.redis.XmsRedis;
 import com.xms.common.config.redis.lock.RedisLock;
+import com.xms.common.constant.ConstantType;
 import com.xms.common.constant.RedisConstant;
 import com.xms.common.constant.SysConstant;
 import com.xms.common.core.domain.api.ResultPista;
@@ -315,6 +316,7 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		dto.setPrincipalReturnTime(item.getPrincipalReturnTime());
 		dto.setAfiAccelerated(item.getAfiAccelerated());
 		dto.setLastRewardDay(item.getLastRewardDay());
+		dto.setRewardStartDay(item.getRewardStartDay());
 		return dto;
 	}
 
@@ -425,7 +427,8 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 		return rewardRecordServiceImpl.lambdaQuery()
 			.lt(Func.isNotEmpty(lastId), RewardRecord::getId, lastId)
 			.eq(RewardRecord::getUserId,SecurityUtils.getLoginAppUser().getUserId())
-			.eq(RewardRecord::getOrderCode, orderNo)
+			.eq(RewardRecord::getSourceOrderCode, orderNo)
+			.in(RewardRecord::getSourceType, ConstantType.xms_reward_record_source_type.type_27,ConstantType.xms_reward_record_source_type.type_47)
 			.orderByDesc(RewardRecord::getId)
 			.last(SysConstant.PAGE_LIMIT)
 			.list().stream().map(record -> {

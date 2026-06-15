@@ -151,6 +151,8 @@
         </template>
       </el-table-column>
       <el-table-column label="运行天数" align="center" prop="runDays" />
+      <el-table-column label="收益发放日期" align="center" prop="rewardStartDay" width="120" />
+      <el-table-column label="已发收益日期" align="center" prop="lastRewardDay" width="120" />
       <el-table-column label="今日收益" align="center" prop="todayReward" />
       <el-table-column label="累计收益" align="center" prop="totalStaticReward" />
       <el-table-column label="是否回本" align="center" prop="isReturnPrincipal">

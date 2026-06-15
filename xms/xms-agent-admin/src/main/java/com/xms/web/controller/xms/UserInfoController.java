@@ -66,6 +66,7 @@ public class UserInfoController extends BaseController {
 	@PostMapping("/export")
 	public void export(HttpServletResponse response, UserInfo userInfo) {
 		List<UserInfo> list = xmsUserInfoService.selectUserInfoList(userInfo);
+		fillWeeklyCommunityIncrement(list);
 		ExcelUtil<UserInfo> util = new ExcelUtil<UserInfo>(UserInfo.class);
 		util.exportExcel(response, list, "用户信息数据");
 	}

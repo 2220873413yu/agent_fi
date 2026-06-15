@@ -72,7 +72,6 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	private static final String SQL_RESET_USER_GLOBAL_DIVIDEND_WEIGHT = "UPDATE t_user_info SET global_dividend_weight = 0, global_dividend_umbrella_weight = 0, global_dividend_community_weight = 0, update_time = ?";
 	private static final String SQL_UPDATE_USER_GLOBAL_DIVIDEND_WEIGHT = "UPDATE t_user_info SET global_dividend_weight = ?, global_dividend_umbrella_weight = ?, global_dividend_community_weight = ?, update_time = ? WHERE user_id = ?";
 	private static final String SQL_UPDATE_STAKE_HOSTING_ORDER_PERFORMANCE_SNAPSHOT = "UPDATE t_stake_hosting_order SET performance_coefficient = ?, performance_points = ?, update_time = ? WHERE id = ?";
-	private static final BigDecimal NODE_RELEASE_POOL_AMOUNT = new BigDecimal("10000000");
 	private static final int NODE_RELEASE_TOTAL_DAYS = 365;
 	private static final int NODE_RELEASE_STATUS_PENDING = 0;
 	private static final int NODE_RELEASE_STATUS_RELEASING = 1;
@@ -137,7 +136,8 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 		if (totalWeight.compareTo(BigDecimal.ZERO) <= 0) {
 			throw new ServiceException("节点认购AFI线性释放初始化失败：总权重为0");
 		}
-		BigDecimal amountPerWeight = NODE_RELEASE_POOL_AMOUNT.divide(totalWeight, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+		BigDecimal nodeReleasePoolAmount = new BigDecimal(sysParaServiceImpl.getValue(ConstantSys.biz_node_release_pool_amount));
+		BigDecimal amountPerWeight = nodeReleasePoolAmount.divide(totalWeight, ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 
 		List<Long> nodeOrderIds = weightedOrders.stream()
 			.map(NodePackageOrder::getId)

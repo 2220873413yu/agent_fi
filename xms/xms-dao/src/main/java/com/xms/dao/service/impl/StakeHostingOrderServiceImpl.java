@@ -61,7 +61,6 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	public static final int PRINCIPAL_RETURN_NOT_REQUIRED = 2;
 	public static final int GRANT_REWARD_MODE_LOCKED = 1;
 	public static final int GRANT_REWARD_MODE_DYNAMIC_AVAILABLE = 2;
-	private static final int DAILY_WAIT_PAY_LIMIT = 10;
 
 	private final IStakeHostingPackageService stakeHostingPackageService;
 	private final IStakeHostingDailyTeamPerformanceService stakeHostingDailyTeamPerformanceService;
@@ -92,7 +91,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	/**
 	 * 创建用户侧托管待支付订单。
 	 *
-	 * <p>该方法只保存待链上支付订单，不扣减站内钱包。下单按用户加 Redis 锁，避免同一用户并发创建过多待支付单；
+	 * <p>该方法只保存待链上支付订单，不扣减站内钱包。下单按用户加 Redis 锁，避免同一用户瞬时并发重复提交；
 	 * 支付状态初始为待支付，业务状态初始为待生效，后续由链上支付回调推进。</p>
 	 *
 	 * @param userId 下单用户ID
@@ -109,16 +108,8 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		StakeHostingPackage hostingPackage = getEnabledPackage(packageId);
 		validateAmount(amount, hostingPackage);
 
-		// 控制用户当天未支付订单数量，避免重复点击或恶意刷待支付订单。
-		int createDay = Integer.parseInt(DateUtil.format(DateUtil.date(), "yyyyMMdd"));
-		Long todayWaitCount = lambdaQuery()
-			.eq(StakeHostingOrder::getUserId, userId)
-			.eq(StakeHostingOrder::getPayStatus, PAY_WAIT)
-			.eq(StakeHostingOrder::getCreateDay, createDay)
-			.count();
-		if (todayWaitCount >= DAILY_WAIT_PAY_LIMIT) {
-			throw new ServiceException(ResponseCode.CODE_1263);
-		}
+		// 待支付订单不限制每日创建数量；实际收益发放日期由支付生效时写入。
+		int createDay = formatDay(new Date());
 
 		// 用户订单保存为待支付/待生效，实际支付金额、hash 和生效时间由回调填充。
 		StakeHostingOrder order = buildBaseOrder(userInfo, hostingPackage, amount, createDay);
@@ -152,7 +143,8 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		validateAmount(amount, hostingPackage);
 
 		Date now = new Date();
-		int createDay = Integer.parseInt(DateUtil.format(DateUtil.date(), "yyyyMMdd"));
+		int createDay = formatDay(now);
+		int rewardStartDay = nextRewardStartDay(now);
 		BigDecimal stakeAmount = amount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 
 		// 先生成订单号，再扣站内USDT；扣款发生在订单落库前，钱包流水主要通过 sourceCode=orderNo 追踪。
@@ -171,6 +163,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setPayAmount(stakeAmount);
 		order.setPayTime(now);
 		order.setEffectiveTime(now);
+		order.setRewardStartDay(rewardStartDay);
 		order.setG7NewPerformanceStatus(G7_STATUS_WAIT);
 		order.setG7ExpirePerformanceStatus(G7_STATUS_WAIT);
 		if (!save(order)) {
@@ -226,6 +219,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			throw new ServiceException(ResponseCode.CODE_1309);
 		}
 		Date now = new Date();
+		int rewardStartDay = nextRewardStartDay(now);
 
 		// 步骤5：只允许待支付、待生效状态推进为生效中，同时记录支付哈希、实付金额和生效时间快照。
 		boolean update = lambdaUpdate()
@@ -238,6 +232,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			.set(StakeHostingOrder::getPayAmount, payAmount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew))
 			.set(StakeHostingOrder::getPayTime, now)
 			.set(StakeHostingOrder::getEffectiveTime, now)
+			.set(StakeHostingOrder::getRewardStartDay, rewardStartDay)
 			.set(StakeHostingOrder::getG7NewPerformanceStatus, G7_STATUS_WAIT)
 			.set(StakeHostingOrder::getG7ExpirePerformanceStatus, G7_STATUS_WAIT)
 			.set(StakeHostingOrder::getUpdateTime, now)
@@ -275,7 +270,8 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		StakeHostingPackage hostingPackage = getEnabledPackage(req.getPackageId());
 		validateAmount(req.getStakeUsdtAmount(), hostingPackage);
 		Date now = new Date();
-		int createDay = Integer.parseInt(DateUtil.format(DateUtil.date(), "yyyyMMdd"));
+		int createDay = formatDay(now);
+		int rewardStartDay = nextRewardStartDay(now);
 
 		// 赠送订单跳过待支付状态，直接记录实付金额、生效时间和待处理的 G7 状态。
 		StakeHostingOrder order = buildBaseOrder(userInfo, hostingPackage, req.getStakeUsdtAmount(), createDay);
@@ -287,6 +283,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		order.setPayAmount(req.getStakeUsdtAmount().setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
 		order.setPayTime(now);
 		order.setEffectiveTime(now);
+		order.setRewardStartDay(rewardStartDay);
 		order.setG7NewPerformanceStatus(G7_STATUS_WAIT);
 		order.setG7ExpirePerformanceStatus(G7_STATUS_WAIT);
 		order.setRemark(req.getRemark());
@@ -307,6 +304,19 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			throw new ServiceException("后台拨付托管收益分配方式不正确");
 		}
 		return grantRewardMode;
+	}
+
+	/**
+	 * 计算订单最早收益发放日期。
+	 *
+	 * <p>生产环境101凌晨执行时发放昨日收益，因此订单生效日后第2天凌晨才会发第一笔收益。</p>
+	 */
+	private int nextRewardStartDay(Date effectiveTime) {
+		return formatDay(DateUtil.offsetDay(effectiveTime, 2));
+	}
+
+	private int formatDay(Date date) {
+		return Integer.parseInt(DateUtil.format(date, "yyyyMMdd"));
 	}
 
 	/**

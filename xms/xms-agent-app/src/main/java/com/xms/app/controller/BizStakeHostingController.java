@@ -8,11 +8,14 @@ import com.xms.app.entity.vo.StopStakeHostingOrderVo;
 import com.xms.app.service.BizStakeHostingService;
 import com.xms.common.annotation.RepeatSubmit;
 import com.xms.common.core.domain.api.ResultPista;
+import com.xms.common.exception.ServiceException;
 import com.xms.common.utils.SecurityUtils;
 import com.xms.dao.domain.RewardRecord;
+import com.xms.dao.service.XmsCommonService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,7 +29,12 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/stakeHosting")
 public class BizStakeHostingController {
-	private final BizStakeHostingService bizStakeHostingService;
+
+	@Autowired
+	private  BizStakeHostingService bizStakeHostingService;
+
+	@Autowired
+	private  XmsCommonService xmsCommonServiceImpl;
 
 	public BizStakeHostingController(BizStakeHostingService bizStakeHostingService) {
 		this.bizStakeHostingService = bizStakeHostingService;
@@ -57,6 +65,10 @@ public class BizStakeHostingController {
 	@PostMapping("/createOrder")
 	@RepeatSubmit
 	public ResultPista<CreateStakeHostingOrderResp> createOrder(@Valid @RequestBody CreateStakeHostingOrderVo req) {
+		ResultPista resultPista = xmsCommonServiceImpl.checkMineSettleTime();
+		if (!resultPista.isSuccess()) {
+			throw new ServiceException(resultPista.getMsg());
+		}
 		return bizStakeHostingService.createOrder(req, SecurityUtils.getLoginAppUser().getUserId());
 	}
 
@@ -148,6 +160,10 @@ public class BizStakeHostingController {
 	@PostMapping("/pledgeAfi")
 	@RepeatSubmit
 	public ResultPista<StakeHostingAfiPledgeDto> pledgeAfi(@Valid @RequestBody PledgeStakeHostingAfiVo req) {
+		ResultPista resultPista = xmsCommonServiceImpl.checkMineSettleTime();
+		if (!resultPista.isSuccess()) {
+			throw new ServiceException(resultPista.getMsg());
+		}
 		return bizStakeHostingService.pledgeAfi(req);
 	}
 }

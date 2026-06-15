@@ -447,8 +447,6 @@
       </el-table-column>-->
 <!--      -->
 <!--      <el-table-column label="备注" align="center" prop="mnemonic" />-->
-      <el-table-column align="center" label="备注" prop="remark" show-overflow-tooltip width="180"/>
-
 
 
       <el-table-column align="center" label="创建时间" prop="createTime" >

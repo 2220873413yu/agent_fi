@@ -151,10 +151,6 @@ public class ConstantSys {
 	 */
 	public static final String PURE_STATIC_RATE_AFTER_RETURN_PERCENT = "PURE_STATIC_RATE_AFTER_RETURN_PERCENT";
 
-	/**
-	 * 测试环境G7历史快照日期回退开关，1表示每次准备快照前将今天以前的快照整体往前移动一天。
-	 */
-	public static final String kaixxguanxx = "kaixxguanxx";
 
 	/**
 	 * Polymarket内部下单最低AFI数量，历史兼容参数。
@@ -170,5 +166,10 @@ public class ConstantSys {
 	 * Polymarket内部交易手续费比例，单位%。
 	 */
 	public static final String biz_polymarket_trade_fee_ratio = "biz_polymarket_trade_fee_ratio";
+
+	/**
+	 * 所有创世节点共分配总量代币
+	 */
+	public static final String biz_node_release_pool_amount = "biz_node_release_pool_amount";
 
 }

@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.xms.common.constant.ConstantStatic;
 import com.xms.common.constant.ConstantSys;
 import com.xms.common.constant.ConstantType;
@@ -126,13 +127,13 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * 发放托管订单每日静态收益。
 	 *
 	 * <p>这是任务101的核心入口。一次执行会按当前环境决定收益归属日：prod 使用任务执行日前一天，
-	 * 非 prod 使用任务执行日，便于本地/测试环境当天创建订单后立即验证收益发放。确定收益归属日后，先准备G7收益率快照，
+	 * 非 prod 使用任务执行日；prod 会受订单 rewardStartDay 限制，避免订单生效后次日凌晨立刻产出。确定收益归属日后，先准备G7收益率快照，
 	 * 再逐笔计算产出中托管订单的静态收益。静态收益成功后，会继续触发上级动态奖励、批量写钱包、
 	 * 保存奖励记录和收益结算明细，最后处理到期订单的本金退还、业绩回退、AFI质押退还和全球分红奖池入账。</p>
 	 *
 	 * <p>日期口径：`executeDay` 表示定时任务实际执行日，用于 `xms_task.task_value`；`rewardDay`
 	 * 表示收益归属日，用于G7快照、结算明细、订单 `last_reward_day` 和服务费奖池归属。
-	 * prod 环境凌晨发昨日收益时，两者不能混用；非 prod 环境为了测试可直接发当天收益。</p>
+	 * `rewardStartDay` 表示订单最早允许发放收益的任务执行日；prod 环境凌晨发昨日收益时，三者不能混用。</p>
 	 *
 	 * <p>幂等口径：理论上任务按 `xms_task(task_type=101, task_value=executeDay)` 做日级幂等；
 	 * `last_reward_day` 记录订单最近一次收益归属日，当前不作为强制过滤条件。注意：本地测试期间
@@ -146,6 +147,8 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	@Transactional(rollbackFor = Exception.class)
 	public void distributeDailyStaticReward() {
 		String executeDay = DateUtil.format(DateUtil.date(), "yyyyMMdd");
+		int executeDayInt = Integer.parseInt(executeDay);
+		boolean prod = isProdProfile();
 
 		int rewardDay = resolveDailyStaticRewardDay();
 		// 1. 任务级幂等：执行日已有101任务记录时，整批静态收益不再重复发放。
@@ -155,20 +158,23 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			return;
 		}
 
-		// 2. 扫描本轮可产出的托管订单：必须已支付、产出中、未删除，并且订单创建日不能晚于收益归属日。
-		//    现在业务是创建成功即支付成功，所以用 createDay<=rewardDay 控制订单从收益归属日开始参与发放。
+		// 2. 扫描本轮可产出的托管订单：必须已支付、产出中、未删除。
+		//    prod 环境还要求订单收益发放日期不能晚于任务执行日；非 prod 放开该限制，方便当天创建订单后测试收益。
 		//    这里没有用 last_reward_day 过滤，是为了保留你本地重复测试101的便利；生产恢复任务标记时要重点确认幂等边界。
-		List<StakeHostingOrder> orderList = stakeHostingOrderService.lambdaQuery()
+		LambdaQueryChainWrapper<StakeHostingOrder> orderQuery = stakeHostingOrderService.lambdaQuery()
 			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
 			.eq(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_RUNNING)
-			.eq(StakeHostingOrder::getDeleted, DELETED_NO)
-			.le(StakeHostingOrder::getCreateDay, rewardDay)
+			.eq(StakeHostingOrder::getDeleted, DELETED_NO);
+		if (prod) {
+			orderQuery.le(StakeHostingOrder::getRewardStartDay, executeDayInt);
+		}
+		List<StakeHostingOrder> orderList = orderQuery
 			//.and(wrapper -> wrapper.ne(StakeHostingOrder::getLastRewardDay, rewardDay).or().isNull(StakeHostingOrder::getLastRewardDay))
 			.list();
 		if (CollectionUtil.isEmpty(orderList)) {
-			log.info("101托管静态收益跳过，没有可发放的收益归属日产出中订单 executeDay={}, rewardDay={}", executeDay, rewardDay);
+			log.info("101托管静态收益跳过，没有可发放的产出中订单 executeDay={}, rewardDay={}, prod={}", executeDay, rewardDay, prod);
 			// 本地测试期间保留不写任务完成标记；生产环境如果要靠 xms_task 防重，需要恢复 addDailyTask。
-			//addDailyTask(executeDay);
+			addDailyTask(executeDay);
 			return;
 		}
 		List<Long> rewardUserIds = orderList.stream()
@@ -197,7 +203,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		if (CollectionUtil.isEmpty(staticRewardResults)) {
 			// 所有订单都被开关、状态抢占或并发变化跳过时，不产生钱包、结算明细和奖池入账。
 			// 本地测试期间保留不写任务完成标记；生产环境如果要靠 xms_task 防重，需要恢复 addDailyTask。
-			//addDailyTask(executeDay);
+			addDailyTask(executeDay);
 			return;
 		}
 		// 5. 先保存静态收益结算明细，记录毛收益、服务费、净收益、基础收益率、AFI加速倍率等审计字段。
@@ -224,7 +230,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		stakeHostingGlobalDividendPoolService.incomeDailyServiceFee(rewardDay,
 			dailyServiceFee.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew), "task101");
 		// 本地测试期间保留不写任务完成标记；生产环境如果要靠 xms_task 防重，需要恢复 addDailyTask。
-		//addDailyTask(executeDay);
+		addDailyTask(executeDay);
 	}
 
 	/**
@@ -249,10 +255,18 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 */
 	private int resolveDailyStaticRewardDay() {
 		String profile = environment.getProperty(Constants.ACTIVE_PROFILES_PROPERTY);
-		boolean prod = Constants.ACTIVE_PROPERTY_PROD.equalsIgnoreCase(profile);
+		boolean prod = isProdProfile(profile);
 		int rewardDay = Integer.parseInt(DateUtil.format(prod ? DateUtil.yesterday() : DateUtil.date(), "yyyyMMdd"));
 		log.info("101托管静态收益日期口径 profile={}, prod={}, rewardDay={}", profile, prod, rewardDay);
 		return rewardDay;
+	}
+
+	private boolean isProdProfile() {
+		return isProdProfile(environment.getProperty(Constants.ACTIVE_PROFILES_PROPERTY));
+	}
+
+	private boolean isProdProfile(String profile) {
+		return Constants.ACTIVE_PROPERTY_PROD.equalsIgnoreCase(profile);
 	}
 
 
@@ -365,7 +379,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.eq(StakeHostingOrder::getPayStatus, StakeHostingOrderServiceImpl.PAY_SUCCESS)
 			.eq(StakeHostingOrder::getStatus, StakeHostingOrderServiceImpl.STATUS_RUNNING)
 			.eq(StakeHostingOrder::getDeleted, DELETED_NO)
-			.le(StakeHostingOrder::getCreateDay, statDay)
+			.le(StakeHostingOrder::getRewardStartDay, statDay)
 			.list();
 		if (CollectionUtil.isEmpty(orderList)) {
 			log.info("托管静态收益率测算跳过，当前没有产出中订单 rewardDay={}", statDay);
@@ -392,10 +406,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	private void addWeeklyTask(String strDate) {
-//		int rows = asyncTaskServiceImpl.addTask(SysConstant.TSK_TYPE_102, strDate);
-//		if (rows != 1) {
-//			throw new RuntimeException("Task processing failed");
-//		}
+		int rows = asyncTaskServiceImpl.addTask(SysConstant.TSK_TYPE_102, strDate);
+		if (rows != 1) {
+			throw new RuntimeException("Task processing failed");
+		}
 	}
 
 	/**
@@ -737,7 +751,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 
 		// 后台拨付单复用 today_reward/total_static_reward 做订单维度累计；
-		// 真正资产入账会在后续批量钱包阶段处理，并使用 47/48 与真实托管收益隔离。
+		// 真正资产入账会在后续批量钱包阶段处理，后台拨付静态收益使用47，动态收益按直推/极差/平级来源类型记录。
 		// 结算明细记录静态收益、服务费、收益率和 AFI 加速倍率快照，用于后台追溯。
 		StakeHostingRewardSettlement staticSettlement = buildSettlement(order, null, REWARD_TYPE_STATIC_FEE, null, grossReward, serviceFeeRatio,
 			serviceFee, grossReward, baseStaticRate, afiAccelerateRate, actualStaticRate,

@@ -49,8 +49,8 @@ public class BizWithdrawalController {
 	@Autowired
 	private BizWithdrawalService bizWithdrawalService;
 
-//	@Autowired
-//	private XmsCommonService xmsCommonServiceImpl;
+	@Autowired
+	private  XmsCommonService xmsCommonServiceImpl;
 
 
 	/**
@@ -74,10 +74,10 @@ public class BizWithdrawalController {
 	@RepeatSubmit
 	@PostMapping(value = "/addWithdrawal")
 	public ResultPista<Void> addWithdrawal(@Valid @RequestBody WithdrawalVo withdrawalVo) {
-	/*	ResultPista resultPista = xmsCommonServiceImpl.checkMineSettleTime();
+		ResultPista resultPista = xmsCommonServiceImpl.checkMineSettleTime();
 		if (!resultPista.isSuccess()) {
 			throw new ServiceException(resultPista.getMsg());
-		}*/
+		}
 		bizWithdrawalService.addWithdrawal(withdrawalVo, SecurityUtils.getLoginAppUser().getUserId());
 		return ResultPista.success();
 	}

@@ -165,4 +165,10 @@ public class StakeHostingOrderDto {
 	 */
 	@ApiModelProperty(value = "最近一次发放日期，格式yyyyMMdd")
 	private Integer lastRewardDay;
+
+	/**
+	 * 收益发放日期，格式yyyyMMdd
+	 */
+	@ApiModelProperty(value = "收益发放日期，格式yyyyMMdd")
+	private Integer rewardStartDay;
 }

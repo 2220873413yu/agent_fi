@@ -8,6 +8,7 @@ import com.xms.dao.domain.StakeHostingOrder;
 import com.xms.dao.entity.bo.StakeHostingGrantRewardSwitchBo;
 import com.xms.dao.service.IStakeHostingAfiPledgeService;
 import com.xms.dao.service.IStakeHostingOrderService;
+import com.xms.dao.service.IStakeHostingUserAmountSummaryService;
 import com.xms.dao.service.UserWalletService;
 import com.xms.dao.service.impl.StakeHostingOrderServiceImpl;
 import com.xms.web.service.StakeHostingOrderAdminService;
@@ -24,13 +25,16 @@ import java.util.Date;
 public class StakeHostingOrderAdminServiceImpl implements StakeHostingOrderAdminService {
 	private final IStakeHostingOrderService stakeHostingOrderService;
 	private final IStakeHostingAfiPledgeService stakeHostingAfiPledgeService;
+	private final IStakeHostingUserAmountSummaryService stakeHostingUserAmountSummaryService;
 	private final UserWalletService userWalletService;
 
 	public StakeHostingOrderAdminServiceImpl(IStakeHostingOrderService stakeHostingOrderService,
 											 IStakeHostingAfiPledgeService stakeHostingAfiPledgeService,
+											 IStakeHostingUserAmountSummaryService stakeHostingUserAmountSummaryService,
 											 UserWalletService userWalletService) {
 		this.stakeHostingOrderService = stakeHostingOrderService;
 		this.stakeHostingAfiPledgeService = stakeHostingAfiPledgeService;
+		this.stakeHostingUserAmountSummaryService = stakeHostingUserAmountSummaryService;
 		this.userWalletService = userWalletService;
 	}
 
@@ -95,6 +99,7 @@ public class StakeHostingOrderAdminServiceImpl implements StakeHostingOrderAdmin
 		}
 		stakeHostingAfiPledgeService.returnPledgeByOrderId(order.getId());
 		stakeHostingOrderService.subtractHostingPerformance(order.getUserId(), principalAmount, order.getId());
+		stakeHostingUserAmountSummaryService.decreaseAmount(principalAmount);
 		stakeHostingOrderService.refreshUserValidByUnfinishedHostingOrder(order.getUserId());
 		stakeHostingOrderService.sendStakeHostingLevelRecalculateAfterCommit(order.getId());
 		return 1;

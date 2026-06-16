@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeHostingUserAmountSummaryMapper">
+
+    <resultMap type="com.xms.dao.domain.StakeHostingUserAmountSummary" id="StakeHostingUserAmountSummaryResult">
+        <id property="id" column="id" />
+        <result property="totalAmount" column="total_amount" />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="deleted" column="deleted" />
+    </resultMap>
+
+    <sql id="selectStakeHostingUserAmountSummaryVo">
+        select id, total_amount, create_time, update_time, remark, deleted
+        from t_stake_hosting_user_amount_summary
+    </sql>
+
+    <select id="selectStakeHostingUserAmountSummaryList" parameterType="com.xms.dao.domain.StakeHostingUserAmountSummary" resultMap="StakeHostingUserAmountSummaryResult">
+        <include refid="selectStakeHostingUserAmountSummaryVo"/>
+        <where>
+            deleted = 0
+            and id = 1
+        </where>
+        order by id asc
+    </select>
+
+</mapper>

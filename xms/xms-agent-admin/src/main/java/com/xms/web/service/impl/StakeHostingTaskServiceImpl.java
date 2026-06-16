@@ -36,6 +36,7 @@ import com.xms.dao.service.IStakeHostingGlobalDividendBatchService;
 import com.xms.dao.service.IStakeHostingGlobalDividendDetailService;
 import com.xms.dao.service.IStakeHostingUserRewardSummaryService;
 import com.xms.dao.service.IStakeHostingGlobalDividendWeightSnapshotService;
+import com.xms.dao.service.IStakeHostingUserAmountSummaryService;
 import com.xms.dao.service.ISysParaService;
 import com.xms.dao.service.IUserLevelConfigService;
 import com.xms.dao.service.UserInfoService;
@@ -101,6 +102,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	private final IStakeHostingGlobalDividendDetailService stakeHostingGlobalDividendDetailService;
 	private final IStakeHostingUserRewardSummaryService stakeHostingUserRewardSummaryService;
 	private final IStakeHostingGlobalDividendWeightSnapshotService stakeHostingGlobalDividendWeightSnapshotService;
+	private final IStakeHostingUserAmountSummaryService stakeHostingUserAmountSummaryService;
 	private final UserInfoService userInfoService;
 	private final IUserLevelConfigService userLevelConfigService;
 	private final ISysParaService sysParaServiceImpl;
@@ -140,8 +142,9 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * `addDailyTask(executeDay)` 被注释时，同一天重复执行会依赖人工控制，不能当成生产幂等。</p>
 	 *
 	 * <p>钱包口径：用户购买单静态/动态收益进入 `valid_num1`；后台拨付单在订单开关开启后，
-	 * 静态收益用 sourceType=47 入 `valid_num3`，动态收益按直推/极差/平级来源类型记录，并按订单收益分配方式选择入上级
-	 * `valid_num3` 或 `valid_num1`。</p>
+	 * 静态收益按订单收益分配方式进入 `valid_num3` 或 `valid_num1`，锁定静态收益使用 sourceType=47，
+	 * mode=3 可用静态收益复用真实购买静态收益来源类型；动态收益按直推/极差/平级来源类型记录，
+	 * 并按订单收益分配方式选择入上级 `valid_num3` 或 `valid_num1`。</p>
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
@@ -850,6 +853,13 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 		markFinishedGrantPrincipalNotRequired(finishedResults, now);
 
 		Map<Long, Long> finishedUserOrderMap = new HashMap<>();
+		BigDecimal finishedStakeAmount = finishedResults.stream()
+			.map(result -> result.order)
+			.filter(order -> order != null
+				&& order.getStakeUsdtAmount() != null
+				&& order.getStakeUsdtAmount().compareTo(BigDecimal.ZERO) > 0)
+			.map(StakeHostingOrder::getStakeUsdtAmount)
+			.reduce(BigDecimal.ZERO, BigDecimal::add);
 		for (StaticRewardResult result : finishedResults) {
 			StakeHostingOrder order = result.order;
 			// 订单完成后回退本人、直推、伞下和全球分红权重等托管业绩影响。
@@ -857,6 +867,10 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			// 非 1 天套餐可能绑定 AFI 加速，到期时退回仍在质押中的 AFI。
 			stakeHostingAfiPledgeService.returnPledgeByOrderId(order.getId());
 			finishedUserOrderMap.putIfAbsent(order.getUserId(), order.getId());
+		}
+		if (finishedStakeAmount.compareTo(BigDecimal.ZERO) > 0) {
+			stakeHostingUserAmountSummaryService.decreaseAmount(
+				finishedStakeAmount.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
 		}
 		for (Map.Entry<Long, Long> entry : finishedUserOrderMap.entrySet()) {
 			stakeHostingOrderService.refreshUserValidByUnfinishedHostingOrder(entry.getKey());
@@ -990,8 +1004,9 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * 批量发放托管静态净收益并记录奖励流水。
 	 *
 	 * <p>用户购买订单继续进入 `valid_num1`，钱包来源类型为31；后台拨付订单在订单开关开启后
-	 * 进入 `valid_num3` 锁定USDT，钱包来源类型为47。订单本身仍复用 todayReward/totalStaticReward
-	 * 做订单维度累计，资产字段和 sourceType 负责区分真实收益与拨付收益。</p>
+	 * 按订单收益分配方式进入 `valid_num1` 或 `valid_num3`，锁定静态收益来源类型为47，mode=3 可用静态收益
+	 * 复用用户购买静态收益来源类型。订单本身仍复用 todayReward/totalStaticReward 做订单维度累计，
+	 * 资产字段和 sourceType 负责区分真实收益与拨付收益。</p>
 	 *
 	 * @param results 本轮静态收益计算结果
 	 * @param now 本轮任务时间
@@ -1008,11 +1023,12 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 				continue;
 			}
 			boolean grantReward = isAdminGrantOrder(result.order);
+			boolean grantStaticRewardToAvailable = isGrantOrderStaticRewardToAvailable(result.order);
 			String gtId = IDUtils.getSnowflakeStr();
-			// 用户购买单进入可用USDT；后台拨付单进入锁定USDT，避免和真实托管收益资产混淆。
+			// 用户购买单进入可用USDT；后台拨付单按订单收益分配方式进入可用或锁定USDT。
 			UserMoney userMoney = new UserMoney();
 			userMoney.setId(result.order.getUserId());
-			if (grantReward) {
+			if (grantReward && !grantStaticRewardToAvailable) {
 				userMoney.setValidNum3(result.netReward);
 			} else {
 				userMoney.setValidNum1(result.netReward);
@@ -1020,23 +1036,19 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 			userMoney.setGtId(gtId);
 			userMoney.setSourceCode(result.order.getOrderNo());
 			userMoney.setSourceId(grantReward ? result.order.getId() : result.order.getUserId());
-			userMoney.setSourceType(grantReward
-				? ConstantType.user_money_log_source_type.type_47
-				: ConstantType.user_money_log_source_type.type_31);
+			userMoney.setSourceType(resolveStaticRewardMoneySourceType(grantReward, grantStaticRewardToAvailable));
 			userMoney.setUpdateTime(now);
 			userMoneyList.add(userMoney);
 
-			// 奖励记录同样用独立币种和来源类型隔离锁定USDT静态收益。
+			// 奖励记录来源类型仍隔离后台拨付静态收益，币种与实际入账资产字段保持一致。
 			RewardRecord rewardRecord = new RewardRecord();
 			rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
 			rewardRecord.setUserId(result.order.getUserId());
 			rewardRecord.setAmount(result.netReward);
-			rewardRecord.setCoinType(grantReward
+			rewardRecord.setCoinType(grantReward && !grantStaticRewardToAvailable
 				? ConstantType.user_money_coin_type.type_3
 				: ConstantType.user_money_coin_type.type_1);
-			rewardRecord.setSourceType(grantReward
-				? ConstantType.xms_reward_record_source_type.type_47
-				: ConstantType.xms_reward_record_source_type.type_27);
+			rewardRecord.setSourceType(resolveStaticRewardRecordSourceType(grantReward, grantStaticRewardToAvailable));
 			rewardRecord.setSourceOrderCode(result.order.getOrderNo());
 			rewardRecord.setSourceUserId(result.order.getUserId());
 			rewardRecord.setGtId(gtId);
@@ -1051,6 +1063,46 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	}
 
 	/**
+	 * 解析托管静态收益钱包来源类型。
+	 *
+	 * @param grantReward 是否后台拨付订单收益
+	 * @param grantStaticRewardToAvailable 后台拨付静态收益是否进入可用USDT
+	 * @return 钱包流水来源类型
+	 */
+	private int resolveStaticRewardMoneySourceType(boolean grantReward, boolean grantStaticRewardToAvailable) {
+		if (!grantReward || grantStaticRewardToAvailable) {
+			return ConstantType.user_money_log_source_type.type_31;
+		}
+		return ConstantType.user_money_log_source_type.type_47;
+	}
+
+	/**
+	 * 解析托管静态收益奖励记录来源类型。
+	 *
+	 * @param grantReward 是否后台拨付订单收益
+	 * @param grantStaticRewardToAvailable 后台拨付静态收益是否进入可用USDT
+	 * @return 奖励记录来源类型
+	 */
+	private int resolveStaticRewardRecordSourceType(boolean grantReward, boolean grantStaticRewardToAvailable) {
+		if (!grantReward || grantStaticRewardToAvailable) {
+			return ConstantType.xms_reward_record_source_type.type_27;
+		}
+		return ConstantType.xms_reward_record_source_type.type_47;
+	}
+
+	/**
+	 * 判断后台拨付订单静态收益是否进入可用USDT。
+	 *
+	 * @param order 静态收益来源订单
+	 * @return true 表示 mode=3，后台拨付静态收益进入 `valid_num1`
+	 */
+	private boolean isGrantOrderStaticRewardToAvailable(StakeHostingOrder order) {
+		return isAdminGrantOrder(order)
+			&& order.getGrantRewardMode() != null
+			&& order.getGrantRewardMode() == StakeHostingOrderServiceImpl.GRANT_REWARD_MODE_ALL_AVAILABLE;
+	}
+
+	/**
 	 * flush 静态收益钱包增量和奖励记录。
 	 *
 	 * @param userMoneyList 待入账钱包增量，可能同时包含 valid_num1 和 valid_num3
@@ -1058,7 +1110,7 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 */
 	private void flushStaticRewardBatch(List<UserMoney> userMoneyList, List<RewardRecord> rewardRecordList) {
 		if (CollectionUtil.isNotEmpty(userMoneyList)) {
-			// 静态收益批量入账按资产字段分流：真实托管收益进 valid_num1，后台拨付收益进 valid_num3。
+			// 静态收益批量入账按资产字段分流：真实托管收益进 valid_num1，后台拨付收益按订单模式进 valid_num1 或 valid_num3。
 			batchUpdateRewardMoney(userMoneyList);
 			userMoneyList.clear();
 		}
@@ -1933,12 +1985,15 @@ public class StakeHostingTaskServiceImpl implements IStakeHostingTaskService {
 	 * 判断后台拨付订单动态收益是否进入可用USDT。
 	 *
 	 * @param order 静态收益来源订单
-	 * @return true 表示 mode=2，后台拨付动态收益进入 `valid_num1`
+	 * @return true 表示 mode=2或mode=3，后台拨付动态收益进入 `valid_num1`
 	 */
 	private boolean isGrantOrderDynamicRewardToAvailable(StakeHostingOrder order) {
-		return order != null
-			&& order.getGrantRewardMode() != null
-			&& order.getGrantRewardMode() == StakeHostingOrderServiceImpl.GRANT_REWARD_MODE_DYNAMIC_AVAILABLE;
+		if (!isAdminGrantOrder(order) || order.getGrantRewardMode() == null) {
+			return false;
+		}
+		Integer mode = order.getGrantRewardMode();
+		return mode == StakeHostingOrderServiceImpl.GRANT_REWARD_MODE_DYNAMIC_AVAILABLE
+			|| mode == StakeHostingOrderServiceImpl.GRANT_REWARD_MODE_ALL_AVAILABLE;
 	}
 
 	/**

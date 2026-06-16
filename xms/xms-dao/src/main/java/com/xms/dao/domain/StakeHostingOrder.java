@@ -94,9 +94,9 @@ public class StakeHostingOrder extends BaseEntity {
 	@ApiModelProperty(value = "后台拨付托管收益开关 0:关闭 1:开启")
 	private Integer grantRewardEnabled;
 
-	/** 后台拨付托管收益分配方式 1:静态动态进锁定USDT 2:静态进锁定USDT动态进可用USDT */
-	@Excel(name = "拨付收益分配方式", sort = 11)
-	@ApiModelProperty(value = "后台拨付托管收益分配方式 1:静态动态进锁定USDT 2:静态进锁定USDT动态进可用USDT")
+	/** 后台拨付托管收益分配方式 1:静态动态进锁定USDT 2:静态进锁定USDT动态进可用USDT 3:静态动态进可用USDT */
+	@Excel(name = "拨付收益分配方式", sort = 11, dictType = "t_stake_hosting_order_grant_reward_mode")
+	@ApiModelProperty(value = "后台拨付托管收益分配方式 1:静态动态进锁定USDT 2:静态进锁定USDT动态进可用USDT 3:静态动态进可用USDT")
 	private Integer grantRewardMode;
 
 	/** 支付状态 0:待支付 1:支付成功 */

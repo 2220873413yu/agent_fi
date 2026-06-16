@@ -21,6 +21,7 @@ import com.xms.dao.mapper.StakeHostingOrderMapper;
 import com.xms.dao.service.IStakeHostingPackageService;
 import com.xms.dao.service.IStakeHostingDailyTeamPerformanceService;
 import com.xms.dao.service.IStakeHostingOrderService;
+import com.xms.dao.service.IStakeHostingUserAmountSummaryService;
 import com.xms.dao.service.IStakeOrderService;
 import com.xms.dao.service.IUserLevelConfigService;
 import com.xms.dao.service.UserInfoService;
@@ -61,6 +62,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	public static final int PRINCIPAL_RETURN_NOT_REQUIRED = 2;
 	public static final int GRANT_REWARD_MODE_LOCKED = 1;
 	public static final int GRANT_REWARD_MODE_DYNAMIC_AVAILABLE = 2;
+	public static final int GRANT_REWARD_MODE_ALL_AVAILABLE = 3;
 
 	private final IStakeHostingPackageService stakeHostingPackageService;
 	private final IStakeHostingDailyTeamPerformanceService stakeHostingDailyTeamPerformanceService;
@@ -69,6 +71,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 	private final IUserLevelConfigService userLevelConfigService;
 	private final AsyncDynamicOrderSettlementService asyncDynamicOrderSettlementServiceImpl;
 	private final UserWalletService userWalletService;
+	private final IStakeHostingUserAmountSummaryService stakeHostingUserAmountSummaryService;
 
 	@Override
 	public List<StakeHostingOrder> selectStakeHostingOrderList(StakeHostingOrder stakeHostingOrder) {
@@ -172,6 +175,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 
 		// 订单生效后同步维护当前有效托管业绩、团队业绩和全球分红权重。
 		addHostingPerformance(order);
+		increaseUserAmountSummary(order);
 
 		// Redis Stream 只作为后置处理触发器，必须等主事务提交后再投递。
 		sendStakeHostingEffectiveAfterCommit(order.getId());
@@ -243,6 +247,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 
 		// 步骤6：订单生效后同步维护本人业绩、团队业绩和全球分红权重；该部分在当前事务内落库。
 		addHostingPerformance(order);
+		increaseUserAmountSummary(order);
 
 		// 步骤7：事务提交后发送异步消息，继续处理G7团队新增、小区业绩重算和真实等级刷新。
 		sendStakeHostingEffectiveAfterCommit(order.getId());
@@ -291,16 +296,26 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 			throw new ServiceException(ResponseCode.CODE_1298);
 		}
 		addHostingPerformance(order);
+		increaseUserAmountSummary(order);
 		// 事务提交后再发送托管生效消息，避免消费者读取到未提交订单。
 		sendStakeHostingEffectiveAfterCommit(order.getId());
 		return 1;
+	}
+
+	private void increaseUserAmountSummary(StakeHostingOrder order) {
+		if (order == null) {
+			return;
+		}
+		stakeHostingUserAmountSummaryService.increaseAmount(order.getStakeUsdtAmount());
 	}
 
 	private int resolveGrantRewardMode(Integer grantRewardMode) {
 		if (grantRewardMode == null) {
 			return GRANT_REWARD_MODE_LOCKED;
 		}
-		if (grantRewardMode != GRANT_REWARD_MODE_LOCKED && grantRewardMode != GRANT_REWARD_MODE_DYNAMIC_AVAILABLE) {
+		if (grantRewardMode != GRANT_REWARD_MODE_LOCKED
+			&& grantRewardMode != GRANT_REWARD_MODE_DYNAMIC_AVAILABLE
+			&& grantRewardMode != GRANT_REWARD_MODE_ALL_AVAILABLE) {
 			throw new ServiceException("后台拨付托管收益分配方式不正确");
 		}
 		return grantRewardMode;
@@ -398,6 +413,7 @@ public class StakeHostingOrderServiceImpl extends XmsDataServiceImpl<StakeHostin
 		}
 		// 订单退出产出后回滚本人、上级团队和全局分红权重相关业绩。
 		subtractHostingPerformance(order.getUserId(), principalAmount, order.getId());
+		stakeHostingUserAmountSummaryService.decreaseAmount(principalAmount);
 		// 如果用户已经没有其他未完成托管单，则同步刷新为无效用户。
 		refreshUserValidByUnfinishedHostingOrder(order.getUserId());
 		// 等级重算放到事务提交后投递，消费者再按订单ID重新查库处理。

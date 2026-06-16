@@ -45,14 +45,22 @@ import static com.xms.app.service.impl.BizUserServiceImpl.checkWallet;
 @Service
 @Slf4j
 public class BizStakeHostingServiceImpl implements BizStakeHostingService {
-	private final IStakeHostingPackageService stakeHostingPackageService;
-	private final IStakeHostingOrderService stakeHostingOrderService;
-	private final IStakeHostingAfiPledgeService stakeHostingAfiPledgeService;
-	private final IStakeHostingAfiAccelerateConfigService stakeHostingAfiAccelerateConfigService;
-	private final UserInfoService userInfoService;
-	private final XmsCommonService xmsCommonServiceImpl;
-	private final XmsRedis xmsRedis;
-	private final BizCommonService bizCommonService;
+	@Autowired
+	private  IStakeHostingPackageService stakeHostingPackageService;
+	@Autowired
+	private  IStakeHostingOrderService stakeHostingOrderService;
+	@Autowired
+	private  IStakeHostingAfiPledgeService stakeHostingAfiPledgeService;
+	@Autowired
+	private  IStakeHostingAfiAccelerateConfigService stakeHostingAfiAccelerateConfigService;
+	@Autowired
+	private  UserInfoService userInfoService;
+	@Autowired
+	private  XmsCommonService xmsCommonServiceImpl;
+	@Autowired
+	private  XmsRedis xmsRedis;
+	@Autowired
+	private  BizCommonService bizCommonService;
 
 	@Autowired
 	private  IRewardRecordService rewardRecordServiceImpl;
@@ -60,26 +68,11 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 	@Autowired
 	private  IStakeHostingStaticRateConfigService stakeHostingStaticRateConfigServiceImpl;
 
+	@Autowired
+	private IStakeHostingUserAmountSummaryService stakeHostingUserAmountSummaryService;
+
 	@Value("${lq.md5Key}")
 	private String md5Key;
-
-	public BizStakeHostingServiceImpl(IStakeHostingPackageService stakeHostingPackageService,
-									  IStakeHostingOrderService stakeHostingOrderService,
-									  IStakeHostingAfiPledgeService stakeHostingAfiPledgeService,
-									  IStakeHostingAfiAccelerateConfigService stakeHostingAfiAccelerateConfigService,
-									  UserInfoService userInfoService,
-									  XmsCommonService xmsCommonServiceImpl,
-									  XmsRedis xmsRedis,
-									  BizCommonService bizCommonService) {
-		this.stakeHostingPackageService = stakeHostingPackageService;
-		this.stakeHostingOrderService = stakeHostingOrderService;
-		this.stakeHostingAfiPledgeService = stakeHostingAfiPledgeService;
-		this.stakeHostingAfiAccelerateConfigService = stakeHostingAfiAccelerateConfigService;
-		this.userInfoService = userInfoService;
-		this.xmsCommonServiceImpl = xmsCommonServiceImpl;
-		this.xmsRedis = xmsRedis;
-		this.bizCommonService = bizCommonService;
-	}
 
 	/**
 	 * 查询 App 托管套餐列表。
@@ -440,5 +433,14 @@ public class BizStakeHostingServiceImpl implements BizStakeHostingService {
 				dto.setAmount(record.getAmount());
 				return dto;
 			}).collect(Collectors.toList());
+	}
+
+	@Override
+	public BigDecimal stakeHostingInfo() {
+		StakeHostingUserAmountSummary summary = stakeHostingUserAmountSummaryService.lambdaQuery()
+			.last("limit 1")
+			.select(StakeHostingUserAmountSummary::getTotalAmount)
+			.one();
+		return summary.getTotalAmount();
 	}
 }

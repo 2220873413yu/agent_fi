@@ -49,7 +49,7 @@ public class RechargeRecord extends BaseEntity {
 	private BigDecimal rechargeAmount;
 
 	/**
-	 * 币种类型 币种1:USDT,2:DFC,3:OORT
+	 * 币种类型 币种1:USDT,2:AFI
 	 */
 	@Excel(name = "币种",sort = 4, dictType = "t_user_money_log_coin_type")
 	private Integer coinType;

@@ -18,6 +18,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -36,9 +37,6 @@ public class BizStakeHostingController {
 	@Autowired
 	private  XmsCommonService xmsCommonServiceImpl;
 
-	public BizStakeHostingController(BizStakeHostingService bizStakeHostingService) {
-		this.bizStakeHostingService = bizStakeHostingService;
-	}
 
 	/**
 	 * 查询托管套餐列表。
@@ -51,6 +49,17 @@ public class BizStakeHostingController {
 	@GetMapping("/packageList")
 	public ResultPista<List<StakeHostingPackageDto>> packageList() {
 		return ResultPista.data(bizStakeHostingService.packageList());
+	}
+
+
+	/**
+	 * 托管信息
+	 * @return
+	 */
+	@ApiOperation(value = "托管信息")
+	@GetMapping("/staekInfo")
+	public ResultPista<BigDecimal> stakeHostingInfo() {
+		return ResultPista.data(bizStakeHostingService.stakeHostingInfo());
 	}
 
 	/**

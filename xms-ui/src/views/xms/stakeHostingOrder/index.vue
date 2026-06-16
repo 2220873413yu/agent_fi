@@ -136,7 +136,11 @@
       </el-table-column>
       <el-table-column label="拨付收益方式" align="center" prop="grantRewardMode" width="190">
         <template slot-scope="scope">
-          <span v-if="scope.row.sourceType == 1">{{ formatGrantRewardMode(scope.row.grantRewardMode) }}</span>
+          <dict-tag
+            v-if="scope.row.sourceType == 1"
+            :options="dict.type.t_stake_hosting_order_grant_reward_mode"
+            :value="scope.row.grantRewardMode || 1"
+          />
           <span v-else>-</span>
         </template>
       </el-table-column>
@@ -227,10 +231,10 @@
         <el-form-item label="收益分配方式" prop="grantRewardMode">
           <el-select v-model="form.grantRewardMode" placeholder="请选择收益分配方式" style="width: 100%">
             <el-option
-              v-for="item in grantRewardModeOptions"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
+              v-for="dict in dict.type.t_stake_hosting_order_grant_reward_mode"
+              :key="dict.value"
+              :label="dict.label"
+              :value="parseInt(dict.value)"
             />
           </el-select>
         </el-form-item>
@@ -254,7 +258,8 @@ export default {
     't_stake_hosting_order_pay_status',
     't_stake_hosting_order_status',
     't_stake_hosting_order_return_principal',
-    't_stake_hosting_order_afi_accelerated'
+    't_stake_hosting_order_afi_accelerated',
+    't_stake_hosting_order_grant_reward_mode'
   ],
   data() {
     return {
@@ -266,10 +271,6 @@ export default {
       total: 0,
       stakeHostingOrderList: [],
       packageOptions: [],
-      grantRewardModeOptions: [
-        { value: 1, label: '静态动态进锁定USDT' },
-        { value: 2, label: '静态进锁定USDT，动态进可用USDT' }
-      ],
       title: '',
       open: false,
       daterangeCreateTime: [],
@@ -316,11 +317,6 @@ export default {
         return '-'
       }
       return value + '%'
-    },
-    formatGrantRewardMode(value) {
-      const mode = Number(value || 1)
-      const option = this.grantRewardModeOptions.find(item => item.value === mode)
-      return option ? option.label : '静态动态进锁定USDT'
     },
     getPackageOptions() {
       listStakeHostingPackage({ pageNum: 1, pageSize: 100, status: 1 }).then(response => {

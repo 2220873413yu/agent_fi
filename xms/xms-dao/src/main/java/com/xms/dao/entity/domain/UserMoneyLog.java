@@ -42,7 +42,7 @@ public class UserMoneyLog extends BaseXmsEntity {
 	private Long userId;
 
 	/**
-	 * 币种1:USDT,2:DFC,3:OORT,4:锁定USDT,5:产出DFC
+	 * 币种1:USDT,2:AFI,4:锁定USDT,5:产出DFC
 	 */
 	@ApiModelProperty(value = "币种")
 	@Excel(name = "币种",dictType = "t_user_money_log_coin_type",sort = 2)

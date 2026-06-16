@@ -9,6 +9,7 @@ import com.xms.app.entity.vo.StopStakeHostingOrderVo;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.dao.domain.RewardRecord;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -104,4 +105,11 @@ public interface BizStakeHostingService {
 	 * @return
 	 */
 	List<OrderRewardDto> orderRewardList(String orderNo, Long lastId);
+
+
+	/**
+	 * 获取质押信息
+	 * @return
+	 */
+	BigDecimal stakeHostingInfo();
 }

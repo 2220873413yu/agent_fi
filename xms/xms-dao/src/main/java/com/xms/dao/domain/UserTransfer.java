@@ -50,7 +50,7 @@ public class UserTransfer extends BaseEntity {
     /** 转账订单号 */
     @Excel(name = "转账订单号",sort = 3,width = 40)
     private String code;
-	/** 转账币种1:USDT,2:DFC,3:OORT,4:锁定USDT,5:产出DFC */
+	/** 转账币种1:USDT,2:AFI,4:锁定USDT,5:产出DFC */
 	@Excel(name = "转账币种",sort = 4,dictType = "t_user_money_log_coin_type")
 	private Integer coinType;
     /** 转账额度 */

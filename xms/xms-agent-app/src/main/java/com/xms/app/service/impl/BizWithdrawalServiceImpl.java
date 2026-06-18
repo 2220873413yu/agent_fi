@@ -366,8 +366,9 @@ public class BizWithdrawalServiceImpl implements BizWithdrawalService {
 		String auditText = withdrawal.getStatus().equals(ConstantType.withdrawal_status.type_3)
 			? "已自动审核"
 			: "需人工审核";
+		String coinType = withdrawal.getCoinType() == ConstantType.user_money_coin_type.type_1 ? "USDT":"AFI";
 		String remarkText = StrUtil.blankToDefault(remark, "备注");
-		String text = String.format("%s:%s，发起提现,金额%sUSDT,%s", remarkText,withdrawal.getAccountNo(), amountText, auditText);
+		String text = String.format("%s:%s，发起提现,金额%s %s,%s", remarkText,withdrawal.getAccountNo(), amountText,coinType, auditText);
 		TelegramMessageDTO telegramMessageDTO = new TelegramMessageDTO();
 		telegramMessageDTO.setChatId(telegramChatId);
 		telegramMessageDTO.setText(text);

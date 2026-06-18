@@ -1,6 +1,7 @@
 package com.xms.app.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.system.SystemUtil;
 import com.alibaba.fastjson.JSON;
 import com.xms.app.entity.bo.DestroyCallbackBo;
@@ -17,12 +18,15 @@ import com.xms.common.constant.SysConstant;
 import com.xms.common.core.domain.BaseEntity;
 import com.xms.common.core.domain.api.ResultPista;
 import com.xms.common.exception.ServiceException;
+import com.xms.common.notify.AsyncTelegramMessageService;
+import com.xms.common.notify.TelegramMessageDTO;
 import com.xms.common.result.ResponseCode;
 import com.xms.common.utils.*;
 import com.xms.common.utils.uuid.IDUtils;
 import com.xms.dao.domain.AssetTransferRecord;
 import com.xms.dao.domain.RechargeRecord;
 import com.xms.dao.entity.domain.UserInfo;
+import com.xms.dao.entity.domain.Withdrawal;
 import com.xms.dao.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,10 +51,14 @@ public class BizRechargeServiceImpl implements BizRechargeService {
 	@Autowired
 	private UserWalletService userWalletServiceImpl;
 
+	@Autowired
+	private AsyncTelegramMessageService asyncTelegramMessageService;
 
 	@Value("${lq.md5Key}")
 	private String md5Key;
 
+	@Value("${telegram.chat-id:}")
+	private String telegramChatId;
 
 	@Autowired
 	private UserInfoService userInfoService;
@@ -269,11 +277,25 @@ public class BizRechargeServiceImpl implements BizRechargeService {
 			if (count != 1) {
 				throw new ServiceException(ResponseCode.CODE_1002);
 			}
+			sendRechargeTelegramAsync(rechargeOrder.getRechargeAmount(),rechargeOrder.getCoinType(),
+				userInfo.getAccount(),userInfo.getRemark());
 		}
 
 		return ResultPista.data("success");
 	}
 
+	private void sendRechargeTelegramAsync(BigDecimal rechargeAmount,Integer coinType,String account,String remark) {
+		// 这里只入 Redis Stream，Telegram HTTP 发送交给独立消费者慢慢处理。
+		String amountText = rechargeAmount.stripTrailingZeros().toPlainString();
+		String strCoinType = coinType == ConstantType.user_money_coin_type.type_1 ? "USDT":"AFI";
+		String remarkText = StrUtil.blankToDefault(remark, "备注");
+		//备注:0x49e374c563c4b508e982c09033d5a225028d1abe，充值usdt/AFI ,金额33.28125 USDT/AFI
+		String text = String.format("%s:%s，充值%s,金额%s %s", remarkText,account,strCoinType,amountText,strCoinType);
+		TelegramMessageDTO telegramMessageDTO = new TelegramMessageDTO();
+		telegramMessageDTO.setChatId(telegramChatId);
+		telegramMessageDTO.setText(text);
+		asyncTelegramMessageService.sendMessage(telegramMessageDTO);
+	}
 
 	/**
 	 * 充值记录

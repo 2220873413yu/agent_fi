@@ -64,6 +64,11 @@ public class MyDirectMemberDto {
 	private BigDecimal umbrellaPerformance;
 
 	/**
+	 * 直推用户的托管业绩
+	 */
+	private BigDecimal performance;
+
+	/**
 	 * 团队业绩(销售价值)
 	 */
 	private BigDecimal umbrellaNodePerformance;

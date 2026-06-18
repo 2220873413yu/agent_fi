@@ -326,6 +326,7 @@ public class BizUserServiceImpl implements BizUserService {
 
 					entity.setSubPerformance(record.getSubPerformance());
 					entity.setUmbrellaPerformance(record.getUmbrellaPerformance());
+					entity.setPerformance(record.getPerformance());
 //					entity.setNodeTeamPerformance(record.getNodeTeamPerformance());
 //					entity.setSubNodePerformance(record.getSubNodePerformance());
 //				entity.setPerformance(record.getPerformance());

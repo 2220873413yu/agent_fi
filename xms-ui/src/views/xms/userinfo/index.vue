@@ -221,14 +221,14 @@
             type="text"
             @click="toSubUser(scope.row)"
           >直推用户</el-button>
-           <el-button
+<!--           <el-button
               v-if="scope.row.lastLoginIp"
               size="small"
               type="text"
               @click="showLoginIpHistory(scope.row)"
             >
               <i class="el-icon-view"></i> 查看登录记录
-            </el-button>
+            </el-button>-->
 <!--            <el-button
               type="text"
               size="small"

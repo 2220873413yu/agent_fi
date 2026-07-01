@@ -87,11 +87,11 @@ public class XmsTask {
 	}
 
 	/**
-	 * 任务类型102 每周天晚上24点结算
+	 * 任务类型102 每周天晚上23:59:00结算
 	 *
 	 */
 	public void distributePtbInterest102() {
-		log.info("任务类型102 每周天晚上24点结算");
+		log.info("任务类型102 每周天晚上23:59:00结算");
 		stakeHostingTaskServiceImpl.distributeWeeklyGlobalDividend();
 	}
 

@@ -832,7 +832,7 @@ public class BizUserServiceImpl implements BizUserService {
 		}
 
 		// 记录用户最近登录IP并签发 App Token。
-		recordUserLoginIp(userInfo);
+		//recordUserLoginIp(userInfo);
 		// 兼容 Windows 开发环境跳过验签的场景，登录完成后再尝试清理随机数。
 		xmsRedis.del(ConstantStatic.USER_RANDOM + loginVo.getAddress());
 		return getLoginAppUserResult(userInfo, appTokenService, Constants.TOKEN_APP_PREFIX);
